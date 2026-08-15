@@ -17,7 +17,7 @@ The **Export Roster to Excel** report contains Camping Nights, Total Hiking Mile
 
 With the correct permissions granted to all members, the Active Scout/Adult data is always live, while the Former Scout/Adult data can be updated by a leader with the correct permissions.  The Former Scout/Adult data only needs to be updated when someone's membership is changed, since their stats will not change once they are a former member.
 
-# Troop All-Time Leaderboards — Setup Guide
+# Setup Guide
 
 
 
