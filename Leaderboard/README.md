@@ -1,4 +1,4 @@
-# Troop All-Time Leaderboards — Setup Guide for Other Sites
+# Troop All-Time Leaderboards — Setup Guide
 
 This page pulls live and admin-published data straight from your own
 TroopWebHost site and renders it as leaderboards (Camping Nights,
