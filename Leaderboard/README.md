@@ -71,7 +71,7 @@ messages there will point at what failed.
 
 Auto-save writes refreshed former-member/merit-badge data directly
 back into this Custom Page's saved source, instead of copying and
-pasting it in manually. It needs one more site-specific value:
+pasting it in manually. It needs one site-specific value:
 `SELF_SECTION_ID`.
 
 1. Manually edit this Custom Page once (follow Step 1, 4–5).
