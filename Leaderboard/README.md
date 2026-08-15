@@ -8,7 +8,8 @@ Active/Former/All views)
 
 <img width="421" height="533" alt="image" src="https://github.com/user-attachments/assets/de485f81-6c75-4d15-a3c0-4a85549fcd56" />
 
-The code works by scraping the **Event Participation Summary for Date Range report** and the **Export Roster to Excel** reports for the data.  By default only the **Adult Leader** and **Event Planner** roles have access to the **Event Participation Summary for Date Range report**, but you can grant this to other roles, without concern of granting too much access.  The **Export Roster to Excel** report contains more sensitive data, and for that reason, don't recommend granting to anyone
+The code works by scraping the **Event Participation Summary for Date Range** and the **Export Roster to Excel** reports for the data.  By default only the **Adult Leader** and **Event Planner** roles have access to the **Event Participation Summary for Date Range report**, but you can grant the **View Event Participation Reports** task to other roles, without concern of granting too much access.  The **Export Roster to Excel** report contains more sensitive data, and for that reason, should not be granted to more roles.  By default anyone with the **Rank Advancement** and **Membership** roles should have access to it.
+
 With the correct permissions granted to all members, the Active Scout/Adult data is always live, while the Former Scout/Adult data can be updated by a leader with the correct permissions.  The Former Scout/Adult data only needs to be updated when someone's membership is changed, since their stats will not change once they are a former member.
 
 # Troop All-Time Leaderboards — Setup Guide
