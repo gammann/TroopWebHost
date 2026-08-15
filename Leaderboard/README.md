@@ -148,6 +148,9 @@ access).
 Repeat this periodically (whenever membership changes) — there's no
 automatic refresh schedule.
 
+<img width="392" height="200" alt="image" src="https://github.com/user-attachments/assets/f5491d2a-a531-41ad-90fd-99d30d948abb" />
+
+
 ---
 
 ## Quick troubleshooting
