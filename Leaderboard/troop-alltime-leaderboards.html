@@ -920,8 +920,19 @@
         })
         .then(function () {
           saveStatusP.style.color = 'var(--moss)';
-          saveStatusP.textContent = 'Saved. Reload this page to see the refreshed snapshot live for everyone.';
           saveBtn.disabled = false;
+
+          var secondsLeft = 3;
+          saveStatusP.textContent = 'Saved. Reloading in ' + secondsLeft + '\u2026';
+          var countdown = setInterval(function () {
+            secondsLeft--;
+            if (secondsLeft <= 0) {
+              clearInterval(countdown);
+              location.reload();
+            } else {
+              saveStatusP.textContent = 'Saved. Reloading in ' + secondsLeft + '\u2026';
+            }
+          }, 1000);
         })
         .catch(function (err) {
           saveStatusP.style.color = 'var(--ember)';
