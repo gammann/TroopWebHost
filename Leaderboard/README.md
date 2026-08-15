@@ -118,6 +118,9 @@ pasting it in manually. It needs one more site-specific value:
    sites (it's part of the platform, not your data) — but confirm
    against the same request just in case.
 
+   <img width="758" height="464" alt="image" src="https://github.com/user-attachments/assets/85242947-ebb8-4c44-9d8a-5240640a50ff" />
+
+
 If you'd rather skip this, that's fine — the manual copy/paste flow
 in Step 4 always works as a fallback regardless.
 
