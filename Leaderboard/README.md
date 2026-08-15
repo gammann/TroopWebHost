@@ -8,7 +8,7 @@ Active/Former/All views)
 
 <img width="421" height="533" alt="image" src="https://github.com/user-attachments/assets/de485f81-6c75-4d15-a3c0-4a85549fcd56" />
 
-With the correct permissions granted to all members, the Active Scout/Adult data is always live, while the Former Scout/Adult data can be updated by a leader with the correct permissions.
+With the correct permissions granted to all members, the Active Scout/Adult data is always live, while the Former Scout/Adult data can be updated by a leader with the correct permissions.  The Former Scout/Adult data only needs to be updated when someone's membership is changed, since their stats will not change once they are a former member.
 
 # Troop All-Time Leaderboards — Setup Guide
 
