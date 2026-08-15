@@ -1,3 +1,14 @@
+# Troop All-Time Leaderboards
+
+This code will create a Leaderboard for different stats in your troop (Camping Nights,
+Hiking Miles, Service Hours, Backpacking Miles, Cycling Miles,
+Paddling Miles, Merit Badges — each with Scout/Adult and
+Active/Former/All views)
+
+
+<img width="421" height="533" alt="image" src="https://github.com/user-attachments/assets/de485f81-6c75-4d15-a3c0-4a85549fcd56" />
+
+
 # Troop All-Time Leaderboards — Setup Guide
 
 This page pulls live and admin-published data straight from your own
