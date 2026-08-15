@@ -109,18 +109,24 @@ access).
    Editor** tasks can do this.
 2. Open the Leaderboard page, scroll down, and open **Admin: Publish former
    member data.**
-3. Click **Generate.**
-4. Either click **Save this to the page now** to publish
+   
+   <img width="392" height="200" alt="image" src="https://github.com/user-attachments/assets/f5491d2a-a531-41ad-90fd-99d30d948abb" />
+4. Click **Generate.**
+   
+   <img width="367" height="179" alt="image" src="https://github.com/user-attachments/assets/2a0a9217-a6cb-404b-a1c3-dc12d6a256c1" />
+6. Either click **Save this to the page now** to publish
    automatically, or copy the code shown and paste it over the
    `FORMER_SNAPSHOT_DATE` / `FORMER_SNAPSHOT_DATA` lines near the top
    of the script yourself, then save.
 
+   <img width="373" height="313" alt="image" src="https://github.com/user-attachments/assets/1138b0eb-ff8b-43f9-a8d0-770a60dc3b78" />
+
+
 Repeat this periodically (whenever membership changes) — there's no
 automatic refresh schedule.
 
-<img width="392" height="200" alt="image" src="https://github.com/user-attachments/assets/f5491d2a-a531-41ad-90fd-99d30d948abb" />
-<img width="367" height="179" alt="image" src="https://github.com/user-attachments/assets/2a0a9217-a6cb-404b-a1c3-dc12d6a256c1" />
-<img width="373" height="313" alt="image" src="https://github.com/user-attachments/assets/1138b0eb-ff8b-43f9-a8d0-770a60dc3b78" />
+
+
 
 
 ---
@@ -135,21 +141,6 @@ automatic refresh schedule.
 | Auto-save button fails | `SELF_SECTION_ID` or `SELF_FORM_ID` is wrong, or the page was recreated since you found it — use the manual copy/paste fallback instead |
 | Admin panel doesn't appear at all | Your account doesn't have the tasks listed in Step 4 — this is intentional, only permitted accounts see it |
 
-### If a Known site-wide value doesn't match your site
-
-1. Open your browser's DevTools → Network tab, and make sure it's
-   recording.
-2. Navigate to the relevant report (see the menu paths above), submit
-   a date range if asked, and click **Open in Excel.**
-3. For the Event Participation report: find the **POST to
-   `FormDetail.aspx`** and check its `Menu_Item_ID`, `Form_ID`, and
-   the `ENTRY...` field names for your start/end dates against
-   `MENU_ITEM_ID`, `FORM_ID_DATE_SUBMIT`, `DATE_FIELD_START`, and
-   `DATE_FIELD_END`. Then find the **GET to
-   `FormReportMultiSection.aspx`** and check its `Form_ID` against
-   `FORM_ID_REPORT`.
-4. For the roster export: check the `Menu_Item_ID` in the
-   `FormReport.aspx` URL against `ROSTER_MENU_ITEM_ID`.
 
 ---
 
@@ -168,8 +159,25 @@ in the script, so you shouldn't need to touch them:
 | DATE_FIELD_END | 5697616 | same report — end-date field |
 | ROSTER_MENU_ITEM_ID | 45897 | Export Roster to Excel |
 
-If live data doesn't load after Step 1 below, that's the first thing
-to check — see Troubleshooting at the end for how to verify these on
+### If a Known site-wide value doesn't match your site
+
+1. Open your browser's DevTools → Network tab, and make sure it's
+   recording.
+2. Navigate to the relevant report (see the menu paths above), submit
+   a date range if asked, and click **Open in Excel.**
+3. For the Event Participation report: find the **POST to
+   `FormDetail.aspx`** and check its `Menu_Item_ID`, `Form_ID`, and
+   the `ENTRY...` field names for your start/end dates against
+   `MENU_ITEM_ID`, `FORM_ID_DATE_SUBMIT`, `DATE_FIELD_START`, and
+   `DATE_FIELD_END`. Then find the **GET to
+   `FormReportMultiSection.aspx`** and check its `Form_ID` against
+   `FORM_ID_REPORT`.
+4. For the roster export: check the `Menu_Item_ID` in the
+   `FormReport.aspx` URL against `ROSTER_MENU_ITEM_ID`.
+
+
+If live data doesn't load, that's the first thing
+to check — see Troubleshooting  for how to verify these on
 your own site.
 
 For reference, the two reports these power are always in the same
