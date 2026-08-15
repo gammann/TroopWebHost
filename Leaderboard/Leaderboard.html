@@ -413,6 +413,7 @@
   var activeStatus = 'All';
   var activeKey = CATEGORIES[0].key;
   var formerDataAvailable = !!FORMER_SNAPSHOT_DATA;
+  var hasAdminAccess = false; // set before first render — see boot sequence
 
   function setState(msg, isError) {
     statusTabsEl.style.display = 'none';
@@ -638,9 +639,9 @@
       empty.className = 'twl-state';
       var dependsOnUnpublishedData = !formerDataAvailable && (activeStatus !== 'Active' || cat.key === 'Merit Badges');
       if (dependsOnUnpublishedData) {
-        empty.textContent = (cat.key === 'Merit Badges'
-          ? 'Merit Badges hasn\u2019t been published yet.'
-          : 'Former-member data hasn\u2019t been published yet.') + ' See the admin panel below.';
+        var whatsMissing = cat.key === 'Merit Badges' ? 'Merit Badges hasn\u2019t been published yet.' : 'Former-member data hasn\u2019t been published yet.';
+        var howToFix = hasAdminAccess ? ' See the admin panel below.' : ' Ask a troop leader to publish it.';
+        empty.textContent = whatsMissing + howToFix;
       } else {
         empty.textContent = 'No one matches this view for ' + cat.label.toLowerCase() + '.';
       }
@@ -919,8 +920,19 @@
         })
         .then(function () {
           saveStatusP.style.color = 'var(--moss)';
-          saveStatusP.textContent = 'Saved. Reload this page to see the refreshed snapshot live for everyone.';
           saveBtn.disabled = false;
+
+          var secondsLeft = 3;
+          saveStatusP.textContent = 'Saved. Reloading in ' + secondsLeft + '\u2026';
+          var countdown = setInterval(function () {
+            secondsLeft--;
+            if (secondsLeft <= 0) {
+              clearInterval(countdown);
+              location.reload();
+            } else {
+              saveStatusP.textContent = 'Saved. Reloading in ' + secondsLeft + '\u2026';
+            }
+          }, 1000);
         })
         .catch(function (err) {
           saveStatusP.style.color = 'var(--ember)';
@@ -1015,6 +1027,15 @@
       return fetchEventWorkbook();
     })
     .then(function (eventWorkbook) {
+      if (stateEl) stateEl.textContent = 'Checking permissions…';
+      return checkRosterAccess().then(function (hasAccess) {
+        return [eventWorkbook, hasAccess];
+      });
+    })
+    .then(function (results) {
+      var eventWorkbook = results[0];
+      hasAdminAccess = results[1];
+
       addLiveDataToActive(leaderboards, eventWorkbook, formerNames);
       addSnapshotDataToLeaderboards(leaderboards, FORMER_SNAPSHOT_DATA);
       fillAllFromActiveAndFormer(leaderboards);
@@ -1027,13 +1048,13 @@
       footerEl.textContent = 'Active updated ' + new Date().toLocaleString() +
         (formerDataAvailable
           ? '  ·  former members from snapshot dated ' + (FORMER_SNAPSHOT_DATE || 'an earlier date')
-          : '  ·  former members not yet published — see admin panel below');
+          : '  ·  former members not yet published' + (hasAdminAccess ? ' — see admin panel below' : ''));
 
       renderStatusTabs();
       renderGroupTabs();
       renderTabs();
       renderPanel();
-      checkRosterAccess().then(function (hasAccess) { if (hasAccess) renderAdminPanel(); });
+      if (hasAdminAccess) renderAdminPanel();
     })
     .catch(function (err) {
       console.error('[Troop Leaderboards]', err);
