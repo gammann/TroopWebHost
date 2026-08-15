@@ -15,7 +15,7 @@ The **Event Participation Summary for Date Range** report contains Total Camping
 
 The **Export Roster to Excel** report contains Camping Nights, Total Hiking Miles, Total Service Hours and Number of Merit Badges for anyone who is or has been a member of the Troop.
 
-With the correct permissions granted to all members, the Active Scout/Adult data, with the exception of Merit Badges is always live, while the Former Scout/Adult and Merit Badge data can be updated by a leader with the correct permissions.  The Former Scout/Adult data only needs to be updated when someone's membership is changed, since their stats will not change once they are a former member.
+With the correct permissions granted to all members, the Active Scout/Adult data, with the exception of Merit Badges is always live, while the Former Scout/Adult and Merit Badge data can be updated by a leader with the correct permissions.  The Former Scout/Adult data can be updated when someone's membership is changed, since their stats will not change once they are a former member or when Active Scouts earn new Merit Badges.
 
 # Setup Guide
 
