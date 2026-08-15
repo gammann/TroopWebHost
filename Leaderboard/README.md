@@ -72,7 +72,7 @@ messages there will point at what failed.
 Auto-save writes refreshed former-member/merit-badge data directly
 back into this Custom Page's saved source, instead of copying and
 pasting it in manually. It needs one site-specific value:
-`SELF_SECTION_ID`.
+`SELF_SECTION_ID`.  Each section on every custom page has a unique id called the `SelectedSectionID`.  You will need to find this for the section you have pasted the Leaderboard code in, so that the Auto-Save function can work.
 
 1. Manually edit this Custom Page once (follow Step 1, 4–5).
 2. With DevTools Network tab recording, save the page.
