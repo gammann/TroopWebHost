@@ -149,6 +149,8 @@ Repeat this periodically (whenever membership changes) — there's no
 automatic refresh schedule.
 
 <img width="392" height="200" alt="image" src="https://github.com/user-attachments/assets/f5491d2a-a531-41ad-90fd-99d30d948abb" />
+<img width="367" height="179" alt="image" src="https://github.com/user-attachments/assets/2a0a9217-a6cb-404b-a1c3-dc12d6a256c1" />
+<img width="373" height="313" alt="image" src="https://github.com/user-attachments/assets/1138b0eb-ff8b-43f9-a8d0-770a60dc3b78" />
 
 
 ---
