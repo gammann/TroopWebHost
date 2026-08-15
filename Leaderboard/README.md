@@ -35,43 +35,6 @@ a couple of permissions.
   needed if you set up auto-save (optional) or if something doesn't
   work out of the box
 
----
-
-## Known site-wide values
-
-These report IDs appear to be the same across every TroopWebHost
-site, not specific to any one troop — they're already set correctly
-in the script, so you shouldn't need to touch them:
-
-| Variable | Value | Report |
-|---|---|---|
-| MENU_ITEM_ID | 46097 | Event Participation Summary For Date Range |
-| FORM_ID_DATE_SUBMIT | 2775 | same report — date-range form |
-| FORM_ID_REPORT | 2776 | same report — resulting summary |
-| DATE_FIELD_START | 5697516 | same report — start-date field |
-| DATE_FIELD_END | 5697616 | same report — end-date field |
-| ROSTER_MENU_ITEM_ID | 45897 | Export Roster to Excel |
-
-If live data doesn't load after Step 1 below, that's the first thing
-to check — see Troubleshooting at the end for how to verify these on
-your own site.
-
-For reference, the two reports these power are always in the same
-place in TroopWebHost's menus:
-
-- **Menu > Calendar > Event Reports > Event Participation Summary for
-  Date Range**
-- **Menu > Membership > Export Membership Data > Export Roster to
-  Excel** (not the Active-only version — you want the one that
-  includes everyone)
-
-⚠️ **The roster export contains sensitive personal information** —
-addresses, medical details, driver's license numbers, etc. Make sure
-whoever has access to it on your site is appropriately restricted
-(normally just troop leadership). The code only ever extracts name +
-a few numeric totals from it, and only when someone with the right
-tasks explicitly runs the publish action — but the underlying report
-access itself should stay tightly controlled on your end regardless.
 
 ---
 
@@ -184,3 +147,41 @@ automatic refresh schedule.
    `FORM_ID_REPORT`.
 4. For the roster export: check the `Menu_Item_ID` in the
    `FormReport.aspx` URL against `ROSTER_MENU_ITEM_ID`.
+
+---
+
+## Known site-wide values
+
+These report IDs appear to be the same across every TroopWebHost
+site, not specific to any one troop — they're already set correctly
+in the script, so you shouldn't need to touch them:
+
+| Variable | Value | Report |
+|---|---|---|
+| MENU_ITEM_ID | 46097 | Event Participation Summary For Date Range |
+| FORM_ID_DATE_SUBMIT | 2775 | same report — date-range form |
+| FORM_ID_REPORT | 2776 | same report — resulting summary |
+| DATE_FIELD_START | 5697516 | same report — start-date field |
+| DATE_FIELD_END | 5697616 | same report — end-date field |
+| ROSTER_MENU_ITEM_ID | 45897 | Export Roster to Excel |
+
+If live data doesn't load after Step 1 below, that's the first thing
+to check — see Troubleshooting at the end for how to verify these on
+your own site.
+
+For reference, the two reports these power are always in the same
+place in TroopWebHost's menus:
+
+- **Menu > Calendar > Event Reports > Event Participation Summary for
+  Date Range**
+- **Menu > Membership > Export Membership Data > Export Roster to
+  Excel** (not the Active-only version — you want the one that
+  includes everyone)
+
+⚠️ **The roster export contains sensitive personal information** —
+addresses, medical details, driver's license numbers, etc. Make sure
+whoever has access to it on your site is appropriately restricted
+(normally just troop leadership). The code only ever extracts name +
+a few numeric totals from it, and only when someone with the right
+tasks explicitly runs the publish action — but the underlying report
+access itself should stay tightly controlled on your end regardless.
