@@ -11,7 +11,7 @@ Active/Former/All views).
 
 The code works by scraping the **Event Participation Summary for Date Range** and the **Export Roster to Excel** reports for the data.  By default only the **Adult Leader** and **Event Planner** roles have access to the **Event Participation Summary for Date Range report**, but you can grant the **View Event Participation Reports** task to other roles, without concern of granting too much access.  The **Export Roster to Excel** report contains more sensitive data, and for that reason, should not be granted to more roles.  By default anyone with the **Rank Advancement** and **Membership** roles should have access to it.
 
-The **Event Participation Summary for Date Range** report contains Total Camping, Total Cabin Camping, Total Service Hours, Total Conservation Hours, Total Hiking Miles, Total Backpacking Miles, Total Cycling Miles, Total Paddling Miles, Total Motor boarding Miles, Total Water Hours, Total Horseback Miles, and Total Skating Miles.
+The **Event Participation Summary for Date Range** report contains Total Camping, Total Cabin Camping, Total Service Hours, Total Conservation Hours, Total Hiking Miles, Total Backpacking Miles, Total Cycling Miles, Total Paddling Miles, Total Motor boarding Miles, Total Water Hours, Total Horseback Miles, and Total Skating Miles for anyone who is or has been a member of the Troop.
 
 The **Export Roster to Excel** report contains Camping Nights, Total Hiking Miles, Total Service Hours and Number of Merit Badges for anyone who is or has been a member of the Troop.
 
