@@ -107,7 +107,7 @@ access).
 
 1. Anyone with the **View Membership Information** and **Web Page
    Editor** tasks can do this.
-2. Open the page, scroll down, and open **Admin: Publish former
+2. Open the Leaderboard page, scroll down, and open **Admin: Publish former
    member data.**
 3. Click **Generate.**
 4. Either click **Save this to the page now** to publish
