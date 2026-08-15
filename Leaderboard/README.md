@@ -99,7 +99,7 @@ Everyone who should see the live (Active) leaderboard data needs the
 **Menu > Administration > Security Configuration > Assign Tasks to
 Roles**
 
-Add the **View Event Participation Reports** task to both the
+Assign the **View Event Participation Reports** task to both the
 **Adult** and **Scout** roles (or whichever roles you want to have
 access).
 
