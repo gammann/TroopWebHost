@@ -12,43 +12,39 @@
     Badges): always fetched LIVE on every page load from the Event
     Participation Summary report. No admin step needed; works for any
     role granted "View Event Participation Reports".
-  - MERIT BADGES (both Active and Former): not every viewer has access
-    to a live source for this — permissions on the widget/report that
-    could provide it live aren't consistent across roles. So Merit
-    Badges, for everyone, comes exclusively from the admin-published
-    data described below.
+  - MERIT BADGES (both Active and Former) and FORMER members (other
+    6 categories): sourced from the roster export, which has the
+    numbers TroopWebHost already computes plus who's left — but also
+    contains sensitive PII, so access to it should stay restricted to
+    leaders on your site. When someone WITH that access opens this
+    page, it automatically regenerates this data using the roster
+    export and saves it back into the page's own source (only when it
+    actually changed) — no button click needed, and only names +
+    numeric totals ever get extracted; nothing sensitive leaves this
+    action. Anyone without that access just sees whatever was last
+    published this way.
   - IMPORTANT: the Event Participation Summary report has no active/
     former field of its own — it lists everyone with event history in
     the date range, including people who've since left. The Active
     tabs cross-reference against the published Former list to exclude
-    them. Until a Former list has been published at least once,
+    them. Until Former data has been published at least once (i.e.
+    until someone with roster-export access has opened this page),
     departed members who attended events may still appear on Active
-    leaderboards — publishing (or republishing after new departures)
-    fixes this.
-  - FORMER members, other 6 categories: also not available live —
-    only the roster export tracks who's left. Restricted to the same
-    admin action as Merit Badges.
-  The "Publish former member data" panel at the bottom of this page
-  pulls ONLY name + the metric values it needs (nothing else — no
-  addresses, medical info, etc.) from that export, for former members
-  in general plus active scouts' Merit Badges specifically.
+    leaderboards.
 
   Active/Former/All tabs merge these two sources — Active is always
-  current, Former only updates when an admin republishes it.
+  current, Former updates automatically whenever someone with access
+  opens the page, and otherwise reflects whatever was published most
+  recently.
 
-  HOW TO PUBLISH/REFRESH FORMER MEMBER DATA
-  1. Open this page while logged in as someone with roster-export
-     access.
-  2. Scroll down, open "Admin: Publish former member data".
-  3. Click "Generate" (this takes a few seconds — it pulls two
-     reports).
-  4. Copy the code block it shows you, OR click "Save this to the
-     page now" to publish it automatically.
-  5. If copying manually: edit this Custom Page, replace the existing
-     FORMER_SNAPSHOT_DATE / FORMER_SNAPSHOT_DATA lines near the top of
-     the script with what you copied, and save.
-  Repeat whenever you want it refreshed — there's no automatic
-  schedule.
+  MANUAL CONTROLS (usually not needed)
+  The "Admin: Former member data" panel at the bottom of the page
+  (visible only to accounts with roster-export access) lets you
+  re-check or manually publish — useful if auto-save couldn't run for
+  some reason, or if you want to force a refresh mid-session. Open it,
+  click "Generate", then either "Save this to the page now" or copy
+  the code and paste it over the FORMER_SNAPSHOT_DATE /
+  FORMER_SNAPSHOT_DATA lines near the top of the script yourself.
 
   CONFIRM BEFORE USE
   MENU_ITEM_ID / FORM_ID values below match this troop's site as
@@ -303,7 +299,7 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 
 <script>
 (function () {
@@ -737,6 +733,40 @@
     });
   }
 
+  // Shared by both the automatic (on-load) and manual (button-click)
+  // publish paths. Former-status people are kept in full; Active-status
+  // people are trimmed down to just their Merit Badges value, since
+  // that's the only category without another live source.
+  function buildFormerMemberList(byName) {
+    return Object.keys(byName)
+      .map(function (n) { return byName[n]; })
+      .map(function (rec) {
+        if (rec.status === 'Former') return rec;
+        var mb = rec.values ? rec.values['Merit Badges'] : undefined;
+        if (typeof mb !== 'number' || mb <= 0) return null;
+        return { name: rec.name, group: rec.group, status: rec.status, values: { 'Merit Badges': mb } };
+      })
+      .filter(function (rec) { return rec !== null; });
+  }
+
+  // Reuses the event workbook already fetched for the live categories
+  // — no need to fetch it a second time just for this.
+  function autoBuildFormerMemberSnapshot(eventWorkbook) {
+    return fetch(ROSTER_REPORT_URL, { credentials: 'include' })
+      .then(function (res) {
+        if (!res.ok) throw new Error('roster export status ' + res.status);
+        return res.text();
+      })
+      .then(function (csvText) {
+        var wb = XLSX.read(csvText, { type: 'string' });
+        var sheet = wb.Sheets[wb.SheetNames[0]];
+        var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
+        var byName = parseRosterRecords(rows);
+        mergeEventValuesIntoRoster(byName, eventWorkbookRows(eventWorkbook));
+        return { stamp: new Date().toLocaleString(), list: buildFormerMemberList(byName) };
+      });
+  }
+
   // Checks whether the current viewer can access the roster export,
   // WITHOUT downloading or reading its (sensitive) contents. A real
   // success response carries a Content-Disposition: attachment header;
@@ -850,12 +880,12 @@
     var details = document.createElement('details');
     details.className = 'twl-admin-panel';
     var summary = document.createElement('summary');
-    summary.textContent = 'Admin: Publish former member data';
+    summary.textContent = 'Admin: Former member data (auto-published \u2014 click for manual controls)';
     details.appendChild(summary);
 
     var note = document.createElement('p');
     note.className = 'twl-admin-note';
-    note.textContent = 'Current members are already live for everyone for 6 of 7 categories \u2014 this publishes data for people who\u2019ve left, PLUS Merit Badges for everyone (active scouts included), since not every viewer has access to a live source for that one. Pulls only name + the needed metric values \u2014 no addresses, medical info, or other sensitive fields ever leave this action. Only someone with roster-export access can generate this. After generating, either click "Save this to the page now" to publish it automatically, or copy the code and paste it over FORMER_SNAPSHOT_DATE / FORMER_SNAPSHOT_DATA near the top of this page\u2019s script yourself.';
+    note.textContent = 'This already ran automatically when you loaded the page (your account has roster-export access), so the data above is current. Use this panel to re-check manually if you want, or to publish by hand if auto-save couldn\u2019t (e.g. this page\u2019s URL didn\u2019t have the info it needed). Pulls only name + the needed metric values \u2014 no addresses, medical info, or other sensitive fields ever leave this action.';
     details.appendChild(note);
 
     var btn = document.createElement('button');
@@ -959,22 +989,7 @@
         .then(function () { return fetchEventWorkbook(); })
         .then(function (workbook) {
           mergeEventValuesIntoRoster(byName, eventWorkbookRows(workbook));
-
-          // Former-status people are kept in full — Active data for
-          // every OTHER category already comes from the live fetch, so
-          // publishing those here would just be dead weight. Merit
-          // Badges is the one exception: not every viewer has access to
-          // a live source for it, so Active-status people are kept too,
-          // but trimmed down to just their Merit Badges value.
-          var list = Object.keys(byName)
-            .map(function (n) { return byName[n]; })
-            .map(function (rec) {
-              if (rec.status === 'Former') return rec;
-              var mb = rec.values ? rec.values['Merit Badges'] : undefined;
-              if (typeof mb !== 'number' || mb <= 0) return null;
-              return { name: rec.name, group: rec.group, status: rec.status, values: { 'Merit Badges': mb } };
-            })
-            .filter(function (rec) { return rec !== null; });
+          var list = buildFormerMemberList(byName);
 
           var stamp = new Date().toLocaleString();
           var code = '  var FORMER_SNAPSHOT_DATE = ' + JSON.stringify(stamp) + ';\n' +
@@ -1011,7 +1026,6 @@
   // ---- Boot -------------------------------------------------------------
 
   leaderboards = emptyLeaderboardShell();
-  var formerNames = buildFormerNameSet(FORMER_SNAPSHOT_DATA);
 
   submitDateRange()
     .then(function () {
@@ -1021,25 +1035,65 @@
     .then(function (eventWorkbook) {
       if (stateEl) stateEl.textContent = 'Checking permissions…';
       return checkRosterAccess().then(function (hasAccess) {
-        return [eventWorkbook, hasAccess];
+        hasAdminAccess = hasAccess;
+        if (!hasAccess) return eventWorkbook;
+
+        // Automatically refresh and publish former-member/Merit Badges
+        // data for anyone who already has the rights to do so — no
+        // button click needed. Applied to THIS render immediately
+        // (no reload required), and saved back to the page's source
+        // in the background so other viewers get it too, but only
+        // when the data actually changed (avoids writing to the page
+        // on every single admin visit for no reason).
+        if (stateEl) stateEl.textContent = 'Publishing former-member data…';
+        return autoBuildFormerMemberSnapshot(eventWorkbook)
+          .then(function (result) {
+            var changed = JSON.stringify(result.list) !== JSON.stringify(FORMER_SNAPSHOT_DATA);
+            FORMER_SNAPSHOT_DATE = result.stamp;
+            FORMER_SNAPSHOT_DATA = result.list;
+
+            if (changed) {
+              var selfIds = getSelfPageIds();
+              if (selfIds.menuItemId && selfIds.customFormId) {
+                fetchCurrentSectionSource(selfIds.menuItemId, selfIds.customFormId)
+                  .then(function (currentSource) {
+                    var updated = replaceSnapshotLines(currentSource, result.stamp, result.list);
+                    return saveSectionSource(selfIds.menuItemId, selfIds.customFormId, updated);
+                  })
+                  .then(function () {
+                    console.log('[Troop Leaderboards] Former-member data auto-published.');
+                  })
+                  .catch(function (err) {
+                    console.warn('[Troop Leaderboards] Auto-publish save failed (data still applied to this view):', err.message);
+                  });
+              } else {
+                console.warn('[Troop Leaderboards] Auto-publish generated fresh data but could not save it \u2014 Menu_Item_ID/Custom_Form_ID missing from the URL. Use the manual panel below.');
+              }
+            }
+          })
+          .catch(function (err) {
+            console.warn('[Troop Leaderboards] Auto-publish generation failed, using previously published data if any:', err.message);
+          })
+          .then(function () { return eventWorkbook; });
       });
     })
-    .then(function (results) {
-      var eventWorkbook = results[0];
-      hasAdminAccess = results[1];
+    .then(function (eventWorkbook) {
+      formerDataAvailable = !!(FORMER_SNAPSHOT_DATA && FORMER_SNAPSHOT_DATA.length);
+      var formerNames = buildFormerNameSet(FORMER_SNAPSHOT_DATA);
 
       addLiveDataToActive(leaderboards, eventWorkbook, formerNames);
       addSnapshotDataToLeaderboards(leaderboards, FORMER_SNAPSHOT_DATA);
       fillAllFromActiveAndFormer(leaderboards);
       sortAll(leaderboards);
 
+      var formerLabel = hasAdminAccess ? 'Auto-published' : 'Snapshot';
       var badge = formerDataAvailable
-        ? '<span class="twl-badge live">Active: Live</span><span class="twl-badge snapshot">Former: Snapshot</span>'
+        ? '<span class="twl-badge live">Active: Live</span><span class="twl-badge snapshot">Former: ' + formerLabel + '</span>'
         : '<span class="twl-badge live">Live · Active Members</span>';
       subtitleEl.innerHTML = 'Full troop history, ' + START_DATE + ' – ' + END_DATE + badge;
       footerEl.textContent = 'Active updated ' + new Date().toLocaleString() +
         (formerDataAvailable
-          ? '  ·  former members from snapshot dated ' + (FORMER_SNAPSHOT_DATE || 'an earlier date')
+          ? '  ·  former members ' + (hasAdminAccess ? 'auto-published just now' : 'from snapshot dated ' + (FORMER_SNAPSHOT_DATE || 'an earlier date'))
           : '  ·  former members not yet published' + (hasAdminAccess ? ' — see admin panel below' : ''));
 
       renderStatusTabs();
