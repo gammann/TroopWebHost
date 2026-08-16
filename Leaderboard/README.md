@@ -1,13 +1,21 @@
 # Troop All-Time Leaderboards
 
-This page pulls live and admin-published data straight from your own
-TroopWebHost site and renders it as leaderboards (Camping Nights,
-Hiking Miles, Service Hours, Backpacking Miles, Cycling Miles,
-Paddling Miles, Merit Badges — each with Scout/Adult and
-Active/Former/All views).
+A self-contained page for TroopWebHost troop sites that shows
+leaderboards for Camping Nights, Hiking Miles, Service Hours,
+Backpacking Miles, Cycling Miles, Paddling Miles, and Merit Badges —
+split by Scout/Adult and Active/Former/All.
+
+It runs entirely inside TroopWebHost as a Custom Page. Six categories
+update live on every page load; Merit Badges and former-member data
+are published periodically by a leader through a built-in admin panel
+(no addresses, medical info, or other sensitive fields ever leave
+that action — just names and totals).
+
 
 
 <img width="421" height="533" alt="image" src="https://github.com/user-attachments/assets/de485f81-6c75-4d15-a3c0-4a85549fcd56" />
+
+
 
 The code works by scraping the **Event Participation Summary for Date Range** and the **Export Roster to Excel** reports for the data.  By default only the **Adult Leader** and **Event Planner** roles have access to the **Event Participation Summary for Date Range report**, but you can grant the **View Event Participation Reports** task to other roles, without concern of granting too much access.  The **Export Roster to Excel** report contains more sensitive data, and for that reason, should not be granted to more roles.  By default anyone with the **Rank Advancement** and **Membership** roles should have access to it.
 
