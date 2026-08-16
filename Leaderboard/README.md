@@ -25,6 +25,8 @@ The **Export Roster to Excel** report contains Camping Nights, Total Hiking Mile
 
 With the correct permissions granted to all members, the Active Scout/Adult data, with the exception of Merit Badges is always live, while the Former Scout/Adult and Merit Badge data is updated when a leader with the correct permissions loads the page.  The Former Scout/Adult data only needs to be updated when someone's membership is changed, since their stats will not change once they are a former member, or when Active Scouts earn new Merit Badges.
 
+This code uses [SheetJS](https://sheetjs.com/) to parse Excel reports exported from TroopWebHost.
+
 # Setup Guide
 
 
