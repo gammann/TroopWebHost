@@ -15,7 +15,7 @@ The **Event Participation Summary for Date Range** report contains Total Camping
 
 The **Export Roster to Excel** report contains Camping Nights, Total Hiking Miles, Total Service Hours and Number of Merit Badges for anyone who is or has been a member of the Troop.
 
-With the correct permissions granted to all members, the Active Scout/Adult data, with the exception of Merit Badges is always live, while the Former Scout/Adult and Merit Badge data can be updated by a leader with the correct permissions.  The Former Scout/Adult data can be updated when someone's membership is changed, since their stats will not change once they are a former member or when Active Scouts earn new Merit Badges.
+With the correct permissions granted to all members, the Active Scout/Adult data, with the exception of Merit Badges is always live, while the Former Scout/Adult and Merit Badge data is updated when a leader with the correct permissions loads the page.  The Former Scout/Adult data only needs to be updated when someone's membership is changed, since their stats will not change once they are a former member, or when Active Scouts earn new Merit Badges.
 
 # Setup Guide
 
@@ -72,20 +72,23 @@ messages there will point at what failed.
 Auto-save writes refreshed former-member/merit-badge data directly
 back into this Custom Page's saved source, instead of copying and
 pasting it in manually. It needs one site-specific value:
-`SELF_SECTION_ID`.  Each section on every custom page has a unique id called the `SelectedSectionID`.  You will need to find this for the section you have pasted the Leaderboard code in, so that the Auto-Save function can work.
+`SELF_SECTION_ID`.  Each section on every custom page has a unique id called the `SelectedSectionID`.  You will need to find this for the section you have pasted the Leaderboard code in, so that the Auto-Save function can update it.
 
-1. Manually edit this Custom Page once (follow Step 1, 4–5).
-2. With DevTools Network tab recording, save the page.
-3. Find the **POST to `formCustomEdit.aspx`** with
+1. Manually edit the Leaderboard Page once.
+2. Navigate to the new page: **Menu > Home > (your page name, e.g.
+   Troop Leaderboards).**
+3. In the upper right-hand corner, click the **Gear icon → Edit This
+   Page.**
+4. Click **Source** for Leaderboard section.
+5. Open the Developer Tools for your browser (Edge/Chrome/Firefox **Ctrl+Shift+I**, Safari **Cmd + Option + I**).
+6. Select the Network tab in Developer Tools, ensure it's recording, click **Save** on the Leaderboard section.
+7. Find the **POST to `formCustomEdit.aspx`** with
    `Selected_Action=SaveContentEdit` in its form data.
-4. Copy the `SelectedSectionID` value from that request into
-   `SELF_SECTION_ID` near the top of the script.
-5. `SELF_FORM_ID` is likely the same `"7323"` across all TroopWebHost
-   sites (it's part of the platform, not your data) — but confirm
-   against the same request just in case.
+8. Find the `SelectedSectionID` value from that request, typical a 3 digit number (depending on the number of custom sections on your site).
+9. Click **Source** for Leaderboard section.
+10. Find `SELF_SECTION_ID` near the top of the script, and enter the number from Step 8.
 
  <img width="749" height="506" alt="image" src="https://github.com/user-attachments/assets/14df8a94-445b-4745-9b24-0b4857db6427" />
-
 
 
 If you'd rather skip this, that's fine — the manual copy/paste flow
@@ -105,21 +108,24 @@ access).
 
 ## Step 4 — Publish former-member and merit-badge data
 
-1. Anyone with the **View Membership Information** and **Web Page
-   Editor** tasks can do this.
-2. Open the Leaderboard page, scroll down, and open **Admin: Publish former
+When anyone with **View Membership Information** and **Web Page Editor** tasks opens the page, it will automatically update the former member and merit badge data.  If you want to update it manually, you can follow these steps:
+
+1. Open the Leaderboard page, scroll down, and open **Admin: Publish former
    member data.**
    
-   <img width="392" height="200" alt="image" src="https://github.com/user-attachments/assets/f5491d2a-a531-41ad-90fd-99d30d948abb" />
-4. Click **Generate.**
+<img width="404" height="172" alt="image" src="https://github.com/user-attachments/assets/f89f8002-3121-4d08-8d80-29329bbe6987" />
+
+2. Click **Generate.**
    
-   <img width="367" height="179" alt="image" src="https://github.com/user-attachments/assets/2a0a9217-a6cb-404b-a1c3-dc12d6a256c1" />
-6. Either click **Save this to the page now** to publish
+<img width="398" height="161" alt="image" src="https://github.com/user-attachments/assets/872889fd-927d-490d-a0ca-a96491d92b66" />
+
+3. Either click **Save this to the page now** to publish
    automatically, or copy the code shown and paste it over the
    `FORMER_SNAPSHOT_DATE` / `FORMER_SNAPSHOT_DATA` lines near the top
    of the script yourself, then save.
 
-   <img width="373" height="313" alt="image" src="https://github.com/user-attachments/assets/1138b0eb-ff8b-43f9-a8d0-770a60dc3b78" />
+ <img width="386" height="290" alt="image" src="https://github.com/user-attachments/assets/5e940e8c-c542-4e63-955b-e488ee674a07" />
+
 
 
 Repeat this periodically (whenever membership changes) — there's no
