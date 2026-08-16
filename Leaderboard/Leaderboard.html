@@ -324,14 +324,6 @@
   var EVENT_REPORT_URL = "FormReportMultiSection.aspx?Menu_Item_ID=" + MENU_ITEM_ID +
     "&Form_ID=" + FORM_ID_REPORT + "&Stack=2&ID=" + RECORD_ID + "&FK=" + RECORD_FK + "&ReportFormat=XLS";
 
-  // Merit Badge counts for active scouts now come from a live "Data
-  // Window - Membership - Active Scouts" WIDGET (server-rendered
-  // straight into a Custom Page's HTML, Name/Earned/In Progress
-  // columns) rather than parsing the Merit Badge History report file
-  // — simpler and avoids a report-export round trip. This reuses the
-  // "Leaderboard-Test" page created while testing widgets; point these
-  // at wherever that widget actually lives on your site (it can be a
-  // small, unlisted page — it doesn't need to be in any menu).
   // Merit Badges are sourced entirely from the admin-published data
   // below (both Active and Former) — not everyone has access to the
   // widget that could otherwise provide this live, and the only other
