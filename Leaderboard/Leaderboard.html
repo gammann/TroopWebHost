@@ -336,12 +336,13 @@
   // Event report column layout confirmed against a real export
   // (0-indexed, header:1 rows): col0 = row type ("Scout"/"Adult"),
   // col1 = Name, col4 = Camping Nights, col6 = Service Hours,
-  // col9 = Hiking Miles, col11 = Backpacking Miles, col12 = Cycling
-  // Miles, col13 = Paddling Miles.
+  // col7 = Conservation Hours, col9 = Hiking Miles, col11 =
+  // Backpacking Miles, col12 = Cycling Miles, col13 = Paddling Miles.
   var CATEGORIES = [
     { key: "Camping Nights",    label: "Camping Nights",    unit: "nights", col: 4,  rosterCol: "Camping Nights" },
     { key: "Hiking Miles",      label: "Hiking Miles",      unit: "mi",     col: 9,  rosterCol: "Total Hiking Miles" },
     { key: "Service Hours",     label: "Service Hours",     unit: "hrs",    col: 6,  rosterCol: "Total Service Hours" },
+    { key: "Conservation Hours", label: "Conservation Hours", unit: "hrs",  col: 7 }, // no rosterCol needed — same as Backpacking/Cycling/Paddling Miles, Former data comes via the event report merge during snapshot generation
     { key: "Backpacking Miles", label: "Backpacking Miles", unit: "mi",     col: 11 },
     { key: "Cycling Miles",     label: "Cycling Miles",     unit: "mi",     col: 12 },
     { key: "Paddling Miles",    label: "Paddling Miles",    unit: "mi",     col: 13 },
