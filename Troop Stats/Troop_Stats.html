@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Annual Planning Meeting Dashboard</title>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Bitter:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap');
+
+  /* Everything below is scoped under .apm-dashboard so pasting this into a
+     TroopWebhost Custom Page can't affect any other element on the site. */
+  .apm-dashboard{
+    --forest:#1f3d31;
+    --forest-dark:#152a22;
+    --parchment:#efe8d8;
+    --parchment-light:#f8f5ec;
+    --ink:#2a2620;
+    --amber:#c17817;
+    --amber-light:#e0a852;
+    --sage:#7c9885;
+    --line:#d8cfb8;
+    --danger:#b3452c;
+
+    max-width:100%;
+    overflow-x:hidden;
+    margin:0;
+    background:var(--parchment);
+    color:var(--ink);
+    font-family:'Inter',sans-serif;
+  }
+  .apm-dashboard, .apm-dashboard *{ box-sizing:border-box; }
+
+  .apm-dashboard header{
+    background:var(--forest);
+    background-image: radial-gradient(circle at 85% -10%, rgba(224,168,82,0.18), transparent 55%);
+    color:var(--parchment-light);
+    padding:40px 32px 32px;
+    border-bottom:6px solid var(--amber);
+  }
+  .apm-dashboard header .eyebrow{
+    font-family:'IBM Plex Mono',monospace;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    font-size:12px;
+    color:var(--amber-light);
+    margin-bottom:8px;
+  }
+  .apm-dashboard header h1{
+    font-family:'Bitter',serif;
+    font-weight:700;
+    font-size:clamp(28px,4vw,42px);
+    margin:0 0 6px;
+  }
+  .apm-dashboard header p{
+    margin:0;
+    color:var(--sage);
+    font-size:14.5px;
+    max-width:640px;
+  }
+
+  .apm-dashboard .access-msg{
+    margin-top:20px;
+    padding:14px 18px;
+    border-radius:6px;
+    font-size:13.5px;
+    max-width:640px;
+  }
+  .apm-dashboard .access-msg:not(.restricted){
+    color:var(--sage);
+    font-family:'IBM Plex Mono',monospace;
+  }
+  .apm-dashboard .access-msg.restricted{
+    background:rgba(179,69,44,0.18);
+    border:1px solid rgba(179,69,44,0.4);
+    color:var(--parchment-light);
+  }
+  .apm-dashboard .access-msg.restricted strong{
+    color:#e8a992;
+    font-family:'Bitter',serif;
+    font-size:15px;
+  }
+  .apm-dashboard .access-msg.restricted p{
+    margin:8px 0 0;
+    color:var(--parchment-light);
+    font-size:13.5px;
+  }
+
+  .apm-dashboard .meta-row{ display:flex; gap:20px; flex-wrap:wrap; margin-top:22px; }
+  .apm-dashboard .meta-field label{
+    display:block;
+    font-family:'IBM Plex Mono',monospace;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.08em;
+    color:var(--amber-light);
+    margin-bottom:5px;
+  }
+  .apm-dashboard .meta-field input{
+    background:var(--forest-dark);
+    border:1px solid #3a5749;
+    color:var(--parchment-light);
+    padding:8px 10px;
+    border-radius:4px;
+    font-family:'Inter',sans-serif;
+    font-size:14px;
+    color-scheme:dark;
+    cursor:pointer;
+  }
+
+  .apm-dashboard main{ max-width:1080px; margin:0 auto; padding:36px 24px 80px; }
+
+  .apm-dashboard .trail{ display:flex; align-items:center; gap:0; margin-bottom:28px; overflow-x:auto; padding-bottom:6px; }
+  .apm-dashboard .trail .stop{ display:flex; align-items:center; gap:8px; flex-shrink:0; }
+  .apm-dashboard .trail .marker{
+    width:26px;height:26px; border-radius:50%;
+    background:var(--parchment-light); border:2px solid var(--sage);
+    display:flex;align-items:center;justify-content:center;
+    font-family:'IBM Plex Mono',monospace; font-size:12px;font-weight:600;
+    color:var(--forest); flex-shrink:0;
+  }
+  .apm-dashboard .trail .marker.done{ background:var(--amber); border-color:var(--amber); color:#fff; }
+  .apm-dashboard .trail .seg{ width:34px; height:2px; background:var(--line); flex-shrink:0; }
+  .apm-dashboard .trail .lbl{ font-size:12px; color:var(--forest); font-weight:500; white-space:nowrap; }
+
+  .apm-dashboard .card{
+    background:var(--parchment-light);
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:22px 24px;
+    margin-bottom:18px;
+    box-shadow:0 1px 0 rgba(0,0,0,0.02);
+  }
+  .apm-dashboard .card h2{ font-family:'Bitter',serif; font-size:18px; margin:0 0 4px; color:var(--forest); }
+  .apm-dashboard .card .sub{ font-size:13px; color:#6b6555; margin:0 0 16px; }
+  .apm-dashboard .card .note{ font-size:12.5px; color:var(--amber); margin:8px 0 0; font-weight:600; }
+
+  .apm-dashboard .drop{
+    border:2px dashed var(--line);
+    border-radius:6px;
+    padding:18px;
+    display:flex; align-items:center; justify-content:space-between;
+    gap:14px; flex-wrap:wrap;
+    background:#fffdf8;
+  }
+  .apm-dashboard .drop.has-file{ border-color:var(--sage); background:#f4f8f4; }
+  .apm-dashboard .drop input[type=file]{ font-size:13px; }
+  .apm-dashboard .status{ font-family:'IBM Plex Mono',monospace; font-size:12px; color:var(--sage); font-weight:600; }
+  .apm-dashboard .status.err{ color:var(--danger); }
+
+  .apm-dashboard .mapping{
+    margin-top:16px;
+    display:grid;
+    grid-template-columns:repeat(auto-fit,minmax(220px,1fr));
+    gap:12px;
+  }
+  .apm-dashboard .mapping .field{ display:flex; flex-direction:column; gap:5px; }
+  .apm-dashboard .mapping label{ font-size:12px; font-weight:600; color:var(--forest); }
+  .apm-dashboard .mapping label .req{ color:var(--danger); }
+  .apm-dashboard .mapping select{
+    padding:8px; border-radius:5px; border:1px solid var(--line);
+    font-family:'Inter',sans-serif; font-size:13.5px; background:#fff;
+  }
+
+  .apm-dashboard .evtypes{ margin-top:14px; display:flex; flex-wrap:wrap; gap:8px 16px; font-size:13px; }
+  .apm-dashboard .evtypes label{ display:flex; align-items:center; gap:6px; }
+  .apm-dashboard .evtypes-header{
+    margin-top:18px; padding-top:16px;
+    border-top:1px solid rgba(224,168,82,0.3);
+    color:var(--parchment-light);
+  }
+  .apm-dashboard .evtypes-header .cap{
+    width:100%; font-family:'IBM Plex Mono',monospace; font-size:11px;
+    text-transform:uppercase; letter-spacing:.08em; color:var(--amber-light);
+    margin-bottom:6px;
+  }
+  .apm-dashboard .evtypes-header label{ color:var(--parchment-light); }
+  .apm-dashboard .evtypes-header .ph{ font-size:13px; color:var(--sage); max-width:640px; }
+
+  .apm-dashboard .btn{
+    background:var(--amber); color:#fff; border:none;
+    padding:14px 28px; border-radius:6px;
+    font-family:'Bitter',serif; font-weight:700; font-size:16px;
+    cursor:pointer; letter-spacing:.01em;
+  }
+  .apm-dashboard .btn:hover{ background:#a8670f; }
+  .apm-dashboard .btn.secondary{
+    background:transparent; color:var(--forest); border:1.5px solid var(--forest);
+    font-size:13px; padding:9px 16px;
+    font-family:'Inter',sans-serif; font-weight:600;
+  }
+  .apm-dashboard .btn.secondary:hover{ background:var(--forest); color:#fff; }
+
+  .apm-dashboard .results{ display:none; }
+  .apm-dashboard .results.show{ display:block; }
+
+  .apm-dashboard .stat-grid{ display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:14px; margin-bottom:22px; }
+  .apm-dashboard .stat{ background:var(--forest); color:var(--parchment-light); border-radius:8px; padding:20px 18px; position:relative; overflow:hidden; }
+  .apm-dashboard .stat::after{ content:""; position:absolute; right:-20px; top:-20px; width:70px; height:70px; border-radius:50%; background:rgba(224,168,82,0.12); }
+  .apm-dashboard .stat .num{ font-family:'IBM Plex Mono',monospace; font-size:34px; font-weight:600; color:var(--amber-light); line-height:1; }
+  .apm-dashboard .stat .lbl{ font-size:12.5px; margin-top:8px; color:var(--sage); }
+  .apm-dashboard .stat .foot{ font-size:11px; color:#9db3a8; margin-top:4px; }
+  .apm-dashboard .stat .delta{
+    font-family:'IBM Plex Mono',monospace; font-size:11.5px; font-weight:600;
+    margin-top:8px; display:inline-flex; align-items:center; gap:4px;
+    padding:2px 8px; border-radius:10px;
+  }
+  .apm-dashboard .stat .delta.up{ background:rgba(224,168,82,0.18); color:var(--amber-light); }
+  .apm-dashboard .stat .delta.down{ background:rgba(179,69,44,0.22); color:#e8a992; }
+  .apm-dashboard .stat .delta.flat{ background:rgba(124,152,133,0.2); color:var(--sage); }
+
+  .apm-dashboard .table-scroll{ width:100%; max-width:100%; }
+  .apm-dashboard table{ width:100%; max-width:100%; table-layout:fixed; border-collapse:collapse; font-size:12.5px; }
+  .apm-dashboard th, .apm-dashboard td{
+    text-align:left; padding:6px 6px; border-bottom:1px solid var(--line);
+    white-space:normal; overflow-wrap:break-word; word-break:break-word;
+  }
+  .apm-dashboard th{
+    font-family:'IBM Plex Mono',monospace; font-size:10px; text-transform:uppercase;
+    letter-spacing:.03em; color:var(--forest); background:#e7e0cb; line-height:1.3;
+  }
+  .apm-dashboard tr:nth-child(even) td{ background:#f9f6ee; }
+  .apm-dashboard td.num{ font-family:'IBM Plex Mono',monospace; text-align:right; }
+
+  .apm-dashboard th.sortable{ cursor:pointer; user-select:none; }
+  .apm-dashboard th.sortable:hover{ background:#ddd2b0; }
+  .apm-dashboard th.sortable.num{ text-align:right; }
+  .apm-dashboard th.sortable .arrow{ display:inline-block; margin-left:3px; font-size:8px; color:var(--amber); }
+
+  .apm-dashboard .badge{
+    display:inline-block; padding:2px 8px; border-radius:10px;
+    font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600;
+  }
+  .apm-dashboard .badge.current{ background:#e3ede5; color:var(--forest); }
+  .apm-dashboard .badge.departed{ background:#f3e3d8; color:var(--danger); }
+
+  .apm-dashboard .two-col{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  @media (max-width:720px){ .apm-dashboard .two-col{ grid-template-columns:1fr; } }
+
+  .apm-dashboard .unmatched{
+    margin-top:10px; font-size:12.5px; color:#6b6555;
+    background:#fbf3e3; border:1px solid var(--line); border-radius:5px; padding:10px 12px;
+  }
+  .apm-dashboard .unmatched summary{ cursor:pointer; font-weight:600; color:var(--forest); }
+
+  .apm-dashboard .print-bar{ display:flex; justify-content:flex-end; gap:10px; margin-bottom:14px; }
+
+  @media print{
+    .apm-dashboard header, .apm-dashboard .card:not(.result-card), .apm-dashboard .trail, .apm-dashboard .print-bar{ display:none !important; }
+    .apm-dashboard{ background:#fff; }
+    .apm-dashboard .results{ display:block !important; }
+    .apm-dashboard .stat{ break-inside:avoid; }
+  }
+</style>
+</head>
+<body>
+
+<div class="apm-dashboard">
+<header>
+  <div class="eyebrow">Troop Planning Tool</div>
+  <h1>Annual Planning Meeting Dashboard</h1>
+  <p>Pulls live data from TroopWebhost. Everything is processed in your browser &mdash; no data leaves this page.</p>
+
+  <div id="accessChecking" class="access-msg">Checking access&hellip;</div>
+
+  <div id="accessRestricted" class="access-msg restricted" style="display:none;">
+    <strong>This page is restricted to Adult Leaders.</strong>
+    <p>Your TroopWebhost account doesn't have permission to pull the reports this dashboard needs. If you believe this is a mistake, contact your Troop's TroopWebhost administrator.</p>
+  </div>
+
+  <div id="gatedControls" style="display:none;">
+    <div class="meta-row">
+      <div class="meta-field">
+        <label>Troop name (optional)</label>
+        <input type="text" id="troopName" placeholder="Troop 123">
+      </div>
+      <div class="meta-field">
+        <label>"As of" date</label>
+        <input type="date" id="asOfDate">
+      </div>
+      <div class="meta-field">
+        <label>Active Scout threshold</label>
+        <div style="display:flex;align-items:center;gap:6px;">
+          <input type="number" id="activeThreshold" value="20" min="0" max="100" step="5" style="width:64px; background:var(--forest-dark); border:1px solid #3a5749; color:var(--parchment-light); padding:8px 10px; border-radius:4px; font-family:'IBM Plex Mono',monospace; font-size:14px;">
+          <span style="color:var(--sage); font-size:13px;">% of eligible events attended</span>
+        </div>
+      </div>
+      <div class="meta-field" style="align-self:flex-end;">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer;">
+          <input type="checkbox" id="includeDeparted" checked style="width:15px;height:15px;">
+          Count scouts who've since left the troop
+        </label>
+      </div>
+    </div>
+    <div class="evtypes evtypes-header" data-evtypes="participation"></div>
+  </div>
+</header>
+
+<main>
+
+  <div id="gatedMain" style="display:none;">
+  <div class="card" data-card="live" id="liveCard" style="border-color:var(--sage); background:linear-gradient(180deg,#f4f8f4,var(--parchment-light));">
+    <h2>Pull live from TroopWebhost</h2>
+    <p class="sub">This page only works when opened as a TroopWebhost Custom Page (same site, so it can use your logged-in session).</p>
+    <button class="btn" id="liveBtn" type="button">Pull latest &amp; build dashboard</button>
+    <div id="liveStatus" style="margin-top:12px; font-family:'IBM Plex Mono',monospace; font-size:12.5px; color:var(--forest);"></div>
+  </div>
+
+  <div class="trail" id="trail"></div>
+
+  <div class="results" id="results">
+    <div class="print-bar">
+      <button class="btn secondary" type="button" onclick="window.print()">Print / Save PDF</button>
+    </div>
+
+    <div class="stat-grid" id="statGrid"></div>
+
+    <div class="card result-card">
+      <h2>Patrols</h2>
+      <p class="sub">Youth on roster, by patrol</p>
+      <div class="table-scroll"><table id="patrolTable"><colgroup><col style="width:70%"><col style="width:30%"></colgroup><thead><tr><th>Patrol</th><th style="text-align:right">Youth</th></tr></thead><tbody></tbody></table></div>
+    </div>
+
+    <div class="card result-card">
+      <h2>Scout Roster &mdash; Activity Summary</h2>
+      <p class="sub">Click a column header to sort. Active % is of the eligible events configured at the top of the page, last 12 months. Includes scouts who've since left the troop when that's enabled above, marked in the Status column.</p>
+      <div class="table-scroll">
+      <table id="scoutTable">
+        <colgroup>
+          <col style="width:20%"><col style="width:11%"><col style="width:13%"><col style="width:13%">
+          <col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:10%">
+        </colgroup>
+        <thead>
+          <tr>
+            <th data-sort="name" class="sortable">Scout</th>
+            <th data-sort="status" class="sortable">Status</th>
+            <th data-sort="patrol" class="sortable">Patrol</th>
+            <th data-sort="rank" class="sortable">Rank</th>
+            <th data-sort="activePct" class="sortable num">Active %</th>
+            <th data-sort="ranksAdvanced" class="sortable num">Ranks Adv.</th>
+            <th data-sort="meritBadges" class="sortable num">Merit Badges</th>
+            <th data-sort="hours" class="sortable num">Hours</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      </div>
+    </div>
+
+    <div class="card result-card">
+      <h2>Patrol Attendance by Campout</h2>
+      <p class="sub">One row per Cabin Campout / Campout event, regardless of the event-type checkboxes above (those only affect Active Scouts). Click a column header to sort.</p>
+      <div class="table-scroll" id="campoutPatrolWrap"></div>
+    </div>
+
+    <div id="unmatchedWrap"></div>
+  </div>
+  </div>
+
+</main>
+
+<script>
+const DEFAULT_EVENT_TYPES = ['Cabin Campout','Campout','Community Service'];
+// Fallback list, used only until the live Event Types pull succeeds (or if it fails).
+let KNOWN_EVENT_TYPES = ['Cabin Campout','Campout','Community Service','OA','Other','PLC','Training','Troop Meeting'];
+
+const CONFIG = {
+  roster:        { label:'Roster', fields:[
+                    {key:'name', label:'Scout Name', required:true},
+                    {key:'patrol', label:'Patrol', required:true},
+                    {key:'rank', label:'Current Rank (optional)', required:false},
+                    {key:'adultFlag', label:'Adult? (to exclude adults)', required:false},
+                    {key:'leftDate', label:'Left Unit (departure date, optional)', required:false},
+                    {key:'joinDate', label:'Date Joined Unit (optional, for year-over-year)', required:false}] },
+  participation: { label:'Event Participation', fields:[
+                    {key:'name', label:'Scout Name', required:true},
+                    {key:'date', label:'Event Date', required:true},
+                    {key:'eventType', label:'Event Type', required:false},
+                    {key:'eventName', label:'Event Name (identifies distinct events)', required:false},
+                    {key:'patrol', label:'Patrol (at time of event)', required:false},
+                    {key:'adultFlag', label:'Adult? (to exclude adults)', required:false},
+                    {key:'serviceHours', label:'Service Hours (optional)', required:false},
+                    {key:'conservationHours', label:'Conservation Hours (optional)', required:false}] },
+  ranks:         { label:'Rank Advancement', fields:[
+                    {key:'name', label:'Scout Name', required:true},
+                    {key:'date', label:'Date Earned / Awarded', required:true},
+                    {key:'rank', label:'Rank (optional)', required:false}] },
+  meritbadges:   { label:'Merit Badges', fields:[
+                    {key:'name', label:'Scout Name', required:true},
+                    {key:'date', label:'Date Earned', required:true},
+                    {key:'badge', label:'Merit Badge (optional)', required:false}] }
+};
+
+const state = {}; // id -> { rows, headers, map }
+
+document.getElementById('asOfDate').valueAsDate = new Date();
+renderEventTypes(); // paint the default event-type checkboxes immediately, before any file is loaded
+document.getElementById('asOfDate').addEventListener('click', function(){
+  if (typeof this.showPicker === 'function'){
+    try { this.showPicker(); } catch(e) { /* unsupported in this context \u2014 field still accepts typed/keyboard input */ }
+  }
+});
+
+// build trail nav
+const trailEl = document.getElementById('trail');
+Object.keys(CONFIG).forEach((id, i) => {
+  if (i>0) { const seg = document.createElement('div'); seg.className='seg'; trailEl.appendChild(seg); }
+  const stop = document.createElement('div'); stop.className='stop';
+  stop.innerHTML = `<div class="marker" data-marker="${id}">${i+1}</div><div class="lbl">${CONFIG[id].label}</div>`;
+  trailEl.appendChild(stop);
+});
+
+function normName(s){
+  if(!s) return '';
+  return String(s).toLowerCase().replace(/[^a-z\s]/g,' ').split(/\s+/).filter(Boolean).sort().join(' ');
+}
+
+function guessHeader(headers, keywords){
+  const lower = headers.map(h=>String(h).toLowerCase());
+  for (const kw of keywords){
+    const idx = lower.findIndex(h => h === kw);
+    if (idx>-1) return headers[idx];
+  }
+  for (const kw of keywords){
+    const idx = lower.findIndex(h => h.includes(kw));
+    if (idx>-1) return headers[idx];
+  }
+  return '';
+}
+
+const GUESS = {
+  name: ['scout name','participant','full name','name','member name','youth name','scout'],
+  patrol: ['patrol'],
+  date: ['date earned','earned','date awarded','awarded','event date','date'],
+  eventType: ['event type','type'],
+  eventName: ['event name','event','event title'],
+  adultFlag: ['adult?','adult'],
+  rank: ['rank','rank earned'],
+  badge: ['merit badge','badge','award'],
+  serviceHours: ['service hours'],
+  conservationHours: ['conservation hours'],
+  leftDate: ['left unit','left'],
+  joinDate: ['date joined unit','date joined']
+};
+
+function renderMapping(id){
+  // Auto-detect each field's column silently (no dropdown UI \u2014 this just
+  // computes state[id].map from the headers using the GUESS keyword lists).
+  const cfg = CONFIG[id];
+  const { headers } = state[id];
+  state[id].map = {};
+  cfg.fields.forEach(f => {
+    state[id].map[f.key] = guessHeader(headers, GUESS[f.key] || []);
+  });
+  if (id === 'participation') renderEventTypes();
+}
+
+function renderEventTypes(){
+  const box = document.querySelector('[data-evtypes="participation"]');
+
+  // Preserve whatever the person has already checked/unchecked before rebuilding.
+  const priorState = {};
+  box.querySelectorAll('input[type=checkbox]').forEach(cb => { priorState[cb.value.toLowerCase()] = cb.checked; });
+
+  const col = state.participation?.map?.eventType;
+  const discovered = col ? [...new Set(state.participation.rows.map(r=>String(r[col]||'').trim()).filter(Boolean))] : [];
+
+  // Union of the known TroopWebhost event types + anything actually found in the
+  // uploaded data, de-duped case-insensitively (prefer the casing as it appears in the data).
+  const byLower = {};
+  KNOWN_EVENT_TYPES.forEach(v => byLower[v.toLowerCase()] = v);
+  discovered.forEach(v => byLower[v.toLowerCase()] = v);
+  const values = Object.values(byLower).sort();
+
+  box.innerHTML = '<div class="cap">Count these event types toward "Active Scouts":</div>' +
+    values.map(v => {
+      const lc = v.toLowerCase();
+      const isChecked = (lc in priorState) ? priorState[lc] : DEFAULT_EVENT_TYPES.map(d=>d.toLowerCase()).includes(lc);
+      return `<label><input type="checkbox" value="${v.replace(/"/g,'&quot;')}" ${isChecked?'checked':''}> ${v}</label>`;
+    }).join('');
+}
+
+function daysBetween(d1,d2){ return (d1-d2)/(1000*60*60*24); }
+
+function parseDateVal(v){
+  if (v instanceof Date && !isNaN(v)) return v;
+  if (!v && v !== 0) return null;
+  // Defensive: if a date cell slipped through as a raw Excel serial number
+  // (happens if the parser isn't told to convert dates), convert it properly
+  // instead of silently failing.
+  if (typeof v === 'number' && v > 20000 && v < 90000){
+    const d = new Date(Date.UTC(1899, 11, 30) + v * 86400000);
+    return isNaN(d) ? null : d;
+  }
+  const s = String(v).trim();
+  if (!s) return null;
+  // Handle M/D/YY or M/D/YYYY explicitly \u2014 2-digit years parse inconsistently
+  // across browsers if left to the native Date constructor.
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (m){
+    const mo = parseInt(m[1],10), da = parseInt(m[2],10);
+    let yr = parseInt(m[3],10);
+    if (yr < 100) yr += 2000;
+    const d = new Date(yr, mo-1, da);
+    return isNaN(d) ? null : d;
+  }
+  const d = new Date(s);
+  return isNaN(d) ? null : d;
+}
+
+function inLastYear(dateVal, asOf){
+  const d = parseDateVal(dateVal);
+  if (!d) return false;
+  const diff = daysBetween(asOf, d);
+  return diff >= 0 && diff <= 366;
+}
+
+function evDateDisplay(d){
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric', year:'numeric' });
+}
+
+function isAdult(row, adultCol){
+  if (!adultCol) return false;
+  return /^y/i.test(String(row[adultCol]||'').trim());
+}
+
+function attemptBuild(silent){
+  const missing = [];
+  Object.keys(CONFIG).forEach(id => {
+    if (!state[id]) return; // optional file not uploaded
+    CONFIG[id].fields.filter(f=>f.required).forEach(f=>{
+      if (!state[id].map[f.key]) missing.push(`${CONFIG[id].label}: ${f.label}`);
+    });
+  });
+  if (missing.length){
+    if (!silent) alert('Please map these required columns first:\n\n' + missing.join('\n'));
+    return false;
+  }
+  if (!state.roster){
+    if (!silent) alert('The Roster file is required \u2014 every other metric is cross-checked against who is still in the troop.');
+    return false;
+  }
+  buildDashboard();
+  return true;
+}
+
+// ---- Live pull: only works when hosted same-origin as a TroopWebhost Custom Page ----
+const LIVE_REPORTS = [
+  { id:'roster',        menuId:'45897', label:'Roster (current + departed)' },
+  { id:'participation', menuId:'45935', label:'Event Participation' },
+  { id:'ranks',          menuId:'46044', label:'Rank Advancement History' },
+  { id:'meritbadges',    menuId:'46045', label:'Merit Badge History' }
+];
+const EVENT_TYPES_MENU_ID = '46065'; // TroopWebhost's own "Event Types" admin table
+let eventTypesLoaded = false;
+
+function csvTextToRows(text){
+  const wb = XLSX.read(text, {type:'string', cellDates:true});
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
+  return rows;
+}
+
+function looksLikeLoginPage(text){
+  const head = text.slice(0, 300).toLowerCase();
+  return head.includes('<!doctype') || head.includes('<html');
+}
+
+// Parses TroopWebhost's Event Types admin page (a real HTML table, not CSV) to
+// get the full list of event types this troop's site actually supports, rather
+// than only the ones that happen to already appear in historical participation
+// data. Looks for the table by its "Event Type" header rather than any fixed
+// element id, since those ids can differ between troops/sessions.
+function parseEventTypesFromHtml(html){
+  const doc = new DOMParser().parseFromString(html, 'text/html');
+  const th = [...doc.querySelectorAll('th')].find(el => el.textContent.trim() === 'Event Type');
+  const table = th ? th.closest('table') : null;
+  if (!table) return null;
+  const types = [];
+  table.querySelectorAll('tr').forEach(row => {
+    const tds = row.querySelectorAll('td');
+    if (tds.length < 2) return; // header row, or a row without the expected columns
+    const name = tds[1].textContent.trim();
+    if (name) types.push(name);
+  });
+  return types.length ? types : null;
+}
+
+async function pullEventTypesLive(statusEl){
+  const line = document.createElement('div');
+  line.textContent = 'Event Types: fetching\u2026';
+  statusEl.appendChild(line);
+  try {
+    const res = await fetch(`/FormList.aspx?Menu_Item_ID=${EVENT_TYPES_MENU_ID}&Stack=1`, { credentials:'same-origin' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    const types = parseEventTypesFromHtml(text);
+    if (!types) throw new Error('could not find the Event Types table on the page \u2014 you may be logged out');
+    KNOWN_EVENT_TYPES = types;
+    eventTypesLoaded = true;
+    renderEventTypes();
+    line.textContent = `Event Types: ${types.length} types loaded \u2713`;
+    return true;
+  } catch(err){
+    line.textContent = `Event Types: failed \u2014 ${err.message} (using the built-in fallback list)`;
+    line.style.color = 'var(--danger)';
+    return false;
+  }
+}
+
+async function pullOneLive(report, statusEl){
+  const line = document.createElement('div');
+  line.textContent = `${report.label}: fetching\u2026`;
+  statusEl.appendChild(line);
+  try {
+    const res = await fetch(`/FormReport.aspx?Menu_Item_ID=${report.menuId}&Stack=1&ReportFormat=XLS`, { credentials:'same-origin' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    if (looksLikeLoginPage(text)) throw new Error('got a login/HTML page instead of report data \u2014 you may be logged out, or this page isn\'t hosted on troopwebhost.org');
+    const rows = csvTextToRows(text);
+    if (!rows.length) throw new Error('report came back empty');
+    const headers = Object.keys(rows[0]);
+    state[report.id] = { rows, headers };
+    document.querySelector(`[data-marker="${report.id}"]`).classList.add('done');
+    renderMapping(report.id);
+    line.textContent = `${report.label}: ${rows.length} rows \u2713`;
+    return true;
+  } catch(err){
+    line.textContent = `${report.label}: failed \u2014 ${err.message}`;
+    line.style.color = 'var(--danger)';
+    return false;
+  }
+}
+
+// ---- Access gate ----
+// The real permission check happens server-side on TroopWebhost's end \u2014 this
+// just probes the same Roster report the dashboard needs, so someone whose
+// account can't pull it sees a clear "restricted" message up front instead of
+// a confusing pull failure after clicking around. It is not itself a security
+// boundary (nothing stops someone from viewing the page source), but the
+// underlying report data stays exactly as protected as TroopWebhost already
+// makes it \u2014 this only changes what the page shows, not what it can fetch.
+async function checkAccess(){
+  const canary = LIVE_REPORTS[0]; // roster \u2014 if this fails, nothing else will work either
+  try {
+    const res = await fetch(`/FormReport.aspx?Menu_Item_ID=${canary.menuId}&Stack=1&ReportFormat=XLS`, { credentials:'same-origin' });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const text = await res.text();
+    if (looksLikeLoginPage(text)) throw new Error('not authorized');
+    const rows = csvTextToRows(text);
+    if (!rows.length) throw new Error('empty response');
+
+    // Access confirmed \u2014 cache this pull so the button doesn't have to repeat it.
+    const headers = Object.keys(rows[0]);
+    state[canary.id] = { rows, headers };
+    renderMapping(canary.id);
+
+    document.getElementById('accessChecking').style.display = 'none';
+    document.getElementById('gatedControls').style.display = '';
+    document.getElementById('gatedMain').style.display = '';
+    const marker = document.querySelector(`[data-marker="${canary.id}"]`);
+    if (marker) marker.classList.add('done');
+  } catch(err){
+    document.getElementById('accessChecking').style.display = 'none';
+    document.getElementById('accessRestricted').style.display = '';
+  }
+}
+checkAccess();
+
+document.getElementById('liveBtn').addEventListener('click', async () => {
+  const statusEl = document.getElementById('liveStatus');
+  statusEl.innerHTML = '';
+  const btn = document.getElementById('liveBtn');
+
+  const alreadyLoaded = LIVE_REPORTS.every(r => state[r.id]);
+  if (alreadyLoaded){
+    const note = document.createElement('div');
+    note.textContent = 'Data already loaded \u2014 rebuilding with current settings (no re-pull). Reload the page first if you want fresh data from TroopWebhost.';
+    statusEl.appendChild(note);
+    if (!eventTypesLoaded) await pullEventTypesLive(statusEl); // still worth a shot
+    attemptBuild(true);
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Pulling\u2026';
+  // Best-effort, non-blocking \u2014 the event type checkboxes just fall back to
+  // the built-in list if this fails, so it never holds up the actual build.
+  if (!eventTypesLoaded) await pullEventTypesLive(statusEl);
+  let okCount = 0;
+  for (const report of LIVE_REPORTS){
+    const ok = await pullOneLive(report, statusEl);
+    if (ok) okCount++;
+  }
+  btn.disabled = false;
+  btn.textContent = 'Pull latest & build dashboard';
+  if (okCount === LIVE_REPORTS.length){
+    attemptBuild(true);
+  } else {
+    const note = document.createElement('div');
+    note.style.marginTop = '8px';
+    note.style.fontWeight = '600';
+    note.textContent = `${okCount} of ${LIVE_REPORTS.length} reports pulled. Fix the failures above and click again to retry.`;
+    statusEl.appendChild(note);
+  }
+});
+
+function buildDashboard(){
+  const asOf = document.getElementById('asOfDate').valueAsDate || new Date();
+  const unmatchedReport = {};
+
+  // Roster \u2014 youth only (Adult filter), and currently on the roster only
+  // (no Left Unit date). Departed scouts pulled out here feed actualLeftDateByScout
+  // below, used as the real cutoff for their Active % instead of a guess.
+  // joinDateByScout is captured for everyone (current or departed) so a scout
+  // who joined partway through the year isn't penalized for events that
+  // happened before they were even in the troop.
+  const rMap = state.roster.map;
+  const rosterRows = [];
+  const actualLeftDateByScout = {};
+  const joinDateByScout = {};
+  state.roster.rows.forEach(r => {
+    if (!String(r[rMap.name]||'').trim()) return;
+    if (isAdult(r, rMap.adultFlag)) return;
+    const key = normName(r[rMap.name]);
+    if (rMap.joinDate){
+      const jd = parseDateVal(r[rMap.joinDate]);
+      if (jd) joinDateByScout[key] = jd;
+    }
+    const leftVal = rMap.leftDate ? String(r[rMap.leftDate]||'').trim() : '';
+    if (leftVal){
+      const d = parseDateVal(r[rMap.leftDate]);
+      if (d) actualLeftDateByScout[key] = d;
+      return; // departed \u2014 not part of the current roster
+    }
+    rosterRows.push(r);
+  });
+  const rosterKeySet = new Set(rosterRows.map(r => normName(r[rMap.name])));
+  const rosterDisplayName = {};
+  rosterRows.forEach(r => rosterDisplayName[normName(r[rMap.name])] = String(r[rMap.name]).trim());
+  const totalScouts = rosterRows.length;
+
+  const patrolCounts = {};
+  rosterRows.forEach(r => {
+    const p = String(r[rMap.patrol]||'Unassigned').trim() || 'Unassigned';
+    patrolCounts[p] = (patrolCounts[p]||0)+1;
+  });
+
+  // Real departure dates come straight from the roster's own Left Unit column
+  // (see above) \u2014 no separate report needed for this anymore.
+
+  // Anyone who shows up in this year's records but isn't on today's roster \u2014
+  // display name falls back to however that report spelled their name.
+  const displayName = Object.assign({}, rosterDisplayName);
+  const rememberName = (key, nm) => { if (!displayName[key]) displayName[key] = nm; };
+
+  const includeDeparted = document.getElementById('includeDeparted').checked;
+  const activeThreshold = Math.max(0, Math.min(100, parseFloat(document.getElementById('activeThreshold').value) || 0));
+
+  // Per-scout breakdowns, keyed by normalized name \u2014 filled in below, used to build the roster table.
+  const attendedByScoutOuter = {};   // key -> Set of distinct eligible events attended
+  const ranksAdvancedByScout = {};   // key -> count of rank-advancement rows in the last 12 mo
+  const meritBadgesByScout = {};     // key -> count of merit badges earned in the last 12 mo
+  const lastSeenByScout = {};        // key -> latest Date seen in any report \u2014 used as an inferred
+                                      // "departure point" so a departed scout's Active % is only
+                                      // measured against events that happened before they left.
+  const noteSeen = (key, dateVal) => {
+    const d = parseDateVal(dateVal);
+    if (!d) return;
+    if (!lastSeenByScout[key] || d > lastSeenByScout[key]) lastSeenByScout[key] = d;
+  };
+
+  // Active scouts (% of eligible events attended) + Service hours (both from the single Event Participation file)
+  let activeCount = null, activeUnmatched = [], totalQualifyingEvents = null;
+  let serviceTotal = null, serviceByScout = null, serviceUnmatched = [];
+  const qualifyingEvents = new Map(); // eventKey -> Date, filled in below when participation loads
+  const eventPatrolMatrix = new Map(); // eventKey -> { name, date, byPatrol: {patrol: Set(scoutKey)} }
+  const rosterPatrolByScout = {};
+  rosterRows.forEach(r => { rosterPatrolByScout[normName(r[rMap.name])] = String(r[rMap.patrol]||'Unassigned').trim() || 'Unassigned'; });
+
+  if (state.participation){
+    const m = state.participation.map;
+    let allowedTypes = null;
+    const checkedBoxes = document.querySelectorAll('[data-evtypes="participation"] input:checked');
+    if (m.eventType && checkedBoxes.length){
+      allowedTypes = new Set([...checkedBoxes].map(c=>c.value.toLowerCase()));
+    }
+
+    const byScout = {};
+    let total = 0;
+
+    const eventKeyFor = (r) => {
+      const evName = m.eventName ? String(r[m.eventName]||'').trim() : '';
+      const evDate = String(r[m.date]||'').trim();
+      // Falls back to date-only if there's no event-name column \u2014 same-day events
+      // would then be treated as one event, which is the best we can do without it.
+      return evName ? `${evName}|${evDate}` : evDate;
+    };
+
+    state.participation.rows.forEach(r => {
+      const nm = String(r[m.name]||'').trim();
+      if (!nm) return;
+      if (isAdult(r, m.adultFlag)) return;
+      if (!inLastYear(r[m.date], asOf)) return;
+      const key = normName(nm);
+      const onRoster = rosterKeySet.has(key);
+      const counts = onRoster || includeDeparted;
+      if (counts){ rememberName(key, nm); noteSeen(key, r[m.date]); }
+
+      // Active scouts: restricted to selected event types, tracked per distinct event
+      if (allowedTypes){
+        const t = String(r[m.eventType]||'').trim().toLowerCase();
+        if (allowedTypes.has(t)){
+          const ek = eventKeyFor(r);
+          const ed = parseDateVal(r[m.date]);
+          if (ed) qualifyingEvents.set(ek, ed);
+          if (counts){
+            (attendedByScoutOuter[key] || (attendedByScoutOuter[key] = new Set())).add(ek);
+          } else {
+            activeUnmatched.push(nm);
+          }
+        }
+      }
+
+      // Patrol attendance by campout \u2014 independent of the "Active Scouts"
+      // event-type checkboxes above. Always strictly Cabin Campout / Campout
+      // event types, matched by "campout" appearing in the event type, so
+      // Community Service and anything else the header checkboxes might
+      // include never shows up in this table.
+      if (m.eventType && counts){
+        const t = String(r[m.eventType]||'').trim().toLowerCase();
+        if (t.includes('campout')){
+          const ek = eventKeyFor(r);
+          const ed = parseDateVal(r[m.date]);
+          if (ed){
+            const evName = m.eventName ? String(r[m.eventName]||'').trim() : '';
+            if (!eventPatrolMatrix.has(ek)){
+              eventPatrolMatrix.set(ek, { name: evName || `Event on ${evDateDisplay(ed)}`, date: ed, byPatrol: {} });
+            }
+            const entry = eventPatrolMatrix.get(ek);
+            const evPatrol = m.patrol ? String(r[m.patrol]||'').trim() : '';
+            const patrol = evPatrol || (onRoster ? rosterPatrolByScout[key] : '') || 'Unknown';
+            (entry.byPatrol[patrol] || (entry.byPatrol[patrol] = new Set())).add(key);
+          }
+        }
+      }
+
+      // Service hours: any event, sum Service + Conservation Hours columns
+      if (m.serviceHours || m.conservationHours){
+        const hrs = (parseFloat(r[m.serviceHours]) || 0) + (parseFloat(r[m.conservationHours]) || 0);
+        if (hrs > 0){
+          if (counts){
+            byScout[key] = (byScout[key]||0) + hrs;
+            total += hrs;
+          } else {
+            serviceUnmatched.push(nm);
+          }
+        }
+      }
+    });
+
+    if (m.eventType) totalQualifyingEvents = qualifyingEvents.size;
+    if (m.serviceHours || m.conservationHours){ serviceTotal = total; serviceByScout = byScout; }
+  }
+
+  // Rank advancement
+  let rankCount = null, rankUnmatched = [];
+  if (state.ranks){
+    const m = state.ranks.map;
+    const set = new Set();
+    state.ranks.rows.forEach(r => {
+      const nm = String(r[m.name]||'').trim();
+      if (!nm) return;
+      if (!inLastYear(r[m.date], asOf)) return;
+      const key = normName(nm);
+      const onRoster = rosterKeySet.has(key);
+      if (onRoster || includeDeparted){
+        set.add(key);
+        rememberName(key, nm);
+        noteSeen(key, r[m.date]);
+        ranksAdvancedByScout[key] = (ranksAdvancedByScout[key]||0) + 1;
+      }
+      else rankUnmatched.push(nm);
+    });
+    rankCount = set.size;
+  }
+
+  // Merit badges
+  let mbCount = null, mbScouts = null, mbUnmatched = [];
+  if (state.meritbadges){
+    const m = state.meritbadges.map;
+    let total = 0;
+    const scoutSet = new Set();
+    state.meritbadges.rows.forEach(r => {
+      const nm = String(r[m.name]||'').trim();
+      if (!nm) return;
+      if (!inLastYear(r[m.date], asOf)) return;
+      total++;
+      const key = normName(nm);
+      const onRoster = rosterKeySet.has(key);
+      if (onRoster || includeDeparted){
+        scoutSet.add(key);
+        rememberName(key, nm);
+        noteSeen(key, r[m.date]);
+        meritBadgesByScout[key] = (meritBadgesByScout[key]||0) + 1;
+      }
+      else mbUnmatched.push(nm);
+    });
+    mbCount = total;
+    mbScouts = scoutSet.size;
+  }
+
+  const suffix = includeDeparted ? '(no longer on current roster)' : '(excluded \u2014 not on current roster)';
+  unmatchedReport[`Active scouts ${suffix}`] = [...new Set(activeUnmatched)];
+  unmatchedReport[`Service hours ${suffix}`] = [...new Set(serviceUnmatched)];
+  unmatchedReport[`Rank advancement ${suffix}`] = [...new Set(rankUnmatched)];
+  unmatchedReport[`Merit badges ${suffix}`] = [...new Set(mbUnmatched)];
+
+  // One row per scout currently on the roster, plus (when the departed-scouts
+  // toggle is on) one row per scout who shows up in the year's records but has
+  // since left \u2014 those get an explicit Status flag since we don't know their
+  // current patrol or rank (that info only exists in the live roster export).
+  const hoursLoaded = !!(state.participation && (state.participation.map.serviceHours || state.participation.map.conservationHours));
+
+  // A scout's Active % denominator is the qualifying events that happened
+  // while they were actually in the troop: on the late end, a departed scout
+  // isn't faulted for events after they left (real Left Unit date, or an
+  // inferred "last seen" if that's missing); on the early end, a scout who
+  // joined partway through the year isn't faulted for events before they
+  // joined (Date Joined Unit, when available). Current-roster scouts who've
+  // been in the troop the whole window get no adjustment on either end.
+  const eligibleEventCount = (startDate, endDate) => {
+    if (totalQualifyingEvents === null) return null;
+    if (!startDate && !endDate) return totalQualifyingEvents;
+    let n = 0;
+    qualifyingEvents.forEach(d => {
+      if (startDate && d < startDate) return;
+      if (endDate && d > endDate) return;
+      n++;
+    });
+    return n;
+  };
+
+  const scoutRowFor = (key, name, isDeparted, patrol, rank) => {
+    const attended = attendedByScoutOuter[key];
+    const endCutoff = isDeparted ? (actualLeftDateByScout[key] || lastSeenByScout[key]) : null;
+    const startCutoff = joinDateByScout[key] || null;
+    const denom = eligibleEventCount(startCutoff, endCutoff);
+    const activePct = (denom !== null && denom > 0)
+      ? Math.round(((attended ? attended.size : 0) / denom) * 1000) / 10
+      : (denom === 0 ? 0 : null);
+    return {
+      name, departed: isDeparted,
+      patrol: patrol, rank: rank,
+      activePct,
+      ranksAdvanced: ranksAdvancedByScout[key] || 0,
+      meritBadges: meritBadgesByScout[key] || 0,
+      hours: hoursLoaded ? Math.round(((serviceByScout && serviceByScout[key]) || 0) * 10) / 10 : null
+    };
+  };
+
+  const scoutTable = rosterRows.map(r => {
+    const key = normName(r[rMap.name]);
+    return scoutRowFor(
+      key, String(r[rMap.name]).trim(), false,
+      String(r[rMap.patrol]||'Unassigned').trim() || 'Unassigned',
+      rMap.rank ? String(r[rMap.rank]||'').trim() : ''
+    );
+  });
+
+  if (includeDeparted){
+    Object.keys(displayName).forEach(key => {
+      if (rosterKeySet.has(key)) return; // already added above
+      scoutTable.push(scoutRowFor(key, displayName[key], true, '\u2014', '\u2014'));
+    });
+  }
+
+  // Active Scouts (aggregate) is derived from the same per-scout Active %
+  // used in the table above, so departed scouts are judged fairly there too.
+  if (totalQualifyingEvents !== null){
+    activeCount = scoutTable.filter(r => r.activePct !== null && r.activePct >= activeThreshold).length;
+  }
+
+  // Patrol attendance by event \u2014 columns are whatever patrol values actually
+  // appear in the event data (patrol at the time of each event), not the
+  // current roster's patrol names, since those can drift over the year.
+  const patrolColumnSet = new Set();
+  const campoutPatrolTable = [...eventPatrolMatrix.entries()].map(([ek, entry]) => {
+    const row = { eventName: entry.name, date: entry.date, dateDisplay: evDateDisplay(entry.date) };
+    let total = 0;
+    Object.keys(entry.byPatrol).forEach(p => {
+      const n = entry.byPatrol[p].size;
+      row[p] = n;
+      total += n;
+      patrolColumnSet.add(p);
+    });
+    row.total = total;
+    return row;
+  }).sort((a,b) => b.date - a.date);
+  const patrolColumns = [...patrolColumnSet].sort((a,b) => {
+    // Keep "Unknown" pinned last; everything else alphabetical.
+    if (a === 'Unknown') return 1;
+    if (b === 'Unknown') return -1;
+    return a.localeCompare(b);
+  });
+
+  // ---- Year-over-year comparison for the stat cards ----
+  // Reconstructs last year's roster from Date Joined Unit / Left Unit (if
+  // available) and recomputes the same 5 metrics for the 12 months before
+  // the current window, so each stat card can show % change vs last year.
+  function rosterKeysAsOf(windowAsOf){
+    if (!rMap.joinDate) return null; // can't reconstruct a historical roster without join dates
+    const set = new Set();
+    state.roster.rows.forEach(r => {
+      const nm = String(r[rMap.name]||'').trim();
+      if (!nm) return;
+      if (isAdult(r, rMap.adultFlag)) return;
+      const joined = parseDateVal(r[rMap.joinDate]);
+      if (!joined || joined > windowAsOf) return; // hadn't joined yet as of that date
+      const leftVal = rMap.leftDate ? String(r[rMap.leftDate]||'').trim() : '';
+      if (leftVal){
+        const left = parseDateVal(r[rMap.leftDate]);
+        if (left && left <= windowAsOf) return; // had already left as of that date
+      }
+      set.add(normName(nm));
+    });
+    return set;
+  }
+
+  function computeYearMetricsFor(windowAsOf, rosterSetForWindow){
+    let totalQual = 0, activeCnt = null, rankCnt = null, mbCnt = null, svcTotal = null;
+
+    if (state.participation){
+      const m = state.participation.map;
+      let allowedTypes = null;
+      const checkedBoxes = document.querySelectorAll('[data-evtypes="participation"] input:checked');
+      if (m.eventType && checkedBoxes.length) allowedTypes = new Set([...checkedBoxes].map(c=>c.value.toLowerCase()));
+
+      const qualifying = new Set();
+      const attended = {};
+      let svc = 0;
+      const hasHours = !!(m.serviceHours || m.conservationHours);
+
+      state.participation.rows.forEach(r => {
+        const nm = String(r[m.name]||'').trim();
+        if (!nm) return;
+        if (isAdult(r, m.adultFlag)) return;
+        if (!inLastYear(r[m.date], windowAsOf)) return;
+        const key = normName(nm);
+        const counts = rosterSetForWindow.has(key) || includeDeparted;
+        if (!counts) return;
+
+        if (allowedTypes){
+          const t = String(r[m.eventType]||'').trim().toLowerCase();
+          if (allowedTypes.has(t)){
+            const evName = m.eventName ? String(r[m.eventName]||'').trim() : '';
+            const evDate = String(r[m.date]||'').trim();
+            const ek = evName ? `${evName}|${evDate}` : evDate;
+            qualifying.add(ek);
+            (attended[key] || (attended[key] = new Set())).add(ek);
+          }
+        }
+        if (hasHours){
+          const hrs = (parseFloat(r[m.serviceHours]) || 0) + (parseFloat(r[m.conservationHours]) || 0);
+          if (hrs > 0) svc += hrs;
+        }
+      });
+
+      if (m.eventType){
+        totalQual = qualifying.size;
+        activeCnt = 0;
+        if (totalQual > 0){
+          Object.keys(attended).forEach(k => {
+            if ((attended[k].size / totalQual) * 100 >= activeThreshold) activeCnt++;
+          });
+        }
+      }
+      if (hasHours) svcTotal = svc;
+    }
+
+    if (state.ranks){
+      const m = state.ranks.map;
+      const set = new Set();
+      state.ranks.rows.forEach(r => {
+        const nm = String(r[m.name]||'').trim();
+        if (!nm) return;
+        if (!inLastYear(r[m.date], windowAsOf)) return;
+        const key = normName(nm);
+        if (rosterSetForWindow.has(key) || includeDeparted) set.add(key);
+      });
+      rankCnt = set.size;
+    }
+
+    if (state.meritbadges){
+      const m = state.meritbadges.map;
+      let total = 0;
+      state.meritbadges.rows.forEach(r => {
+        const nm = String(r[m.name]||'').trim();
+        if (!nm) return;
+        if (!inLastYear(r[m.date], windowAsOf)) return;
+        const key = normName(nm);
+        if (rosterSetForWindow.has(key) || includeDeparted) total++;
+      });
+      mbCnt = total;
+    }
+
+    return { totalScouts: rosterSetForWindow.size, activeCount: activeCnt, rankCount: rankCnt, mbCount: mbCnt, serviceTotal: svcTotal };
+  }
+
+  function pctChange(curr, prev){
+    if (curr === null || prev === null || prev === undefined) return null;
+    if (prev === 0) return curr === 0 ? 0 : null; // no meaningful % change from a zero baseline
+    return Math.round(((curr - prev) / prev) * 1000) / 10;
+  }
+
+  const prevAsOf = new Date(asOf);
+  prevAsOf.setDate(prevAsOf.getDate() - 365);
+  const rosterSetPrev = rosterKeysAsOf(prevAsOf);
+  const prevMetrics = rosterSetPrev ? computeYearMetricsFor(prevAsOf, rosterSetPrev) : null;
+  const yoy = prevMetrics ? {
+    totalScouts: pctChange(totalScouts, prevMetrics.totalScouts),
+    activeCount: pctChange(activeCount, prevMetrics.activeCount),
+    rankCount: pctChange(rankCount, prevMetrics.rankCount),
+    mbCount: pctChange(mbCount, prevMetrics.mbCount),
+    serviceTotal: pctChange(serviceTotal, prevMetrics.serviceTotal)
+  } : null;
+
+  renderResults({
+    troopName: document.getElementById('troopName').value.trim(),
+    asOf, totalScouts, patrolCounts,
+    activeCount, rankCount, mbCount, mbScouts,
+    serviceTotal, rosterDisplayName: displayName,
+    unmatchedReport, includeDeparted, totalQualifyingEvents, activeThreshold,
+    scoutTable, campoutPatrolTable, patrolColumns, yoy
+  });
+}
+
+function statCard(num, label, foot='', delta=null){
+  let deltaHtml = '';
+  if (delta !== null && delta !== undefined){
+    const dir = delta > 0 ? 'up' : (delta < 0 ? 'down' : 'flat');
+    const arrow = dir === 'up' ? '\u25B2' : (dir === 'down' ? '\u25BC' : '\u2192');
+    const sign = delta > 0 ? '+' : '';
+    deltaHtml = `<div class="delta ${dir}">${arrow} ${sign}${delta}% vs last year</div>`;
+  }
+  return `<div class="stat"><div class="num">${num}</div><div class="lbl">${label}</div>${foot?`<div class="foot">${foot}</div>`:''}${deltaHtml}</div>`;
+}
+
+function renderResults(d){
+  const pct = (n,d2) => d2 ? Math.round((n/d2)*100)+'%' : '\u2014';
+  const depNote = d.includeDeparted ? ' \u00B7 incl. departed' : '';
+  const y = d.yoy || {};
+
+  let stats = '';
+  stats += statCard(d.totalScouts, 'Scouts on Roster', 'Youth, active today', y.totalScouts);
+  stats += d.activeCount!==null
+    ? statCard(d.activeCount, 'Active Scouts', `\u2265${d.activeThreshold}% of ${d.totalQualifyingEvents} eligible event${d.totalQualifyingEvents===1?'':'s'} \u00B7 last 12 mo${depNote}`, y.activeCount)
+    : statCard('\u2014', 'Active Scouts', 'Pull live data above');
+  stats += d.rankCount!==null
+    ? statCard(d.rankCount, 'Advanced \u22651 Rank', `${pct(d.rankCount,d.totalScouts)} of roster \u00B7 last 12 mo${depNote}`, y.rankCount)
+    : statCard('\u2014', 'Advanced \u22651 Rank', 'Pull live data above');
+  stats += d.mbCount!==null
+    ? statCard(d.mbCount, 'Merit Badges Earned', `by ${d.mbScouts} scouts \u00B7 last 12 mo${depNote}`, y.mbCount)
+    : statCard('\u2014', 'Merit Badges Earned', 'Pull live data above');
+  stats += d.serviceTotal!==null
+    ? statCard(Math.round(d.serviceTotal*10)/10, 'Service Hours', `last 12 mo${depNote}`, y.serviceTotal)
+    : statCard('\u2014', 'Service Hours', 'Pull live data above');
+
+  document.getElementById('statGrid').innerHTML = stats;
+
+  const patrolBody = document.querySelector('#patrolTable tbody');
+  patrolBody.innerHTML = Object.entries(d.patrolCounts)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([p,c])=>`<tr><td>${p}</td><td class="num">${c}</td></tr>`).join('') ||
+    '<tr><td colspan="2">No patrol data</td></tr>';
+
+  const uwrap = document.getElementById('unmatchedWrap');
+  const entries = Object.entries(d.unmatchedReport).filter(([,v])=>v.length);
+  uwrap.innerHTML = entries.length ? `
+    <details class="unmatched">
+      <summary>Names that didn't match the current roster (${entries.reduce((s,[,v])=>s+v.length,0)}) \u2014 check for typos, nicknames, or scouts who've left the troop</summary>
+      ${entries.map(([label,names])=>`<div style="margin-top:8px"><strong>${label}:</strong> ${names.join(', ')}</div>`).join('')}
+    </details>` : '';
+
+  scoutTableData = d.scoutTable || [];
+  renderScoutTable();
+
+  campoutPatrolData = d.campoutPatrolTable || [];
+  campoutPatrolColumns = d.patrolColumns || [];
+  renderCampoutPatrolTable();
+
+  document.getElementById('results').classList.add('show');
+  document.getElementById('results').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// ---- Sortable per-scout roster table ----
+const RANK_ORDER = ['scout','tenderfoot','second class','first class','star','life','eagle'];
+let scoutTableData = [];
+let scoutSortKey = 'name';
+let scoutSortDir = 1; // 1 = ascending, -1 = descending
+
+function rankSortValue(rank){
+  const idx = RANK_ORDER.indexOf(String(rank||'').trim().toLowerCase());
+  return idx === -1 ? RANK_ORDER.length : idx;
+}
+
+function renderScoutTable(){
+  const tbody = document.querySelector('#scoutTable tbody');
+  const rows = [...scoutTableData].sort((a,b) => {
+    let av = a[scoutSortKey], bv = b[scoutSortKey];
+    if (scoutSortKey === 'rank'){ av = rankSortValue(av); bv = rankSortValue(bv); }
+    if (scoutSortKey === 'status'){ av = a.departed ? 1 : 0; bv = b.departed ? 1 : 0; return (av-bv) * scoutSortDir; }
+    if (scoutSortKey === 'name' || scoutSortKey === 'patrol'){
+      const cmp = String(av||'').localeCompare(String(bv||''));
+      return cmp * scoutSortDir;
+    }
+    // numeric columns \u2014 nulls (no participation data loaded) sort last regardless of direction
+    if (av === null) return 1;
+    if (bv === null) return -1;
+    return ((av||0) - (bv||0)) * scoutSortDir;
+  });
+
+  tbody.innerHTML = rows.length ? rows.map(r => `
+    <tr>
+      <td>${r.name}</td>
+      <td><span class="badge ${r.departed?'departed':'current'}">${r.departed?'Departed':'Current'}</span></td>
+      <td>${r.patrol}</td>
+      <td>${r.rank || '\u2014'}</td>
+      <td class="num">${r.activePct===null ? '\u2014' : r.activePct+'%'}</td>
+      <td class="num">${r.ranksAdvanced}</td>
+      <td class="num">${r.meritBadges}</td>
+      <td class="num">${r.hours===null ? '\u2014' : r.hours}</td>
+    </tr>`).join('') : '<tr><td colspan="8">No roster data</td></tr>';
+
+  document.querySelectorAll('#scoutTable th.sortable').forEach(th => {
+    th.querySelector('.arrow')?.remove();
+    if (th.dataset.sort === scoutSortKey){
+      const arrow = document.createElement('span');
+      arrow.className = 'arrow';
+      arrow.textContent = scoutSortDir === 1 ? '\u25B2' : '\u25BC';
+      th.appendChild(arrow);
+    }
+  });
+}
+
+document.querySelectorAll('#scoutTable th.sortable').forEach(th => {
+  th.addEventListener('click', () => {
+    const key = th.dataset.sort;
+    if (scoutSortKey === key){ scoutSortDir *= -1; }
+    else { scoutSortKey = key; scoutSortDir = (key === 'name' || key === 'patrol' || key === 'rank' || key === 'status') ? 1 : -1; }
+    renderScoutTable();
+  });
+});
+
+// ---- Sortable patrol-attendance-by-campout table (columns are dynamic per troop) ----
+let campoutPatrolData = [];
+let campoutPatrolColumns = [];
+let campoutSortKey = 'date';
+let campoutSortDir = -1; // most recent event first by default
+
+function escAttr(s){ return String(s).replace(/"/g,'&quot;'); }
+function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderCampoutPatrolTable(){
+  const wrap = document.getElementById('campoutPatrolWrap');
+  if (!campoutPatrolData.length){
+    wrap.innerHTML = '<table><tbody><tr><td>No qualifying events in the current window.</td></tr></tbody></table>';
+    return;
+  }
+
+  const rows = [...campoutPatrolData].sort((a,b) => {
+    let av, bv;
+    if (campoutSortKey === 'eventName'){
+      return String(a.eventName).localeCompare(String(b.eventName)) * campoutSortDir;
+    }
+    if (campoutSortKey === 'date'){ av = a.date; bv = b.date; }
+    else { av = a[campoutSortKey] || 0; bv = b[campoutSortKey] || 0; }
+    return ((av - bv)) * campoutSortDir;
+  });
+
+  const cols = [
+    { key:'eventName', label:'Event', type:'text' },
+    { key:'date', label:'Date', type:'date' },
+    ...campoutPatrolColumns.map(p => ({ key:p, label:p, type:'num' })),
+    { key:'total', label:'Total', type:'num' }
+  ];
+
+  const theadHtml = '<tr>' + cols.map(c => {
+    const isSorted = c.key === campoutSortKey;
+    const arrow = isSorted ? `<span class="arrow">${campoutSortDir===1?'\u25B2':'\u25BC'}</span>` : '';
+    const cls = 'sortable' + (c.type==='num' ? ' num' : '');
+    return `<th class="${cls}" data-sort="${escAttr(c.key)}">${escHtml(c.label)}${arrow}</th>`;
+  }).join('') + '</tr>';
+
+  const tbodyHtml = rows.map(r => '<tr>' + cols.map(c => {
+    if (c.key === 'eventName') return `<td>${escHtml(r.eventName)}</td>`;
+    if (c.key === 'date') return `<td>${escHtml(r.dateDisplay)}</td>`;
+    const v = r[c.key] || 0;
+    return `<td class="num">${v || ''}</td>`;
+  }).join('') + '</tr>').join('');
+
+  wrap.innerHTML = `<table><thead>${theadHtml}</thead><tbody>${tbodyHtml}</tbody></table>`;
+
+  wrap.querySelectorAll('th.sortable').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.sort;
+      if (campoutSortKey === key){ campoutSortDir *= -1; }
+      else { campoutSortKey = key; campoutSortDir = (key === 'eventName') ? 1 : -1; }
+      renderCampoutPatrolTable();
+    });
+  });
+}
+</script>
+
+</div>
+</body>
+</html>
