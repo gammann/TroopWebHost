@@ -21,7 +21,7 @@ Everything runs client-side in the browser. No backend, no build step, no file u
 - **Patrol Attendance by Campout** — one row per Cabin Campout/Campout event, with a column per patrol showing how many of that patrol's scouts attended. Always scoped strictly to campout-type events, independent of the Active Scouts event-type checkboxes.
 - **Year-over-year deltas** — every stat card shows a small badge (▲/▼ and a %) comparing the current 12-month window to the same window one year earlier, when enough data is available to compute it.
 
-- <img width="512" height="300" alt="image" src="https://github.com/user-attachments/assets/3210c06f-fbc9-4fc5-a165-90c43ac18ab9" />
+ <img width="512" height="300" alt="image" src="https://github.com/user-attachments/assets/3210c06f-fbc9-4fc5-a165-90c43ac18ab9" />
 
 ## Access restriction
 
