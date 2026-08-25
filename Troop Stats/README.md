@@ -52,7 +52,7 @@ Column mapping (which header is "Scout Name," "Date," etc.) is auto-detected by 
 ## Installation
 
 1. Open your troop's **TroopWebhost Custom Page editor**.
-2. Paste the entire contents of `annual-planning-dashboard.html` in as raw HTML.
+2. Paste the entire contents of `troop_stats.html` in as raw HTML.
 3. Save/publish the page.
 4. Open the page while logged into TroopWebhost, and click **Pull latest & build dashboard**.
 
