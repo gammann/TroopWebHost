@@ -1,0 +1,818 @@
+<!--
+  OA Tracker
+  ----------------------------------------
+  Paste this WHOLE block into TroopWebHost: Manage Custom Pages → (new or
+  existing Custom Page) → HTML editor. It must run ON troopwebhost.org
+  (same-origin) so the report requests below inherit your logged-in session.
+  It will NOT work pasted into an external site or previewed elsewhere —
+  the fetch calls will be blocked without your session cookie.
+
+  READ BEFORE USING
+  ------------------
+  1. The "Pull Reports Automatically" button re-submits TroopWebHost's own
+     Order of the Arrow Eligibility form to set "Compute Eligibility As Of
+     This Date" to whatever you enter here. That is a real save, not a
+     read-only lookup — it will overwrite that field for anyone else who
+     opens that screen, exactly as if you'd typed the date in by hand.
+  2. The Events, Uncompleted-Requirements, and Active Roster exports are
+     plain read-only report links — no side effects. All three URLs below
+     are confirmed against captured requests on this troop's site.
+  3. Adults are pulled via that same OA Eligibility screen's "Print Adult
+     OA Eligibility Report" button (BUTTON7) — same date, same mechanism,
+     just a different button. Confirmed: its columns match the Scout
+     report exactly except "Rank"/"Rank Date" are replaced by "Leadership".
+  4. On load, this page also does one read-only fetch of the OA
+     Eligibility screen just to display its current saved date next to
+     the date field below — that fetch does not save anything. Note that
+     this shows whatever date happens to be saved right now, which may
+     be a stale/past date rather than your next election date — check it
+     before pulling.
+  5. If a fetch comes back empty or SheetJS fails to parse it, check
+     Tools → Reporting Options on TroopWebHost — if it's set to "PDF only,"
+     these XLS links may return a PDF instead, which SheetJS can't read.
+-->
+<div id="oatrk-root">
+<style>
+  #oatrk-root, #oatrk-root *{ box-sizing:border-box; }
+  #oatrk-root{
+    --pine-950:#101f17; --pine-900:#16281d; --pine-800:#1e3626;
+    --parchment:#efe8d4; --parchment-dim:#cfc6a8;
+    --brass:#c08a2e; --brass-light:#e0b464;
+    --moss-light:#a9c397; --brick-light:#d98266;
+    --hair:rgba(239,232,212,0.14); --hair-strong:rgba(239,232,212,0.28);
+    background:linear-gradient(180deg, var(--pine-950), var(--pine-900) 40%, var(--pine-950));
+    color:var(--parchment);
+    font-family:'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    padding:28px 24px 60px;
+    border-radius:6px;
+    max-width:1040px;
+    margin:20px auto;
+  }
+  #oatrk-root a{ color:var(--brass-light); }
+  #oatrk-root header.oatrk-masthead{
+    border:1px solid var(--hair-strong); border-radius:4px;
+    padding:24px 26px 20px; margin-bottom:24px;
+    background:linear-gradient(180deg, rgba(255,255,255,0.03), transparent);
+    position:relative;
+  }
+  #oatrk-root .oatrk-eyebrow{
+    font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.16em;
+    text-transform:uppercase; color:var(--brass-light); margin:0 0 10px;
+  }
+  #oatrk-root h1{
+    font-family:'Roboto Slab', Georgia, serif; font-weight:700;
+    font-size:clamp(24px,3.4vw,32px); margin:0 0 8px; line-height:1.1;
+  }
+  #oatrk-root header.oatrk-masthead p.oatrk-sub{
+    margin:0; max-width:64ch; color:var(--parchment-dim); font-size:14px; line-height:1.55;
+  }
+  #oatrk-root .oatrk-callout{
+    margin-top:16px; padding:11px 14px; border-left:3px solid var(--brass);
+    background:rgba(192,138,46,0.08); font-size:12.5px; line-height:1.55;
+    color:var(--parchment-dim); border-radius:0 3px 3px 0;
+  }
+  #oatrk-root .oatrk-callout b{ color:var(--parchment); }
+
+  #oatrk-root .oatrk-sheet{
+    border:1px solid var(--hair-strong); border-radius:4px;
+    background:rgba(255,255,255,0.025); padding:22px 24px 24px; margin-bottom:24px;
+  }
+  #oatrk-root .oatrk-sheet h2{ font-family:'Roboto Slab',Georgia,serif; font-size:17px; margin:0 0 4px; }
+  #oatrk-root .oatrk-sheet-sub{ font-size:12.5px; color:var(--parchment-dim); margin:0 0 18px; }
+
+  #oatrk-root .oatrk-field-line{
+    display:grid; grid-template-columns:24px 1fr; gap:14px;
+    padding:13px 0; border-top:1px solid var(--hair); align-items:start;
+  }
+  #oatrk-root .oatrk-field-line:first-of-type{ border-top:none; }
+  #oatrk-root .oatrk-field-letter{
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:12px;
+    color:var(--pine-950); background:var(--brass-light); width:24px; height:24px;
+    border-radius:50%; display:flex; align-items:center; justify-content:center; margin-top:2px;
+  }
+  #oatrk-root .oatrk-field-label{ font-size:13.5px; font-weight:600; margin-bottom:3px; }
+  #oatrk-root .oatrk-field-hint{ font-size:12px; color:var(--parchment-dim); margin-bottom:9px; line-height:1.5; }
+  #oatrk-root .oatrk-field-hint code{
+    font-family:'JetBrains Mono',monospace; font-size:11px; background:rgba(0,0,0,0.25);
+    padding:1px 5px; border-radius:3px;
+  }
+  #oatrk-root input[type="date"], #oatrk-root .oatrk-file-drop{
+    font-family:'Public Sans',sans-serif; font-size:13.5px; color:var(--parchment);
+    background:rgba(0,0,0,0.22); border:1px solid var(--hair-strong); border-radius:3px; padding:8px 11px;
+  }
+  #oatrk-root input[type="date"]{ width:190px; }
+  #oatrk-root input[type="date"]::-webkit-calendar-picker-indicator{ filter:invert(0.85); cursor:pointer; }
+  #oatrk-root .oatrk-file-drop{
+    display:flex; align-items:center; justify-content:space-between; gap:12px;
+    cursor:pointer; width:100%;
+  }
+  #oatrk-root .oatrk-file-drop:hover{ border-color:var(--brass); }
+  #oatrk-root .oatrk-file-drop.oatrk-has-file{ border-color:var(--moss-light); background:rgba(169,195,151,0.12); }
+  #oatrk-root .oatrk-file-drop input{ display:none; }
+  #oatrk-root .oatrk-file-drop .oatrk-fname{
+    font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--parchment-dim);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  #oatrk-root .oatrk-file-drop.oatrk-has-file .oatrk-fname{ color:var(--moss-light); }
+  #oatrk-root .oatrk-file-drop .oatrk-btn-txt{
+    flex-shrink:0; font-size:11.5px; font-weight:600; text-transform:uppercase;
+    letter-spacing:.04em; color:var(--brass-light);
+  }
+
+  #oatrk-root .oatrk-run-row{ margin-top:20px; display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
+  #oatrk-root .oatrk-btn{
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:12.5px; letter-spacing:.07em;
+    text-transform:uppercase; color:var(--pine-950); background:var(--brass-light);
+    border:none; border-radius:3px; padding:12px 22px; cursor:pointer;
+  }
+  #oatrk-root .oatrk-btn:hover:not(:disabled){ background:var(--brass); }
+  #oatrk-root .oatrk-btn:disabled{ opacity:0.35; cursor:not-allowed; }
+  #oatrk-root .oatrk-status{ font-size:12px; color:var(--parchment-dim); }
+  #oatrk-root .oatrk-status.oatrk-err{ color:var(--brick-light); }
+
+  #oatrk-root .oatrk-results{ display:none; }
+  #oatrk-root .oatrk-results.oatrk-show{ display:block; }
+  #oatrk-root .oatrk-section{ margin-bottom:28px; }
+  #oatrk-root .oatrk-section-head{ display:flex; align-items:center; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+  #oatrk-root .oatrk-stamp{
+    font-family:'JetBrains Mono',monospace; font-weight:700; font-size:11px; letter-spacing:.08em;
+    text-transform:uppercase; padding:6px 12px; border:2px solid currentColor; border-radius:3px;
+    transform:rotate(-2deg); white-space:nowrap;
+  }
+  #oatrk-root .oatrk-stamp.go{ color:var(--moss-light); }
+  #oatrk-root .oatrk-stamp.reach{ color:var(--brass-light); }
+  #oatrk-root .oatrk-stamp.block{ color:var(--brick-light); }
+  #oatrk-root .oatrk-section-title{ font-family:'Roboto Slab',Georgia,serif; font-size:18px; }
+  #oatrk-root .oatrk-section-count{ font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--parchment-dim); margin-left:auto; }
+  #oatrk-root .oatrk-section-desc{ font-size:12.5px; color:var(--parchment-dim); margin:-2px 0 12px; max-width:70ch; line-height:1.5; }
+
+  #oatrk-root table{ width:100%; border-collapse:collapse; font-size:13px; }
+  #oatrk-root thead th{
+    text-align:left; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.06em;
+    text-transform:uppercase; color:var(--parchment-dim); font-weight:600;
+    padding:0 10px 7px; border-bottom:1px solid var(--hair-strong);
+  }
+  #oatrk-root tbody td{ padding:10px 10px; border-bottom:1px solid var(--hair); vertical-align:middle; }
+  #oatrk-root tbody tr:last-child td{ border-bottom:none; }
+  #oatrk-root td.oatrk-name{ font-weight:600; }
+  #oatrk-root td.oatrk-num, #oatrk-root th.oatrk-num-h{ font-family:'JetBrains Mono',monospace; text-align:right; }
+  #oatrk-root .oatrk-bar-cell{ min-width:150px; }
+  #oatrk-root .oatrk-bar-track{ height:7px; border-radius:4px; background:rgba(0,0,0,0.3); overflow:hidden; margin-bottom:4px; }
+  #oatrk-root .oatrk-bar-fill{ height:100%; background:var(--moss-light); }
+  #oatrk-root .oatrk-bar-label{ font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--parchment-dim); }
+  #oatrk-root .oatrk-tag{
+    display:inline-block; font-family:'JetBrains Mono',monospace; font-size:10px; padding:2px 7px;
+    border-radius:3px; background:rgba(255,255,255,0.08); color:var(--parchment-dim);
+  }
+  #oatrk-root .oatrk-empty-row{ padding:18px 10px; color:var(--parchment-dim); font-size:12.5px; font-style:italic; }
+  #oatrk-root details.oatrk-audit{ border:1px solid var(--hair); border-radius:4px; padding:11px 15px; margin-top:6px; }
+  #oatrk-root details.oatrk-audit summary{
+    cursor:pointer; font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.04em;
+    color:var(--brass-light); text-transform:uppercase;
+  }
+  #oatrk-root .oatrk-audit-body{ margin-top:11px; font-size:12px; }
+  #oatrk-root .oatrk-audit-body table{ font-size:12px; }
+  #oatrk-root .oatrk-footnote{ font-size:11.5px; color:var(--parchment-dim); margin-top:6px; }
+  #oatrk-root .oatrk-config-note{ font-size:11.5px; color:var(--parchment-dim); margin-top:10px; padding-top:10px; border-top:1px dashed var(--hair-strong); }
+</style>
+
+<header class="oatrk-masthead">
+  <p class="oatrk-eyebrow">Troop Advancement Desk</p>
+  <h1>OA Tracker</h1>
+  <p class="oatrk-sub">Pulls the Order of the Arrow Eligibility, Events, and Uncompleted Requirements reports straight from this site and sorts scouts into who's eligible now, who's within reach on the current calendar, and who just needs rank.</p>
+  <div class="oatrk-callout">
+    <b>Heads up:</b> pulling the OA Eligibility report re-saves the "Compute Eligibility As Of This Date" field on that screen — the same as typing it in by hand. It is not a read-only lookup.
+  </div>
+</header>
+
+<div class="oatrk-sheet">
+  <h2>Compute eligibility</h2>
+  <p class="oatrk-sheet-sub">Runs entirely in your browser, using your current TroopWebHost login. Nothing is sent anywhere else.</p>
+  <div class="oatrk-field-line">
+    <div class="oatrk-field-letter">1</div>
+    <div>
+      <div class="oatrk-field-label">Compute Eligibility As Of This Date</div>
+      <div class="oatrk-field-hint">This becomes the new value on the Order of the Arrow Eligibility screen — see the note above.</div>
+      <input type="date" id="oatrk-dateAuto">
+      <div class="oatrk-field-hint" id="oatrk-liveDateStatus" style="margin-top:8px;margin-bottom:0;">Checking the current value on TroopWebHost…</div>
+    </div>
+  </div>
+  <div class="oatrk-run-row">
+    <button class="oatrk-btn" id="oatrk-runAuto" disabled>Pull Reports Automatically</button>
+    <span class="oatrk-status" id="oatrk-statusAuto">Pick a date to continue.</span>
+  </div>
+</div>
+
+<div class="oatrk-results" id="oatrk-results">
+  <div class="oatrk-section">
+    <div class="oatrk-section-head">
+      <span class="oatrk-stamp go">Eligible</span>
+      <span class="oatrk-section-title">Eligible now</span>
+      <span class="oatrk-section-count" id="oatrk-cnt1"></span>
+    </div>
+    <p class="oatrk-section-desc">Straight from the OA Eligibility reports — camping minimums are satisfied (rank too, for scouts) as of the date entered above. Adults appear here with "Adult" in the rank column.</p>
+    <table>
+      <thead><tr><th>Member</th><th>Rank / Type</th><th class="oatrk-num-h">Long-term nights</th><th class="oatrk-num-h">Short-term nights</th></tr></thead>
+      <tbody id="oatrk-tbl1"></tbody>
+    </table>
+  </div>
+
+  <div class="oatrk-section">
+    <div class="oatrk-section-head">
+      <span class="oatrk-stamp reach">Within reach</span>
+      <span class="oatrk-section-title">Can become eligible on this calendar</span>
+      <span class="oatrk-section-count" id="oatrk-cnt2"></span>
+    </div>
+    <p class="oatrk-section-desc">Scouts already First Class or higher, and all adults (no rank requirement) — camping nights still short, but the campouts already on the calendar between today and the target date supply enough nights to close the gap.</p>
+    <table>
+      <thead><tr><th>Member</th><th>Rank / Type</th><th>Still needs</th><th class="oatrk-bar-cell">Nights needed vs. available</th></tr></thead>
+      <tbody id="oatrk-tbl2"></tbody>
+    </table>
+    <details class="oatrk-audit">
+      <summary>Show the campouts counted toward this</summary>
+      <div class="oatrk-audit-body" id="oatrk-auditBody"></div>
+    </details>
+  </div>
+
+  <div class="oatrk-section">
+    <div class="oatrk-section-head">
+      <span class="oatrk-stamp block">Rank-blocked</span>
+      <span class="oatrk-section-title">Camping nights met — needs First Class</span>
+      <span class="oatrk-section-count" id="oatrk-cnt3"></span>
+    </div>
+    <p class="oatrk-section-desc">Scouts only — camping requirement is already satisfied (or reachable on this calendar) — rank is the only thing standing between them and eligibility.</p>
+    <table>
+      <thead><tr><th>Scout</th><th>Current rank</th><th class="oatrk-num-h">Requirements left to First Class</th></tr></thead>
+      <tbody id="oatrk-tbl3"></tbody>
+    </table>
+  </div>
+
+  <div class="oatrk-section">
+    <div class="oatrk-section-head">
+      <span class="oatrk-stamp block">Awaiting Ordeal</span>
+      <span class="oatrk-section-title">Elected, but no Ordeal date on file</span>
+      <span class="oatrk-section-count" id="oatrk-cnt4"></span>
+    </div>
+    <p class="oatrk-section-desc">Straight from the Active Roster export — anyone with an OA Election date but no OA Ordeal date, youth and adults alike. Elections expire 18 months after the election date if the Ordeal isn't done by then, so this is sorted most-urgent first.</p>
+    <table>
+      <thead><tr><th>Member</th><th>Type</th><th>OA Election date</th><th>Ordeal deadline</th></tr></thead>
+      <tbody id="oatrk-tbl4"></tbody>
+    </table>
+  </div>
+
+  <div class="oatrk-section">
+    <div class="oatrk-section-head">
+      <span class="oatrk-stamp go">Members</span>
+      <span class="oatrk-section-title">Already in the Order of the Arrow</span>
+      <span class="oatrk-section-count" id="oatrk-cnt5"></span>
+    </div>
+    <p class="oatrk-section-desc">Scouts and adults already inducted, straight from the Active Roster export's OA Member flag. Honor is the highest of Ordeal/Brotherhood/Vigil on file, with the date of that most recent honor. Anyone whose Ordeal was at least 6 months ago and hasn't advanced further is flagged eligible for Brotherhood.</p>
+    <table>
+      <thead><tr><th>Member</th><th>Rank / Type</th><th>OA Honor</th><th>Most recent honor date</th></tr></thead>
+      <tbody id="oatrk-tbl5"></tbody>
+    </table>
+  </div>
+
+</div>
+
+</div><!-- /#oatrk-root -->
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script>
+(function(){
+
+/* ============ CONFIG — verify these against your own site ============
+   Order of the Arrow Eligibility screen:
+     Menu_Item_ID = 53654, Form_ID = 8400 (the on-screen form),
+     date field id = ENTRY15966316 / RVALENTRY15966316 / OLD15966316.
+     Confirmed from a captured request on this troop's site.
+
+   Events export:
+     GET FormReport.aspx?Menu_Item_ID=53104&Stack=1&ReportFormat=XLS
+     Confirmed — this is the site's own "Export Events To Excel" link.
+
+   Uncompleted Requirements export:
+     GET FormReport.aspx?Menu_Item_ID=46046&Stack=1&ReportFormat=XLS
+     Confirmed from a captured request — the response's Content-Disposition
+     file name matched "Uncompleted Requirements for Rank Advancement In
+     Progress" exactly. Despite ReportFormat=XLS, the server actually
+     returns plain CSV text — SheetJS handles this transparently either way.
+========================================================================= */
+var OATRK_OA_MENU_ITEM_ID = '53654';
+var OATRK_OA_FORM_ID = '8400';
+var OATRK_EVENTS_URL = 'FormReport.aspx?Menu_Item_ID=53104&Stack=1&ReportFormat=XLS';
+var OATRK_REQS_URL   = 'FormReport.aspx?Menu_Item_ID=46046&Stack=1&ReportFormat=XLS';
+var OATRK_ROSTER_URL = 'FormReport.aspx?Menu_Item_ID=53747&Stack=1&ReportFormat=XLS'; // Export Active Roster To Excel — confirmed
+var ADULT_OA_EXPECTED_COLS = ['OA Eligibility','Name']; // confirmed — matches Scout report's columns except Rank→Leadership
+
+var RANK_ORDER = ['Scout','Tenderfoot','Second Class','First Class','Star','Life','Eagle'];
+function rankIndex(r){ return RANK_ORDER.indexOf((r||'').trim()); }
+function rankAtLeastFirstClass(r){ return rankIndex(r) >= RANK_ORDER.indexOf('First Class'); }
+function normName(name){
+  var parts = (name||'').split(',');
+  var last = (parts[0]||'').trim().toLowerCase();
+  var firstPart = (parts[1]||'').trim().toLowerCase();
+  var first = firstPart.split(/\s+/)[0] || '';
+  return last+'|'+first;
+}
+function parseEventDate(s){
+  if(!s) return null;
+  var datePart = String(s).trim().split(' ')[0];
+  var m = datePart.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(!m) return null;
+  var mo = m[1], da = m[2], yr = m[3];
+  yr = yr.length===2 ? (2000+parseInt(yr,10)) : parseInt(yr,10);
+  return new Date(yr, parseInt(mo,10)-1, parseInt(da,10));
+}
+function isoToMDY(iso){
+  var parts = iso.split('-');
+  return parts[1]+'/'+parts[2]+'/'+parts[0];
+}
+function mdyToIso(mdy){
+  var parts = mdy.split('/');
+  if(parts.length !== 3) return null;
+  var mo = parts[0].padStart(2,'0'), da = parts[1].padStart(2,'0'), yr = parts[2];
+  return yr+'-'+mo+'-'+da;
+}
+function esc(s){ var d=document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
+
+/* ---- turn any SheetJS-readable buffer/text into array-of-objects ---- */
+function bufferToObjects(data){
+  var wb = (typeof data === 'string')
+    ? XLSX.read(data, {type:'string'})
+    : XLSX.read(data, {type:'array'});
+  var ws = wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(ws, {defval:'', raw:false});
+}
+
+/* ================= AUTO-PULL MODE ================= */
+var autoDate = document.getElementById('oatrk-dateAuto');
+var runAutoBtn = document.getElementById('oatrk-runAuto');
+var statusAuto = document.getElementById('oatrk-statusAuto');
+
+autoDate.addEventListener('change', function(){
+  runAutoBtn.disabled = !autoDate.value;
+  statusAuto.textContent = autoDate.value ? 'Ready — click Pull Reports Automatically.' : 'Pick a date to continue.';
+  statusAuto.classList.remove('oatrk-err');
+});
+
+var oatrkLastKnownOADate = null; // filled in by loadLiveOADate(), reused as OLD15966316
+
+function fetchOAEligibility(mdyDate){
+  var fd = new FormData();
+  fd.append('menuopenflag','N');
+  fd.append('Selected_Action','save');
+  fd.append('Hover_Action','');
+  fd.append('Selected_Button_ID','BUTTON6');
+  fd.append('Menu_Item_ID', OATRK_OA_MENU_ITEM_ID);
+  fd.append('Form_ID', OATRK_OA_FORM_ID);
+  fd.append('Link_To_Menu_Item_ID','');
+  fd.append('Pass','1');
+  fd.append('Stack','1');
+  fd.append('NextSectionPageNumber','');
+  fd.append('NewRowsPerPage','');
+  fd.append('ChildRowID','0');
+  fd.append('Report_Format','XLS');
+  fd.append('Current_URL','FormDetail.aspx?Menu_Item_ID='+OATRK_OA_MENU_ITEM_ID+'&Stack=0');
+  fd.append('Page_Layout','1');
+  fd.append('Report_option','2');
+  fd.append('FK','0');
+  fd.append('ID','1');
+  fd.append('RVALENTRY15966316','Y');
+  // Use the value actually read off the live page if we have it; falling back
+  // to the new date (i.e. "unchanged") is safer than an empty string, which
+  // TroopWebHost never actually sends.
+  fd.append('OLD15966316', oatrkLastKnownOADate || mdyDate);
+  fd.append('ENTRY15966316', mdyDate);
+  fd.append('FirstControl','ENTRY15966316');
+
+  return fetch('FormDetail.aspx', { method:'POST', body: fd, credentials:'same-origin' })
+    .then(function(res){
+      if(!res.ok) throw new Error('OA Eligibility request failed (HTTP '+res.status+'). Are you logged into TroopWebHost in this tab?');
+      assertReportResponse(res, 'OA Eligibility');
+      return res.arrayBuffer();
+    });
+}
+
+/* Same screen, same mechanism, but clicks "Print Adult OA Eligibility
+   Report" (BUTTON7) instead of the Scout one (BUTTON6). Not yet verified
+   against a real response — see note #3 at the top of this block. */
+function fetchAdultOAEligibility(mdyDate){
+  var fd = new FormData();
+  fd.append('menuopenflag','N');
+  fd.append('Selected_Action','save');
+  fd.append('Hover_Action','');
+  fd.append('Selected_Button_ID','BUTTON7');
+  fd.append('Menu_Item_ID', OATRK_OA_MENU_ITEM_ID);
+  fd.append('Form_ID', OATRK_OA_FORM_ID);
+  fd.append('Link_To_Menu_Item_ID','');
+  fd.append('Pass','1');
+  fd.append('Stack','1');
+  fd.append('NextSectionPageNumber','');
+  fd.append('NewRowsPerPage','');
+  fd.append('ChildRowID','0');
+  fd.append('Report_Format','XLS');
+  fd.append('Current_URL','FormDetail.aspx?Menu_Item_ID='+OATRK_OA_MENU_ITEM_ID+'&Stack=0');
+  fd.append('Page_Layout','1');
+  fd.append('Report_option','2');
+  fd.append('FK','0');
+  fd.append('ID','1');
+  fd.append('RVALENTRY15966316','Y');
+  fd.append('OLD15966316', oatrkLastKnownOADate || mdyDate);
+  fd.append('ENTRY15966316', mdyDate);
+  fd.append('FirstControl','ENTRY15966316');
+
+  return fetch('FormDetail.aspx', { method:'POST', body: fd, credentials:'same-origin' })
+    .then(function(res){
+      if(!res.ok) throw new Error('Adult OA Eligibility request failed (HTTP '+res.status+').');
+      assertReportResponse(res, 'Adult OA Eligibility');
+      return res.arrayBuffer();
+    });
+}
+function fetchSimple(url, label){
+  return fetch(url, { credentials:'same-origin' }).then(function(res){
+    if(!res.ok) throw new Error(label+' request failed (HTTP '+res.status+').');
+    assertReportResponse(res, label);
+    return res.arrayBuffer();
+  });
+}
+
+/* Catches the most common silent failure: a login/error page comes back
+   with HTTP 200, SheetJS "parses" it into rows that don't match any
+   expected column, and every list quietly ends up empty. */
+function assertReportResponse(res, label){
+  var ct = (res.headers.get('content-type')||'').toLowerCase();
+  if(ct.indexOf('html') !== -1){
+    throw new Error(label+' returned a webpage instead of report data (final URL: '+res.url+'). You are probably logged out of TroopWebHost in this tab — reload the page, confirm you\'re logged in, and try again.');
+  }
+}
+
+/* Confirms the parsed rows actually have the columns we expect, and fails
+   with the real column list if not — instead of just returning 0 scouts. */
+function assertColumns(rows, expectedAnyOf, label){
+  if(!rows.length) throw new Error(label+' came back with zero rows — the export may be empty, or the request didn\'t go through as expected.');
+  var found = Object.keys(rows[0]);
+  var ok = expectedAnyOf.some(function(col){ return found.indexOf(col) !== -1; });
+  if(!ok){
+    throw new Error(label+' didn\'t have the expected columns. Found: ['+found.join(', ')+']. This usually means a different report or page came back than intended — check the Menu_Item_ID/Form_ID in the CONFIG comment at the top of this block.');
+  }
+}
+
+/* Read-only: loads the OA Eligibility screen and reads the date already
+   saved there. Does not submit or change anything. */
+function fetchLiveOADate(){
+  var url = 'FormDetail.aspx?Menu_Item_ID='+OATRK_OA_MENU_ITEM_ID+'&Stack=0';
+  return fetch(url, { credentials:'same-origin' }).then(function(res){
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    return res.text();
+  }).then(function(html){
+    var tagMatch = html.match(/<input[^>]*id="ENTRY15966316"[^>]*>/i);
+    if(!tagMatch) throw new Error('field not found on page');
+    var valMatch = tagMatch[0].match(/value="([^"]*)"/i);
+    if(!valMatch) throw new Error('field has no value attribute');
+    return valMatch[1]; // e.g. "02/12/2026"
+  });
+}
+
+function loadLiveOADate(){
+  var statusEl = document.getElementById('oatrk-liveDateStatus');
+  fetchLiveOADate().then(function(mdy){
+    oatrkLastKnownOADate = mdy;
+    statusEl.textContent = 'Currently set on TroopWebHost: ' + mdy;
+    var iso = mdyToIso(mdy);
+    if(iso && !autoDate.value){
+      autoDate.value = iso;
+      runAutoBtn.disabled = false;
+      statusAuto.textContent = 'Loaded the current TroopWebHost date — change it above if you want a different one, then click Pull Reports Automatically.';
+    }
+  }).catch(function(err){
+    statusEl.textContent = 'Could not read the current TroopWebHost date (' + err.message + '). Make sure you\'re logged in, or enter a date manually.';
+  });
+}
+
+runAutoBtn.addEventListener('click', function(){
+  var mdy = isoToMDY(autoDate.value);
+  runAutoBtn.disabled = true;
+  statusAuto.classList.remove('oatrk-err');
+  statusAuto.textContent = 'Pulling Scout OA Eligibility report…';
+
+  var adultRows = null, adultWarning = null;
+
+  fetchOAEligibility(mdy)
+    .then(function(buf){
+      var oa = bufferToObjects(buf);
+      assertColumns(oa, ['OA Eligibility','Name'], 'OA Eligibility export');
+      statusAuto.textContent = 'Pulling Adult OA Eligibility report…';
+      return fetchAdultOAEligibility(mdy)
+        .then(function(adultBuf){
+          var adults = bufferToObjects(adultBuf);
+          assertColumns(adults, ADULT_OA_EXPECTED_COLS, 'Adult OA Eligibility export');
+          adultRows = adults;
+        })
+        .catch(function(err){
+          adultWarning = err.message;
+          adultRows = [];
+        })
+        .then(function(){ return oa; });
+    })
+    .then(function(oa){
+      statusAuto.textContent = 'Pulling Events export…';
+      return fetchSimple(OATRK_EVENTS_URL, 'Events export').then(function(evBuf){
+        var events = bufferToObjects(evBuf);
+        assertColumns(events, ['Type','Event','Campout Nights'], 'Events export');
+        return { oa: oa, events: events };
+      });
+    })
+    .then(function(data){
+      statusAuto.textContent = 'Pulling Uncompleted Requirements export…';
+      return fetchSimple(OATRK_REQS_URL, 'Uncompleted Requirements export').then(function(reqBuf){
+        var reqs = bufferToObjects(reqBuf);
+        assertColumns(reqs, ['Scout','Award'], 'Uncompleted Requirements export');
+        data.reqs = reqs;
+        return data;
+      });
+    })
+    .then(function(data){
+      statusAuto.textContent = 'Pulling Active Roster export…';
+      return fetchSimple(OATRK_ROSTER_URL, 'Active Roster export').then(function(rosterBuf){
+        var roster = bufferToObjects(rosterBuf);
+        assertColumns(roster, ['OA Election','OA Ordeal','Name'], 'Active Roster export');
+        data.roster = roster;
+        return data;
+      });
+    })
+    .then(function(data){
+      var types = Array.from(new Set(data.events.map(function(r){ return (r['Type']||'').trim(); }).filter(Boolean)));
+      var includedTypes = new Set(types.filter(function(t){ return /^campout$/i.test(t); }));
+      var suffix = adultWarning ? ' (adults skipped: '+adultWarning+')' : ', '+adultRows.length+' adults';
+      statusAuto.textContent = 'Done — pulled '+data.oa.length+' scouts'+suffix+', '+data.events.length+' events, '+data.reqs.length+' requirement rows, '+data.roster.length+' roster rows.';
+      runReport(data.oa, adultRows||[], data.events, data.reqs, data.roster, includedTypes, autoDate.value);
+    })
+    .catch(function(err){
+      statusAuto.textContent = 'Error: ' + err.message;
+      statusAuto.classList.add('oatrk-err');
+    })
+    .finally(function(){ runAutoBtn.disabled = false; });
+});
+
+/* Show the currently-saved OA Eligibility date as soon as the page loads. */
+loadLiveOADate();
+
+/* ================= shared computation + rendering ================= */
+function evaluateCamping(lt, st, hasLongAvailable, availableShortNights){
+  var ltOk = lt >= 5 || hasLongAvailable;
+  var stNeeded = Math.max(0, 10 - st);
+  var reachable = ltOk && stNeeded <= availableShortNights;
+  return { ltOk: ltOk, stNeeded: stNeeded, reachable: reachable };
+}
+
+/* Elections expire 18 months after the election date if the Ordeal isn't
+   completed by then — after that the member has to be elected again. */
+var OATRK_ORDEAL_WINDOW_MONTHS = 18;
+function ordealDeadlineInfo(electionDate){
+  var elDate = parseEventDate(electionDate);
+  if(!elDate) return null;
+  var deadline = new Date(elDate.getTime());
+  deadline.setMonth(deadline.getMonth() + OATRK_ORDEAL_WINDOW_MONTHS);
+  var today = new Date(); today.setHours(0,0,0,0);
+  var daysLeft = Math.round((deadline - today) / 86400000);
+  var mm = String(deadline.getMonth()+1).padStart(2,'0');
+  var dd = String(deadline.getDate()).padStart(2,'0');
+  var yyyy = deadline.getFullYear();
+  return { deadlineStr: mm+'/'+dd+'/'+yyyy, daysLeft: daysLeft, overdue: daysLeft < 0 };
+}
+
+/* Brotherhood eligibility: 6 full months since the Ordeal date, and no
+   higher honor already earned. */
+var OATRK_BROTHERHOOD_WAIT_MONTHS = 6;
+function honorInfo(rosterRow){
+  var ordeal = (rosterRow['OA Ordeal']||'').trim();
+  var brotherhood = (rosterRow['OA Brotherhood']||'').trim();
+  var vigil = (rosterRow['OA Vigil']||'').trim();
+
+  var honor = vigil ? 'Vigil' : (brotherhood ? 'Brotherhood' : (ordeal ? 'Ordeal' : null));
+
+  var candidates = [];
+  if(ordeal) candidates.push({ label:'Ordeal', d:parseEventDate(ordeal), str:ordeal });
+  if(brotherhood) candidates.push({ label:'Brotherhood', d:parseEventDate(brotherhood), str:brotherhood });
+  if(vigil) candidates.push({ label:'Vigil', d:parseEventDate(vigil), str:vigil });
+  var mostRecent = null;
+  candidates.forEach(function(c){
+    if(c.d && (!mostRecent || c.d > mostRecent.d)) mostRecent = c;
+  });
+
+  var brotherhoodEligible = false;
+  if(honor === 'Ordeal' && mostRecent && mostRecent.d){
+    var today = new Date(); today.setHours(0,0,0,0);
+    var waitOver = new Date(mostRecent.d.getTime());
+    waitOver.setMonth(waitOver.getMonth() + OATRK_BROTHERHOOD_WAIT_MONTHS);
+    brotherhoodEligible = waitOver <= today;
+  }
+
+  return { honor: honor, mostRecentStr: mostRecent ? mostRecent.str : null, brotherhoodEligible: brotherhoodEligible };
+}
+
+function runReport(oaRows, adultRows, eventRows, reqRows, rosterRows, includedTypes, targetIso){
+  var today = new Date(); today.setHours(0,0,0,0);
+  var target = new Date(targetIso+'T00:00:00');
+
+  var upcoming = eventRows.filter(function(r){
+    if(!includedTypes.has((r['Type']||'').trim())) return false;
+    var start = parseEventDate(r['Start']);
+    if(!start) return false;
+    return start > today && start <= target;
+  }).map(function(r){
+    return {
+      event: r['Event'], start: r['Start'], end: r['End'],
+      nights: parseInt(r['Campout Nights'],10) || 0,
+      type: r['Type']
+    };
+  });
+
+  var longEvents = upcoming.filter(function(e){ return e.nights >= 5; });
+  var shortEvents = upcoming.filter(function(e){ return e.nights > 0 && e.nights < 5; });
+  var availableShortNights = shortEvents.reduce(function(a,e){ return a+e.nights; }, 0);
+  var hasLongAvailable = longEvents.length > 0;
+
+  var reqMap = {};
+  (reqRows||[]).forEach(function(r){
+    var key = normName(r['Scout']);
+    var award = (r['Award']||'').replace('(Current requirements)','').trim();
+    if(!reqMap[key]) reqMap[key] = {};
+    reqMap[key][award] = (reqMap[key][award]||0) + 1;
+  });
+
+  /* Elected but not yet through the Ordeal — straight off the roster,
+     covers youth and adults alike. Sorted most-urgent first: overdue
+     (needs re-election) at the top, then soonest deadline. Computed
+     before the eligibility loops below because anyone still inside their
+     18-month window is excluded from "Eligible Now" — they're already
+     in the pipeline, not a new nomination. */
+  var list4 = (rosterRows||[]).filter(function(r){
+    return (r['OA Election']||'').trim() && !(r['OA Ordeal']||'').trim();
+  }).map(function(r){
+    var info = ordealDeadlineInfo(r['OA Election']);
+    return {
+      name: r['Name'],
+      isAdult: (r['Adult']||'').trim().toUpperCase()==='Y',
+      election: r['OA Election'],
+      deadlineStr: info ? info.deadlineStr : null,
+      daysLeft: info ? info.daysLeft : null,
+      overdue: info ? info.overdue : false
+    };
+  }).sort(function(a,b){
+    if(a.daysLeft==null) return 1;
+    if(b.daysLeft==null) return -1;
+    return a.daysLeft - b.daysLeft;
+  });
+
+  /* Anyone shown in Awaiting Ordeal is excluded from every other section,
+     overdue or not — that section is their one home. */
+  var awaitingOrdealSet = {};
+  list4.forEach(function(p){ awaitingOrdealSet[normName(p.name)] = true; });
+
+  var list1 = [], list2 = [], list3 = [], alreadyOACount = 0;
+
+  oaRows.forEach(function(row){
+    var status = (row['OA Eligibility']||'').trim();
+    var name = row['Name'];
+    var rank = row['Rank'];
+    var lt = parseInt(row['Long-Term Camping Nights'],10) || 0;
+    var st = parseInt(row['Short-Term Camping Nights'],10) || 0;
+
+    if(awaitingOrdealSet[normName(name)]) return; // already shown in Awaiting Ordeal
+
+    if(/already/i.test(status)){ alreadyOACount++; return; }
+    if(/^eligible/i.test(status)){
+      list1.push({name:name, rank:rank, lt:lt, st:st});
+      return;
+    }
+
+    var ev = evaluateCamping(lt, st, hasLongAvailable, availableShortNights);
+    if(!ev.reachable) return;
+
+    var rankOk = rankAtLeastFirstClass(rank);
+    if(rankOk){
+      var needsParts = [];
+      if(lt < 5) needsParts.push('a long-term trip');
+      if(ev.stNeeded > 0) needsParts.push(ev.stNeeded+' more short-term night'+(ev.stNeeded===1?'':'s'));
+      list2.push({ name:name, rank:rank, lt:lt, st:st, stNeeded:ev.stNeeded, needsLabel: needsParts.join(' + ') || 'nothing — recheck export' });
+    } else {
+      var key = normName(name);
+      var r = reqMap[key] || {};
+      var tf = r['Tenderfoot']||0, sc = r['Second Class']||0, fc = r['First Class']||0;
+      var hasData = (tf+sc+fc) > 0;
+      list3.push({ name:name, rank:rank, total: tf+sc+fc, hasData:hasData });
+    }
+  });
+
+  /* Adults: camping requirement only, no rank gate. Column names are
+     confirmed against a real export — see CONFIG. */
+  var alreadyOACountAdult = 0;
+  (adultRows||[]).forEach(function(row){
+    var status = (row['OA Eligibility']||'').trim();
+    var name = row['Name'];
+    var lt = parseInt(row['Long-Term Camping Nights'],10) || 0;
+    var st = parseInt(row['Short-Term Camping Nights'],10) || 0;
+
+    if(awaitingOrdealSet[normName(name)]) return; // already shown in Awaiting Ordeal
+
+    if(/already/i.test(status)){ alreadyOACountAdult++; return; }
+    if(/^eligible/i.test(status)){
+      list1.push({name:name, rank:'Adult', lt:lt, st:st});
+      return;
+    }
+
+    var ev = evaluateCamping(lt, st, hasLongAvailable, availableShortNights);
+    if(!ev.reachable) return;
+
+    var needsParts = [];
+    if(lt < 5) needsParts.push('a long-term trip');
+    if(ev.stNeeded > 0) needsParts.push(ev.stNeeded+' more short-term night'+(ev.stNeeded===1?'':'s'));
+    list2.push({ name:name, rank:'Adult', lt:lt, st:st, stNeeded:ev.stNeeded, needsLabel: needsParts.join(' + ') || 'nothing — recheck export' });
+  });
+
+  /* Already-inducted members, straight from the roster's own OA Member
+     flag — this is the one place with the honor-level dates. */
+  var list5 = (rosterRows||[]).filter(function(r){
+    return (r['OA Member']||'').trim().toUpperCase()==='Y';
+  }).map(function(r){
+    var isAdult = (r['Adult']||'').trim().toUpperCase()==='Y';
+    var info = honorInfo(r);
+    return {
+      name: r['Name'],
+      rankOrType: isAdult ? (r['Leadership']||'Adult') : (r['Rank']||'Youth'),
+      honor: info.honor,
+      mostRecentStr: info.mostRecentStr,
+      brotherhoodEligible: info.brotherhoodEligible
+    };
+  });
+
+  render(list1, list2, list3, list4, list5, upcoming, availableShortNights, hasLongAvailable, longEvents, shortEvents);
+}
+
+function render(list1, list2, list3, list4, list5, upcoming, availableShortNights, hasLongAvailable, longEvents, shortEvents){
+  document.getElementById('oatrk-results').classList.add('oatrk-show');
+  document.getElementById('oatrk-cnt1').textContent = list1.length + ' member' + (list1.length===1?'':'s');
+  document.getElementById('oatrk-cnt2').textContent = list2.length + ' member' + (list2.length===1?'':'s');
+  document.getElementById('oatrk-cnt3').textContent = list3.length + ' scout' + (list3.length===1?'':'s');
+  document.getElementById('oatrk-cnt4').textContent = list4.length + ' member' + (list4.length===1?'':'s');
+  document.getElementById('oatrk-cnt5').textContent = list5.length + ' member' + (list5.length===1?'':'s');
+
+  var t1 = document.getElementById('oatrk-tbl1');
+  t1.innerHTML = list1.length ? list1.map(function(s){ return (
+    '<tr><td class="oatrk-name">'+esc(s.name)+'</td><td>'+esc(s.rank)+'</td>'+
+    '<td class="oatrk-num">'+s.lt+'</td><td class="oatrk-num">'+s.st+'</td></tr>'
+  ); }).join('') : '<tr><td class="oatrk-empty-row" colspan="4">No one currently meets all three requirements.</td></tr>';
+
+  var t2 = document.getElementById('oatrk-tbl2');
+  t2.innerHTML = list2.length ? list2.map(function(s){
+    var pct = Math.min(100, Math.round((s.st/10)*100));
+    return (
+      '<tr><td class="oatrk-name">'+esc(s.name)+'</td><td>'+esc(s.rank)+'</td>'+
+      '<td><span class="oatrk-tag">'+esc(s.needsLabel)+'</span></td>'+
+      '<td class="oatrk-bar-cell"><div class="oatrk-bar-track"><div class="oatrk-bar-fill" style="width:'+pct+'%"></div></div>'+
+      '<div class="oatrk-bar-label">'+s.st+'/10 short-term nights logged · '+availableShortNights+' more available on the calendar</div></td></tr>'
+    );
+  }).join('') : '<tr><td class="oatrk-empty-row" colspan="4">No one currently short on nights can close the gap with what\'s on the calendar.</td></tr>';
+
+  var auditBody = document.getElementById('oatrk-auditBody');
+  if(upcoming.length === 0){
+    auditBody.innerHTML = '<p>No events of the selected type(s) are scheduled between today and the target date.</p>';
+  } else {
+    auditBody.innerHTML =
+      '<p>'+longEvents.length+' long-term (5+ night) trip'+(longEvents.length===1?'':'s')+' and '+shortEvents.length+' short-term trip'+(shortEvents.length===1?'':'s')+
+      ' scheduled, supplying up to <b>'+availableShortNights+' short-term night'+(availableShortNights===1?'':'s')+'</b>'+
+      (hasLongAvailable?' and at least one qualifying long-term trip':'')+'.</p>' +
+      '<table><thead><tr><th>Event</th><th>Dates</th><th>Type</th><th class="oatrk-num-h">Nights</th></tr></thead><tbody>' +
+      upcoming.map(function(e){ return '<tr><td>'+esc(e.event)+'</td><td>'+esc(e.start)+' – '+esc(e.end)+'</td><td><span class="oatrk-tag">'+esc(e.type)+'</span></td><td class="oatrk-num">'+e.nights+'</td></tr>'; }).join('') +
+      '</tbody></table>';
+  }
+
+  var t3 = document.getElementById('oatrk-tbl3');
+  t3.innerHTML = list3.length ? list3.map(function(s){
+    return '<tr><td class="oatrk-name">'+esc(s.name)+'</td><td>'+esc(s.rank||'—')+'</td>'+
+      '<td class="oatrk-num">'+(s.hasData ? s.total : '<span class="oatrk-tag">no data found</span>')+'</td></tr>';
+  }).join('') : '<tr><td class="oatrk-empty-row" colspan="3">No one is being held up by rank alone right now.</td></tr>';
+
+  var t4 = document.getElementById('oatrk-tbl4');
+  t4.innerHTML = list4.length ? list4.map(function(s){
+    var statusHtml = s.deadlineStr
+      ? (s.overdue
+          ? '<span class="oatrk-tag" style="background:rgba(217,130,102,0.25);color:var(--brick-light);">overdue by '+Math.abs(s.daysLeft)+' day'+(Math.abs(s.daysLeft)===1?'':'s')+' — needs re-election</span>'
+          : '<span class="oatrk-tag">'+s.daysLeft+' day'+(s.daysLeft===1?'':'s')+' left (by '+s.deadlineStr+')</span>')
+      : '<span class="oatrk-tag">could not read election date</span>';
+    return '<tr><td class="oatrk-name">'+esc(s.name)+'</td><td>'+(s.isAdult?'Adult':'Youth')+'</td><td>'+esc(s.election)+'</td><td>'+statusHtml+'</td></tr>';
+  }).join('') : '<tr><td class="oatrk-empty-row" colspan="4">No one is currently in this gap.</td></tr>';
+
+  var t5 = document.getElementById('oatrk-tbl5');
+  t5.innerHTML = list5.length ? list5.map(function(s){
+    var honorHtml = s.honor
+      ? esc(s.honor) + (s.brotherhoodEligible ? ' <span class="oatrk-tag">eligible for Brotherhood</span>' : '')
+      : '<span class="oatrk-tag">no honor date on file</span>';
+    return '<tr><td class="oatrk-name">'+esc(s.name)+'</td><td>'+esc(s.rankOrType)+'</td><td>'+honorHtml+'</td><td>'+esc(s.mostRecentStr||'—')+'</td></tr>';
+  }).join('') : '<tr><td class="oatrk-empty-row" colspan="4">No members recorded yet.</td></tr>';
+}
+
+})();
+</script>
