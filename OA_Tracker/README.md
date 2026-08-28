@@ -33,7 +33,7 @@ Clicking **Pull Reports Automatically** re-submits TroopWebHost's own Order of t
 
 ## What's confirmed vs. inferred
 
-Every report URL below was reverse-engineered from captured network requests, not from official documentation, since TroopWebHost has no public API. All five are now confirmed against a real response for this troop's account:
+Every report URL below was reverse-engineered from captured network requests, not from official documentation, since TroopWebHost has no public API:
 
 | Report | Menu_Item_ID | Status |
 |---|---|---|
@@ -52,7 +52,7 @@ If something needs correcting, the values live in one place — search this file
 - **The date field looks wrong on load**: that's the value *currently saved* on the live OA Eligibility screen, not necessarily your intended target date — it's a starting point, not a recommendation. Change it before pulling.
 - **Someone in "Already in the Order of the Arrow" shows "no honor date on file"**: their roster record has `OA Member = Y` but no date in Ordeal, Brotherhood, or Vigil — a real data gap on TroopWebHost, not a bug here. Worth fixing at the source.
 
-## Business rules encoded here (not TroopWebHost defaults)
+## Business rules encoded here
 
 These were specified during development, not pulled from any report — if BSA or your council changes them, update the code:
 
