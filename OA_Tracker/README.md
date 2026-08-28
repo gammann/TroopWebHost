@@ -36,7 +36,7 @@ Clicking **Pull Reports Automatically** re-submits TroopWebHost's own Order of t
 
 ## What's confirmed vs. inferred
 
-Every report URL below was reverse-engineered from captured network requests, not from official documentation, since TroopWebHost has no public API. All five are now confirmed against a real response for this troop's account:
+Every report URL below was reverse-engineered from captured network requests, not from official documentation, since TroopWebHost has no public API. 
 
 | Report | Menu_Item_ID | Status |
 |---|---|---|
@@ -57,9 +57,9 @@ If something needs correcting, the values live in one place — search this file
 
 ## Business rules encoded here (not TroopWebHost defaults)
 
-These were specified during development, not pulled from any report — if BSA or your council changes them, update the code:
 
 - Long-term camping = 5+ nights in a single trip; short-term = 1–4 nights. Eligibility needs at least one qualifying long-term trip and 10+ short-term nights within the window TroopWebHost itself computes for your chosen date.
-- Adults: no camping-night or rank threshold under current OA rules (this changed from an earlier version of the tool that did apply a camping minimum to adults — see Section 6 above). Section 6 is informational, not a determination.
+- Adults: no camping-night or rank threshold under current OA rules.
+-  Section 6 is informational, not a determination.
 - Ordeal window: 18 months from the OA Election date (`OATRK_ORDEAL_WINDOW_MONTHS` in CONFIG).
 - Brotherhood eligibility: 6 full months since the Ordeal date, and no higher honor (Brotherhood or Vigil) already earned (`OATRK_BROTHERHOOD_WAIT_MONTHS` in CONFIG).
