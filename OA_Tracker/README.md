@@ -33,15 +33,15 @@ Clicking **Pull Reports Automatically** re-submits TroopWebHost's own Order of t
 
 ## What's confirmed vs. inferred
 
-Every report URL below was reverse-engineered from captured network requests, not from official documentation, since TroopWebHost has no public API. Most are confirmed against a real response; one is not:
+Every report URL below was reverse-engineered from captured network requests, not from official documentation, since TroopWebHost has no public API. All five are now confirmed against a real response for this troop's account:
 
 | Report | Menu_Item_ID | Status |
 |---|---|---|
 | Scout OA Eligibility | 53654 (Form_ID 8400, BUTTON6) | Confirmed — form fields verified against live page HTML and its client-side JS |
 | Adult OA Eligibility | 53654 (Form_ID 8400, BUTTON7) | Confirmed — response columns verified against a real export |
+| Events export | 53104 | Confirmed — response's file name matched exactly |
 | Uncompleted Requirements | 46046 | Confirmed — response's file name matched exactly |
 | Active Roster | 53747 | Confirmed — response's file name matched exactly |
-| **Events export** | **53104** | **Not independently confirmed for this troop's account** — carried over from an earlier session's menu HTML. If Sections 2 or 4's "available nights" numbers look wrong, this is the first thing to check. |
 
 If something needs correcting, the values live in one place — search this file for `CONFIG` near the top of the `<script>` block.
 
@@ -49,7 +49,6 @@ If something needs correcting, the values live in one place — search this file
 
 - **A pull comes back empty with no error message**: open Tools → Reporting Options on TroopWebHost. If it's set to "PDF only," these report links may return a PDF instead of data, which the parser can't read.
 - **Adults come back empty**: the Adult OA Eligibility report's columns were verified once against a real export, but if TroopWebHost changes that report's layout, re-check `ADULT_OA_EXPECTED_COLS` in CONFIG.
-- **Events/nights numbers look off**: see the Events export caveat above — verify Menu_Item_ID 53104 is correct for your account by opening "Export Events To Excel" from your own menu and comparing the URL.
 - **The date field looks wrong on load**: that's the value *currently saved* on the live OA Eligibility screen, not necessarily your intended target date — it's a starting point, not a recommendation. Change it before pulling.
 - **Someone in "Already in the Order of the Arrow" shows "no honor date on file"**: their roster record has `OA Member = Y` but no date in Ordeal, Brotherhood, or Vigil — a real data gap on TroopWebHost, not a bug here. Worth fixing at the source.
 
