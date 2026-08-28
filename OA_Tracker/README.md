@@ -1,16 +1,19 @@
 # OA Tracker
 
-A single-file custom page for TroopWebHost that automatically pulls five reports, cross-references them, and sorts every scout and adult leader into one of five buckets for Order of the Arrow eligibility and First Class advancement — no manual exports, no spreadsheet wrangling.
+A single-file custom page for TroopWebHost that automatically pulls five reports, cross-references them, and sorts every scout and adult leader into one of six buckets for Order of the Arrow eligibility and First Class advancement — no manual exports, no spreadsheet wrangling.
+
+Official OA eligibility requirements: [oa-scouting.org/about/membership](https://oa-scouting.org/about/membership) — a link to this also appears near the top of the page itself.
 
 ## What it shows
 
-1. **Eligible now** — rank (scouts only) and both camping-night minimums are already met.
-2. **Within reach** — camping nights are short, but the campouts already on the calendar between today and your target date supply enough nights to close the gap. Scouts need First Class or higher to land here; adults have no rank gate.
+1. **Eligible now** — scouts only. Rank and both camping-night minimums are already met.
+2. **Within reach** — scouts already First Class or higher whose camping nights are short, but the campouts already on the calendar between today and your target date supply enough nights to close the gap.
 3. **Camping nights met — needs First Class** — scouts only. Camping requirement is satisfied (or reachable), rank is the only blocker. Shows how many Tenderfoot + Second Class + First Class requirements are still open.
 4. **Awaiting Ordeal** — anyone with an OA Election date but no Ordeal date yet, youth and adults alike. Sorted most-urgent first, since **elections expire 18 months after the election date** if the Ordeal isn't completed — past that, the member needs to be elected again. Overdue members are flagged accordingly.
 5. **Already in the Order of the Arrow** — fully inducted members, with their OA Honor (Ordeal, Brotherhood, or Vigil — whichever is highest on file) and the date of that most recent honor. Anyone whose current honor is Ordeal-only and at least 6 months old is flagged eligible for Brotherhood.
+6. **Adults with camping nights in this window** — informational only, not a pass/fail list. Adults no longer have a camping-night threshold under current OA rules, so this just surfaces every adult with any camping nights logged in the 2-year window, most-nights-first, as a starting point for discussion rather than a determination.
 
-**A member appears in exactly one section.** Anyone in Awaiting Ordeal — overdue or not — is excluded from every other section; that's their one home until their Ordeal is resolved (or their election expires).
+**A member appears in exactly one section.** Anyone in Awaiting Ordeal — overdue or not — is excluded from every other section; that's their one home until their Ordeal is resolved (or their election expires). Section 6 also excludes anyone already shown in Section 4 or 5.
 
 ## Installation
 
@@ -33,7 +36,7 @@ Clicking **Pull Reports Automatically** re-submits TroopWebHost's own Order of t
 
 ## What's confirmed vs. inferred
 
-Every report URL below was reverse-engineered from captured network requests, not from official documentation, since TroopWebHost has no public API:
+Every report URL below was reverse-engineered from captured network requests, not from official documentation, since TroopWebHost has no public API. All five are now confirmed against a real response for this troop's account:
 
 | Report | Menu_Item_ID | Status |
 |---|---|---|
@@ -52,11 +55,11 @@ If something needs correcting, the values live in one place — search this file
 - **The date field looks wrong on load**: that's the value *currently saved* on the live OA Eligibility screen, not necessarily your intended target date — it's a starting point, not a recommendation. Change it before pulling.
 - **Someone in "Already in the Order of the Arrow" shows "no honor date on file"**: their roster record has `OA Member = Y` but no date in Ordeal, Brotherhood, or Vigil — a real data gap on TroopWebHost, not a bug here. Worth fixing at the source.
 
-## Business rules encoded here
+## Business rules encoded here (not TroopWebHost defaults)
 
 These were specified during development, not pulled from any report — if BSA or your council changes them, update the code:
 
 - Long-term camping = 5+ nights in a single trip; short-term = 1–4 nights. Eligibility needs at least one qualifying long-term trip and 10+ short-term nights within the window TroopWebHost itself computes for your chosen date.
-- Adults: camping requirement only, no rank requirement.
+- Adults: no camping-night or rank threshold under current OA rules (this changed from an earlier version of the tool that did apply a camping minimum to adults — see Section 6 above). Section 6 is informational, not a determination.
 - Ordeal window: 18 months from the OA Election date (`OATRK_ORDEAL_WINDOW_MONTHS` in CONFIG).
 - Brotherhood eligibility: 6 full months since the Ordeal date, and no higher honor (Brotherhood or Vigil) already earned (`OATRK_BROTHERHOOD_WAIT_MONTHS` in CONFIG).

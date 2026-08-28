@@ -180,6 +180,7 @@
   <p class="oatrk-eyebrow">Troop Advancement Desk</p>
   <h1>OA Tracker</h1>
   <p class="oatrk-sub">Pulls the Order of the Arrow Eligibility, Events, and Uncompleted Requirements reports straight from this site and sorts scouts into who's eligible now, who's within reach on the current calendar, and who just needs rank.</p>
+  <p class="oatrk-sub" style="margin-top:10px;">Official eligibility requirements: <a href="https://oa-scouting.org/about/membership" target="_blank" rel="noopener">oa-scouting.org/about/membership</a></p>
   <div class="oatrk-callout">
     <b>Heads up:</b> pulling the OA Eligibility report re-saves the "Compute Eligibility As Of This Date" field on that screen — the same as typing it in by hand. It is not a read-only lookup.
   </div>
@@ -210,9 +211,9 @@
       <span class="oatrk-section-title">Eligible now</span>
       <span class="oatrk-section-count" id="oatrk-cnt1"></span>
     </div>
-    <p class="oatrk-section-desc">Straight from the OA Eligibility reports — camping minimums are satisfied (rank too, for scouts) as of the date entered above. Adults appear here with "Adult" in the rank column.</p>
+    <p class="oatrk-section-desc">Straight from the Scout OA Eligibility report — rank and both camping-night minimums are satisfied as of the date entered above. Adults no longer have a camping threshold under current OA rules, so they're covered separately below rather than judged against this bar.</p>
     <table>
-      <thead><tr><th>Member</th><th>Rank / Type</th><th class="oatrk-num-h">Long-term nights</th><th class="oatrk-num-h">Short-term nights</th></tr></thead>
+      <thead><tr><th>Scout</th><th>Rank</th><th class="oatrk-num-h">Long-term nights</th><th class="oatrk-num-h">Short-term nights</th></tr></thead>
       <tbody id="oatrk-tbl1"></tbody>
     </table>
   </div>
@@ -223,9 +224,9 @@
       <span class="oatrk-section-title">Can become eligible on this calendar</span>
       <span class="oatrk-section-count" id="oatrk-cnt2"></span>
     </div>
-    <p class="oatrk-section-desc">Scouts already First Class or higher, and all adults (no rank requirement) — camping nights still short, but the campouts already on the calendar between today and the target date supply enough nights to close the gap.</p>
+    <p class="oatrk-section-desc">Scouts already First Class or higher — camping nights still short, but the campouts already on the calendar between today and the target date supply enough nights to close the gap.</p>
     <table>
-      <thead><tr><th>Member</th><th>Rank / Type</th><th>Still needs</th><th class="oatrk-bar-cell">Nights needed vs. available</th></tr></thead>
+      <thead><tr><th>Scout</th><th>Rank</th><th>Still needs</th><th class="oatrk-bar-cell">Nights needed vs. available</th></tr></thead>
       <tbody id="oatrk-tbl2"></tbody>
     </table>
     <details class="oatrk-audit">
@@ -270,6 +271,19 @@
     <table>
       <thead><tr><th>Member</th><th>Rank / Type</th><th>OA Honor</th><th>Most recent honor date</th></tr></thead>
       <tbody id="oatrk-tbl5"></tbody>
+    </table>
+  </div>
+
+  <div class="oatrk-section">
+    <div class="oatrk-section-head">
+      <span class="oatrk-stamp reach">Adults</span>
+      <span class="oatrk-section-title">Adults with camping nights in this window</span>
+      <span class="oatrk-section-count" id="oatrk-cnt6"></span>
+    </div>
+    <p class="oatrk-section-desc">Informational only — adults no longer have a camping-night threshold to clear under current OA rules, so this isn't a pass/fail list. It's every adult with at least one camping night logged in the Adult OA Eligibility report's 2-year window, most-nights-first, as a starting point for discussion.</p>
+    <table>
+      <thead><tr><th>Adult</th><th>Leadership</th><th class="oatrk-num-h">Long-term nights</th><th class="oatrk-num-h">Short-term nights</th></tr></thead>
+      <tbody id="oatrk-tbl6"></tbody>
     </table>
   </div>
 
@@ -706,31 +720,28 @@ function runReport(oaRows, adultRows, eventRows, reqRows, rosterRows, includedTy
     }
   });
 
-  /* Adults: camping requirement only, no rank gate. Column names are
-     confirmed against a real export — see CONFIG. */
-  var alreadyOACountAdult = 0;
-  (adultRows||[]).forEach(function(row){
+  /* Adults no longer have a camping-night threshold to clear under
+     current OA rules (rank was never required for them). Rather than
+     mark all of them "eligible" with nothing to filter on, this is
+     just an informational list of adults with any camping nights
+     logged in the report's 2-year window — a starting point for
+     conversation, not a pass/fail determination. */
+  var list6 = (adultRows||[]).filter(function(row){
     var status = (row['OA Eligibility']||'').trim();
     var name = row['Name'];
+    if(awaitingOrdealSet[normName(name)]) return false; // already shown in Awaiting Ordeal
+    if(/already/i.test(status)) return false; // already shown in Already in the OA
     var lt = parseInt(row['Long-Term Camping Nights'],10) || 0;
     var st = parseInt(row['Short-Term Camping Nights'],10) || 0;
-
-    if(awaitingOrdealSet[normName(name)]) return; // already shown in Awaiting Ordeal
-
-    if(/already/i.test(status)){ alreadyOACountAdult++; return; }
-    if(/^eligible/i.test(status)){
-      list1.push({name:name, rank:'Adult', lt:lt, st:st});
-      return;
-    }
-
-    var ev = evaluateCamping(lt, st, hasLongAvailable, availableShortNights);
-    if(!ev.reachable) return;
-
-    var needsParts = [];
-    if(lt < 5) needsParts.push('a long-term trip');
-    if(ev.stNeeded > 0) needsParts.push(ev.stNeeded+' more short-term night'+(ev.stNeeded===1?'':'s'));
-    list2.push({ name:name, rank:'Adult', lt:lt, st:st, stNeeded:ev.stNeeded, needsLabel: needsParts.join(' + ') || 'nothing — recheck export' });
-  });
+    return (lt + st) > 0;
+  }).map(function(row){
+    return {
+      name: row['Name'],
+      leadership: row['Leadership'] || '',
+      lt: parseInt(row['Long-Term Camping Nights'],10) || 0,
+      st: parseInt(row['Short-Term Camping Nights'],10) || 0
+    };
+  }).sort(function(a,b){ return (b.lt+b.st) - (a.lt+a.st); });
 
   /* Already-inducted members, straight from the roster's own OA Member
      flag — this is the one place with the honor-level dates. */
@@ -748,16 +759,17 @@ function runReport(oaRows, adultRows, eventRows, reqRows, rosterRows, includedTy
     };
   });
 
-  render(list1, list2, list3, list4, list5, upcoming, availableShortNights, hasLongAvailable, longEvents, shortEvents);
+  render(list1, list2, list3, list4, list5, list6, upcoming, availableShortNights, hasLongAvailable, longEvents, shortEvents);
 }
 
-function render(list1, list2, list3, list4, list5, upcoming, availableShortNights, hasLongAvailable, longEvents, shortEvents){
+function render(list1, list2, list3, list4, list5, list6, upcoming, availableShortNights, hasLongAvailable, longEvents, shortEvents){
   document.getElementById('oatrk-results').classList.add('oatrk-show');
-  document.getElementById('oatrk-cnt1').textContent = list1.length + ' member' + (list1.length===1?'':'s');
-  document.getElementById('oatrk-cnt2').textContent = list2.length + ' member' + (list2.length===1?'':'s');
+  document.getElementById('oatrk-cnt1').textContent = list1.length + ' scout' + (list1.length===1?'':'s');
+  document.getElementById('oatrk-cnt2').textContent = list2.length + ' scout' + (list2.length===1?'':'s');
   document.getElementById('oatrk-cnt3').textContent = list3.length + ' scout' + (list3.length===1?'':'s');
   document.getElementById('oatrk-cnt4').textContent = list4.length + ' member' + (list4.length===1?'':'s');
   document.getElementById('oatrk-cnt5').textContent = list5.length + ' member' + (list5.length===1?'':'s');
+  document.getElementById('oatrk-cnt6').textContent = list6.length + ' adult' + (list6.length===1?'':'s');
 
   var t1 = document.getElementById('oatrk-tbl1');
   t1.innerHTML = list1.length ? list1.map(function(s){ return (
@@ -812,6 +824,12 @@ function render(list1, list2, list3, list4, list5, upcoming, availableShortNight
       : '<span class="oatrk-tag">no honor date on file</span>';
     return '<tr><td class="oatrk-name">'+esc(s.name)+'</td><td>'+esc(s.rankOrType)+'</td><td>'+honorHtml+'</td><td>'+esc(s.mostRecentStr||'—')+'</td></tr>';
   }).join('') : '<tr><td class="oatrk-empty-row" colspan="4">No members recorded yet.</td></tr>';
+
+  var t6 = document.getElementById('oatrk-tbl6');
+  t6.innerHTML = list6.length ? list6.map(function(s){
+    return '<tr><td class="oatrk-name">'+esc(s.name)+'</td><td>'+esc(s.leadership||'—')+'</td>'+
+      '<td class="oatrk-num">'+s.lt+'</td><td class="oatrk-num">'+s.st+'</td></tr>';
+  }).join('') : '<tr><td class="oatrk-empty-row" colspan="4">No adults with camping nights in this window.</td></tr>';
 }
 
 })();
