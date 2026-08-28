@@ -34,17 +34,17 @@ This only works pasted directly into TroopWebHost's own site (same-origin) — i
 
 Clicking **Pull Reports Automatically** re-submits TroopWebHost's own Order of the Arrow Eligibility form to set "Compute Eligibility As Of This Date" to whatever you entered. **This is a real save**, identical to a leader typing that date into the field by hand — it will overwrite that value for anyone else who opens that screen. The Events, Uncompleted Requirements, and Active Roster pulls are plain read-only report links with no side effects.
 
-## What's confirmed vs. inferred
+## Reports Used
 
 Every report URL below was reverse-engineered from captured network requests, not from official documentation, since TroopWebHost has no public API. 
 
-| Report | Menu_Item_ID | Status |
-|---|---|---|
-| Scout OA Eligibility | 53654 (Form_ID 8400, BUTTON6) | Confirmed — form fields verified against live page HTML and its client-side JS |
-| Adult OA Eligibility | 53654 (Form_ID 8400, BUTTON7) | Confirmed — response columns verified against a real export |
-| Events export | 53104 | Confirmed — response's file name matched exactly |
-| Uncompleted Requirements | 46046 | Confirmed — response's file name matched exactly |
-| Active Roster | 53747 | Confirmed — response's file name matched exactly |
+| Report | Menu_Item_ID | 
+|---|---|
+| Scout OA Eligibility | 53654 (Form_ID 8400, BUTTON6) | 
+| Adult OA Eligibility | 53654 (Form_ID 8400, BUTTON7) | 
+| Events export | 53104 | 
+| Uncompleted Requirements | 46046 | 
+| Active Roster | 53747 | 
 
 If something needs correcting, the values live in one place — search this file for `CONFIG` near the top of the `<script>` block.
 
