@@ -15,6 +15,17 @@ Official OA eligibility requirements: [oa-scouting.org/about/membership](https:/
 
 **A member appears in exactly one section.** Anyone in Awaiting Ordeal — overdue or not — is excluded from every other section; that's their one home until their Ordeal is resolved (or their election expires). Section 6 also excludes anyone already shown in Section 4 or 5.
 
+<img width="836" height="1123" alt="image" src="https://github.com/user-attachments/assets/0a6c06ce-6571-4829-95d9-b47b6b7a1bad" />
+
+
+
+<img width="799" height="870" alt="image" src="https://github.com/user-attachments/assets/e512ce9b-bcd7-43a4-b7fd-8b2af49a2003" />
+
+
+
+<img width="808" height="489" alt="image" src="https://github.com/user-attachments/assets/8d72d506-6183-4359-a08d-07f9a63c7dc3" />
+
+
 ## Installation
 
 1. Open the file and copy its entire contents.
