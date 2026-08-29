@@ -66,11 +66,11 @@ If something needs correcting, the values live in one place — search this file
 - **The date field looks wrong on load**: that's the value *currently saved* on the live OA Eligibility screen, not necessarily your intended target date — it's a starting point, not a recommendation. Change it before pulling.
 - **Someone in "Already in the Order of the Arrow" shows "no honor date on file"**: their roster record has `OA Member = Y` but no date in Ordeal, Brotherhood, or Vigil — a real data gap on TroopWebHost, not a bug here. Worth fixing at the source.
 
-## Business rules encoded here (not TroopWebHost defaults)
+## OA Eligibility Requirements:
 
 
 - Long-term camping = 5+ nights in a single trip; short-term = 1–4 nights. Eligibility needs at least one qualifying long-term trip and 10+ short-term nights within the window TroopWebHost itself computes for your chosen date.
-- Adults: no camping-night or rank threshold under current OA rules.
+- Adults: no camping-night requirement, must be nominated by the unit committee.  The number of adults nominated can be no more than two-thirds of the number of youth candidates elected.
 -  Section 6 is informational, not a determination.
 - Ordeal window: 18 months from the OA Election date (`OATRK_ORDEAL_WINDOW_MONTHS` in CONFIG).
 - Brotherhood eligibility: 6 full months since the Ordeal date, and no higher honor (Brotherhood or Vigil) already earned (`OATRK_BROTHERHOOD_WAIT_MONTHS` in CONFIG).
