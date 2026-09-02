@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Added README screenshots of all 5 wizard steps, generated from fully
+  synthetic demo data (no real Scout information)
+- Fixed leftover text from the old file-export workflow ("Drop in the
+  TroopWebHost export files...", "Pulled from the member profile export",
+  "check your merit badge export was included") to reflect the current
+  live-session-based fetching
 - Verified `TWH_CONFIG`'s Menu_Item_ID/Form_ID values (both leader-side and
   self-service) against HAR captures from two additional, unrelated troop
   sites. Every value matched exactly, including individual `ENTRY###` field
