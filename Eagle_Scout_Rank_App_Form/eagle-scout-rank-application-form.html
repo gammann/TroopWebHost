@@ -1,0 +1,1932 @@
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<style>.eagle-scope {
+    /* Colors pulled directly from this troop's TroopWebHost theme
+       (bootstrap_override_colors_boy_scout.css) so this page matches
+       the rest of the site. */
+    --navy: #006600;        /* .navtable / .navicon background */
+    --navy-dark: #004400;   /* darker shade for gradient/hover */
+    --red: #cc0000;         /* .RequiredIndicator */
+    --paper: #ffffee;       /* body background */
+    --card: #ffffff;        /* .form-control background */
+    --line: #cccccc;        /* .table-curved border-color */
+    --ink: #222222;
+    --muted: #5a5a5a;
+    --gold: #ead296;        /* .nav-tabs background */
+    --yellow: #ffff00;      /* .navlink color */
+    --grid-head: #ffffcc;   /* .table-striped thead background */
+    --ok: #1f7a1f;
+    --warn: #cc0000;
+  }.eagle-scope, .eagle-scope * { box-sizing: border-box; }.eagle-scope {
+    margin: 0; padding: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: "Iowan Old Style", "Georgia", serif;
+  }.eagle-scope .eagle-wrap { max-width: 980px; margin: 0 auto; padding: 0 24px 80px; }.eagle-scope header.eagle-top {
+    background: var(--navy);
+    background-image: linear-gradient(160deg, var(--navy) 0%, var(--navy-dark) 100%);
+    color: #fff;
+    padding: 36px 24px 28px;
+    border-bottom: 6px solid var(--gold);
+  }.eagle-scope header.eagle-top .eagle-inner { max-width: 980px; margin: 0 auto; }.eagle-scope header.eagle-top .eagle-eyebrow {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    font-size: 11.5px;
+    color: rgba(255,255,255,0.82);
+    margin: 0 0 8px;
+  }.eagle-scope header.eagle-top h1 {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-weight: 800;
+    font-size: 34px;
+    line-height: 1.1;
+    margin: 0 0 10px;
+    letter-spacing: -0.01em;
+  }.eagle-scope header.eagle-top p.eagle-sub {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 15px;
+    color: rgba(255,255,255,0.88);
+    max-width: 640px;
+    margin: 0;
+    line-height: 1.55;
+  }.eagle-scope .eagle-steps-nav {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    display: flex;
+    gap: 6px;
+    margin-top: 22px;
+    flex-wrap: wrap;
+  }.eagle-scope .eagle-steps-nav .eagle-pill {
+    font-size: 12px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.08);
+    color: rgba(255,255,255,0.75);
+    border: 1px solid rgba(255,255,255,0.18);
+  }.eagle-scope .eagle-steps-nav .eagle-pill.eagle-active { background: var(--gold); color: #2a1f04; border-color: var(--gold); font-weight: 700; }.eagle-scope .eagle-steps-nav .eagle-pill.eagle-done { background: rgba(255,255,255,0.22); color: #fff; border-color: rgba(255,255,255,0.5); }.eagle-scope section.eagle-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    margin-top: 28px;
+    padding: 26px 28px;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.03);
+  }.eagle-scope section.eagle-card h2 {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 12.5px;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+    color: var(--red);
+    margin: 0 0 4px;
+    font-weight: 700;
+  }.eagle-scope section.eagle-card h3 {
+    font-size: 21px;
+    margin: 0 0 14px;
+    font-weight: 600;
+    color: var(--navy-dark);
+  }.eagle-scope section.eagle-card p.eagle-help {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 13.5px;
+    color: var(--muted);
+    line-height: 1.6;
+    margin: 0 0 18px;
+  }.eagle-scope .eagle-method-box {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    border: 1px solid var(--line);
+    border-radius: 5px;
+    padding: 16px 18px;
+    margin-top: 18px;
+    background: var(--paper);
+  }.eagle-scope .eagle-btn-row { margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }.eagle-scope button, .eagle-scope .btn {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 11px 22px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    transition: transform .06s, filter .12s;
+  }.eagle-scope button.eagle-primary { background: var(--red); color: #fff; }.eagle-scope button.eagle-primary:hover { filter: brightness(1.08); }.eagle-scope button.eagle-primary:disabled { background: #cbb; cursor: not-allowed; filter: none; }.eagle-scope button.eagle-secondary { background: transparent; color: var(--navy); border: 1.5px solid var(--navy); }.eagle-scope button.eagle-secondary:hover { background: rgba(0,102,0,0.07); }.eagle-scope button.eagle-ghost { background: transparent; color: var(--muted); border: 1.5px solid var(--line); padding: 8px 14px; font-size: 12.5px; }.eagle-scope button:active { transform: translateY(1px); }.eagle-scope .eagle-note {
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 13px;
+    line-height: 1.6;
+    padding: 12px 14px;
+    border-radius: 4px;
+    margin-top: 14px;
+  }.eagle-scope .eagle-note.eagle-info { background: #f9fff9; color: var(--navy-dark); border-left: 3px solid var(--navy); }.eagle-scope .eagle-note.eagle-warn { background: #fdecea; color: #7a1c1f; border-left: 3px solid var(--red); }.eagle-scope .eagle-note.eagle-ok { background: #f0fff0; color: var(--ok); border-left: 3px solid var(--ok); }.eagle-scope label.eagle-field {
+    display: block;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 11.5px;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--muted);
+    margin-bottom: 5px;
+    margin-top: 16px;
+  }.eagle-scope input[type=text], .eagle-scope input[type=email], .eagle-scope input[type=tel], .eagle-scope input[type=number], .eagle-scope select, .eagle-scope textarea {
+    width: 100%;
+    font-family: "Helvetica Neue", Arial, sans-serif;
+    font-size: 14.5px;
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-radius: 3px;
+    background: var(--card);
+    color: var(--ink);
+  }.eagle-scope input:focus, .eagle-scope select:focus, .eagle-scope textarea:focus { outline: 2px solid var(--gold); outline-offset: 1px; }.eagle-scope .eagle-grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 0 18px; }.eagle-scope .eagle-grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0 18px; }.eagle-scope .eagle-grid4 { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 0 18px; }.eagle-scope .eagle-datepart { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }.eagle-scope .eagle-datepart input { text-align: center; }.eagle-scope table.eagle-mb-table { width: 100%; border-collapse: collapse; margin-top: 8px; font-family: "Helvetica Neue", Arial, sans-serif; font-size: 13px; }.eagle-scope table.eagle-mb-table th {
+    text-align: left; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em;
+    color: var(--muted); padding: 6px 8px; border-bottom: 2px solid var(--line);
+    background: var(--grid-head);
+  }.eagle-scope table.eagle-mb-table td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }.eagle-scope table.eagle-mb-table tr.eagle-assigned td { background: #f0fff0; }.eagle-scope table.eagle-mb-table select.eagle-slotpick { font-size: 12.5px; padding: 4px 6px; }.eagle-scope .eagle-badge-star { color: var(--gold); font-weight: 700; }.eagle-scope .eagle-pill-count {
+    font-family: "Helvetica Neue", Arial, sans-serif; font-size: 12px; font-weight: 700;
+    padding: 3px 10px; border-radius: 999px; background: var(--grid-head); color: #6b5417;
+  }.eagle-scope .eagle-pill-count.eagle-full { background: #f0fff0; color: var(--ok); }.eagle-scope .eagle-pill-count.eagle-over { background: #fdecea; color: var(--red); }.eagle-scope .eagle-pos-card {
+    border: 1px solid var(--line); border-radius: 4px; padding: 12px 14px; margin-top: 10px;
+    display: flex; align-items: flex-start; gap: 12px; font-family: "Helvetica Neue", Arial, sans-serif; font-size: 13.5px;
+  }.eagle-scope .eagle-pos-card input[type=checkbox] { margin-top: 3px; }.eagle-scope .eagle-pos-card .eagle-title { font-weight: 700; color: var(--navy-dark); }.eagle-scope .eagle-pos-card .eagle-dates { color: var(--muted); font-size: 12.5px; margin-top: 2px; }.eagle-scope .eagle-pos-card .eagle-editrow { margin-top: 8px; display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }.eagle-scope .eagle-pos-card .eagle-editrow .eagle-datepart input { padding: 6px; font-size: 13px; }.eagle-scope .eagle-pos-card .eagle-editrow label { font-size: 10px; }.eagle-scope footer.actions {
+    position: sticky; bottom: 0;
+    background: linear-gradient(0deg, var(--paper) 60%, rgba(246,244,238,0));
+    padding: 18px 0 6px;
+    display: flex; justify-content: flex-end; gap: 12px;
+  }.eagle-scope .eagle-small-print { font-family: "Helvetica Neue", Arial, sans-serif; font-size: 11.5px; color: var(--muted); margin-top: 26px; line-height: 1.6; text-align:center; }.eagle-scope .eagle-hidden { display: none !important; }.eagle-scope .eagle-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 720px) {.eagle-scope .eagle-grid2, .eagle-scope .eagle-grid3, .eagle-scope .eagle-two-col { grid-template-columns: 1fr; }.eagle-scope header.eagle-top h1 { font-size: 26px; }
+  }
+</style>
+
+<div class="eagle-scope">
+<header class="eagle-top">
+  <div class="eagle-inner">
+    <p class="eagle-eyebrow">Life-to-Eagle Toolkit &middot; unofficial</p>
+    <h1>Eagle Scout Rank Application Form</h1>
+    <p class="eagle-sub">Look up a Scout and this fills out BSA form 512-728 automatically, pulling merit badges, ranks, positions, and requirement dates straight from your logged-in TroopWebHost session - no exports, no uploads. Review everything before it's submitted; nothing here is a substitute for the unit leader's sign-off.</p>
+    <div class="eagle-steps-nav">
+      <span class="eagle-pill eagle-active" id="nav-1">1 &nbsp;Upload</span>
+      <span class="eagle-pill" id="nav-2">2 &nbsp;Review Scout Info</span>
+      <span class="eagle-pill" id="nav-3">3 &nbsp;Merit Badges</span>
+      <span class="eagle-pill" id="nav-4">4 &nbsp;Positions &amp; Dates</span>
+      <span class="eagle-pill" id="nav-5">5 &nbsp;Download</span>
+    </div>
+  </div>
+</header>
+
+<div class="eagle-wrap">
+
+  <!-- SOURCE PDF SETTINGS -->
+  <section class="eagle-card" id="pdf-source-card">
+    <h2>Application form source</h2>
+    <h3>512-728 &mdash; Eagle Scout Rank Application</h3>
+    <p class="eagle-help">
+      This tool fills whatever PDF is at the link below. Scouting America updates this form occasionally &mdash;
+      if the link ever breaks, get the current URL from
+      <a href="https://www.scouting.org/awards/awards-central/eagle-scout/" target="_blank" rel="noopener">scouting.org's Eagle Scout awards page</a>,
+      paste it in here, and click Save. This is stored in the browser (not in the page code), so any admin
+      of this custom page can update it without editing anything.
+    </p>
+    <label class="eagle-field">Official form URL</label>
+    <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+      <input type="text" id="pdfSourceUrl" style="flex:1; min-width:280px;">
+      <button class="eagle-secondary" id="pdfSourceSave" type="button">Save</button>
+      <button class="eagle-ghost" id="pdfSourceReset" type="button">Reset to default</button>
+    </div>
+    <div id="pdfSourceStatus" style="margin-top:10px;"></div>
+  </section>
+
+  <!-- STEP 1: LOAD SCOUT -->
+  <section class="eagle-card" id="step-upload">
+    <h2>Step 1</h2>
+    <h3>Load a Scout</h3>
+    <p class="eagle-help">This reads your troop's data directly from TroopWebHost using your logged-in session &mdash; nothing is uploaded or leaves your browser.</p>
+
+    <div class="eagle-method-box" id="liveModeBox">
+      <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+        <input type="text" id="liveScoutSearch" list="liveScoutList" placeholder="Start typing a Scout's name..." style="flex:1; min-width:220px;">
+        <datalist id="liveScoutList"></datalist>
+        <button class="eagle-primary" id="liveLoadBtn" disabled type="button">Load this Scout</button>
+        <button class="eagle-ghost" id="btnReset" type="button">Start over</button>
+      </div>
+      <div id="liveStatus" style="margin-top:12px;"></div>
+    </div>
+  </section>
+
+  <!-- STEP 2: SCOUT INFO -->
+  <section class="eagle-card eagle-hidden" id="step-info">
+    <h2>Step 2</h2>
+    <h3>Scout &amp; unit information</h3>
+    <p class="eagle-help">Pulled from the member profile export. Fix anything that looks off - this feeds straight into the PDF.</p>
+
+    <div class="eagle-two-col">
+      <div>
+        <label class="eagle-field">Full name</label>
+        <input type="text" id="f_fullname">
+
+        <label class="eagle-field">Street address</label>
+        <input type="text" id="f_street">
+
+        <div class="eagle-grid3">
+          <div><label class="eagle-field">City</label><input type="text" id="f_city"></div>
+          <div><label class="eagle-field">State</label><input type="text" id="f_state" maxlength="2"></div>
+          <div><label class="eagle-field">Zip</label><input type="text" id="f_zip"></div>
+        </div>
+
+        <div class="eagle-grid2">
+          <div><label class="eagle-field">Telephone</label><input type="text" id="f_phone"></div>
+          <div><label class="eagle-field">Email</label><input type="text" id="f_email"></div>
+        </div>
+
+        <label class="eagle-field">Date of birth</label>
+        <div class="eagle-datepart">
+          <input type="text" id="f_dob_m" placeholder="MM" maxlength="2">
+          <input type="text" id="f_dob_d" placeholder="DD" maxlength="2">
+          <input type="text" id="f_dob_y" placeholder="YY" maxlength="2">
+        </div>
+      </div>
+
+      <div>
+        <label class="eagle-field">Troop / crew / ship number</label>
+        <input type="text" id="f_unitno">
+
+        <div class="eagle-grid3">
+          <div><label class="eagle-field">Unit city</label><input type="text" id="f_unitcity"></div>
+          <div><label class="eagle-field">Unit state</label><input type="text" id="f_unitstate" maxlength="2"></div>
+          <div><label class="eagle-field">Unit zip</label><input type="text" id="f_unitzip"></div>
+        </div>
+
+        <label class="eagle-field">Parent / guardian name(s)</label>
+        <input type="text" id="f_parent">
+
+        <label class="eagle-field">Employer (optional)</label>
+        <input type="text" id="f_employer">
+
+        <label class="eagle-field">Cub Scout / Webelos / Arrow of Light / 5th grade at joining</label>
+        <div class="eagle-grid4" style="grid-template-columns: repeat(4, 1fr);">
+          <div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Cub Scout?</div>
+            <select id="f_cub"><option value="">Unknown</option><option value="Y">Yes</option><option value="N">No</option></select>
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Webelos?</div>
+            <select id="f_webelos"><option value="">Unknown</option><option value="Y">Yes</option><option value="N">No</option></select>
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Arrow of Light?</div>
+            <select id="f_aol"><option value="">Unknown</option><option value="Y">Yes</option><option value="N">No</option></select>
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:4px;">Finished 5th grade?</div>
+            <select id="f_5thgrade"><option value="">Unknown</option><option value="Y">Yes</option><option value="N">No</option></select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <label class="eagle-field">Rank board-of-review dates</label>
+    <table class="eagle-mb-table" id="rankTable">
+      <thead><tr><th>Rank</th><th>Month</th><th>Day</th><th>Year</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="eagle-btn-row">
+      <button class="eagle-secondary" id="back-1b" type="button">Back</button>
+      <button class="eagle-primary" id="next-2" type="button">Continue to merit badges</button>
+    </div>
+  </section>
+
+  <!-- STEP 3: MERIT BADGES -->
+  <section class="eagle-card eagle-hidden" id="step-badges">
+    <h2>Step 3</h2>
+    <h3>Merit badges</h3>
+    <p class="eagle-help">Required badges (marked <span class="eagle-badge-star">*</span>) are auto-assigned where there's exactly one earned candidate. Where a Scout earned more than one option for a choice requirement (#7, #8, #10), pick which one fills the requirement - the other stays available as an elective. Then pick exactly 8 electives for slots 14-21.</p>
+
+    <div id="requiredBadgesArea"></div>
+
+    <div style="margin-top:24px; display:flex; align-items:center; justify-content:space-between;">
+      <label class="eagle-field" style="margin:0;">Electives (slots 14-21)</label>
+      <span class="eagle-pill-count" id="electiveCount">0 / 8 selected</span>
+    </div>
+    <table class="eagle-mb-table" id="electiveTable">
+      <thead><tr><th></th><th>Merit badge</th><th>Earned</th><th>Unit</th></tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <div class="eagle-btn-row">
+      <button class="eagle-secondary" id="back-2b" type="button">Back</button>
+      <button class="eagle-primary" id="next-3" type="button">Continue to positions &amp; dates</button>
+    </div>
+  </section>
+
+  <!-- STEP 4: POSITIONS + REQ 5/6/7 -->
+  <section class="eagle-card eagle-hidden" id="step-positions">
+    <h2>Step 4</h2>
+    <h3>Positions of responsibility &amp; remaining requirements</h3>
+    <p class="eagle-help">Requirement 4 only counts time served <em>after</em> the Life board of review. Positions that overlap that date are listed below with dates pre-adjusted - check the ones to include (you can list up to two) and edit dates if needed.</p>
+
+    <div id="positionsArea"></div>
+
+    <label class="eagle-field">Requirement 5 - Service project</label>
+    <div class="eagle-grid2">
+      <div><label class="eagle-field">Name of project</label><input type="text" id="f_projectname"></div>
+      <div><label class="eagle-field">Beneficiary organization</label><input type="text" id="f_beneficiary"></div>
+    </div>
+    <div class="eagle-grid2">
+      <div><label class="eagle-field">Total hours</label><input type="text" id="f_hours"></div>
+      <div>
+        <label class="eagle-field">Date project finished</label>
+        <div class="eagle-datepart">
+          <input type="text" id="f_proj_m" placeholder="MM" maxlength="2">
+          <input type="text" id="f_proj_d" placeholder="DD" maxlength="2">
+          <input type="text" id="f_proj_y" placeholder="YY" maxlength="2">
+        </div>
+      </div>
+    </div>
+
+    <label class="eagle-field">Requirement 6 - Unit leader conference date</label>
+    <div class="eagle-datepart" style="max-width:220px;">
+      <input type="text" id="f_conf_m" placeholder="MM" maxlength="2">
+      <input type="text" id="f_conf_d" placeholder="DD" maxlength="2">
+      <input type="text" id="f_conf_y" placeholder="YY" maxlength="2">
+    </div>
+
+    <label class="eagle-field">Requirement 7 - Eagle board of review date</label>
+    <div class="eagle-datepart" style="max-width:220px;">
+      <input type="text" id="f_eaglebor_m" placeholder="MM" maxlength="2">
+      <input type="text" id="f_eaglebor_d" placeholder="DD" maxlength="2">
+      <input type="text" id="f_eaglebor_y" placeholder="YY" maxlength="2">
+    </div>
+
+    <div class="eagle-btn-row">
+      <button class="eagle-secondary" id="back-3b" type="button">Back</button>
+      <button class="eagle-primary" id="next-4" type="button">Continue to download</button>
+    </div>
+  </section>
+
+  <!-- STEP 5: DOWNLOAD -->
+  <section class="eagle-card eagle-hidden" id="step-download">
+    <h2>Step 5</h2>
+    <h3>Generate &amp; download</h3>
+    <p class="eagle-help">This fills the official BSA form 512-728 (Jan 2026 revision) client-side, in your browser - nothing is uploaded anywhere. Still needed by hand: references (Requirement 2), the ambitions/leadership statement attachment, and all signatures.</p>
+    <div id="finalChecklist"></div>
+    <div class="eagle-btn-row">
+      <button class="eagle-secondary" id="back-4b" type="button">Back</button>
+      <button class="eagle-primary" id="btnGenerate" type="button">Generate filled PDF</button>
+    </div>
+    <div id="genStatus"></div>
+  </section>
+
+  <p class="eagle-small-print">Unofficial helper tool - not produced by or affiliated with Scouting America. Always verify every field before submitting to your unit leader and council.</p>
+</div>
+</div>
+
+<script>
+(function() {
+"use strict";
+/* ============================================================
+   Eagle Scout Rank Application Form - live TroopWebHost custom page
+   Reads Scout data directly via same-origin fetch() using the
+   logged-in session. Nothing is uploaded anywhere.
+   ============================================================ */
+
+const STATE = {
+  scout: {},          // parsed personal info
+  ranks: [],          // [{rank, dateEarned}]
+  positions: [],      // [{position, start, end}]
+  meritBadges: [],    // [{name, started, earned, awarded, applied, counselor, comment, starred}]
+  requirements: {},   // {req5date, req6date, req7date, ...}
+  assignment: {        // built during review step
+    required: {},      // slotKey -> badge index (recomputed each render)
+    userOverridden: {}, // slotKey -> badge index, ONLY set when the user picks via the dropdown
+    electiveChoices: [] // array of badge objects, up to 8
+  },
+  positionSelections: [] // built during step 4
+};
+
+/* ---------- Utilities ---------- */
+
+function getInputValue(doc, name) {
+  const el = doc.querySelector(`[name="${cssEscape(name)}"]`);
+  if (!el) return null;
+  const tag = el.tagName.toLowerCase();
+  if (tag === 'select') {
+    const opt = el.querySelector('option[selected]');
+    if (opt) return (opt.getAttribute('value') || opt.textContent || '').trim();
+    return (el.value || '').trim();
+  }
+  if (el.type === 'checkbox') {
+    return el.checked || el.getAttribute('checked') !== null;
+  }
+  return (el.getAttribute('value') || '').trim();
+}
+
+function flipLastFirst(name) {
+  const m = (name || '').match(/^\s*([^,]+),\s*(.+)\s*$/);
+  return m ? `${m[2]} ${m[1]}` : name;
+}
+
+// Look up a value by its visible label text, for pages that render read-only
+// data as "Label: value" or <label>Label</label> next to an input/cell,
+// rather than as a named form field we can target with getInputValue(). Used
+// on the self-service ("My Scouts" / parent-facing) profile view, whose
+// layout doesn't match the leader-side ENTRY-numbered form.
+function getValueByLabelText(doc, labelText) {
+  const target = labelText.toLowerCase().replace(/:$/, '');
+  const candidates = Array.from(doc.querySelectorAll('label, td, th, span, div, b, strong'));
+  for (const el of candidates) {
+    const text = (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase().replace(/:$/, '');
+    if (text !== target) continue;
+    const forId = el.getAttribute && el.getAttribute('for');
+    if (forId) {
+      const input = doc.getElementById(forId);
+      if (input) return (input.value || input.getAttribute('value') || input.textContent || '').trim();
+    }
+    if (el.tagName === 'TD' || el.tagName === 'TH') {
+      const row = el.closest('tr');
+      if (row) {
+        const cells = Array.from(row.querySelectorAll('td,th'));
+        const i = cells.indexOf(el);
+        if (i !== -1 && cells[i + 1]) {
+          const cellText = cells[i + 1].textContent.replace(/\s+/g, ' ').trim();
+          if (cellText) return cellText;
+        }
+      }
+    }
+    const sib = el.nextElementSibling;
+    if (sib) {
+      const input = sib.matches('input,select,textarea') ? sib : sib.querySelector('input,select,textarea');
+      if (input) return (input.value || input.getAttribute('value') || '').trim();
+      const sibText = sib.textContent.replace(/\s+/g, ' ').trim();
+      if (sibText) return sibText;
+    }
+  }
+  return '';
+}
+
+function cssEscape(s) {
+  return s.replace(/([#.\[\]$"'\\])/g, '\\$1');
+}
+
+function headerCells(table) {
+  const headRow = table.querySelector('tr');
+  if (!headRow) return [];
+  const cells = Array.from(headRow.querySelectorAll('th,td'));
+  return cells.map(c => c.textContent.replace(/\s+/g, ' ').trim());
+}
+
+function tableHasHeaders(table, headerWords) {
+  const cells = headerCells(table);
+  const txt = cells.join(' | ').toLowerCase();
+  return headerWords.every(w => txt.includes(w.toLowerCase()));
+}
+
+// Returns { colIndex: {label: idx}, rows: [ {label: text} ] }
+// labels: array of {key, match} where match is a substring to find in header cell text (case-insensitive)
+function extractTableByLabels(table, labelDefs) {
+  const hCells = headerCells(table);
+  const colIndex = {};
+  labelDefs.forEach(({ key, match }) => {
+    const idx = hCells.findIndex(c => c.toLowerCase().includes(match.toLowerCase()));
+    if (idx !== -1) colIndex[key] = idx;
+  });
+  const rows = Array.from(table.querySelectorAll('tr')).slice(1);
+  const out = [];
+  rows.forEach(r => {
+    const cells = Array.from(r.querySelectorAll('td')).map(td => td.textContent.replace(/\s+/g, ' ').trim());
+    if (!cells.length) return;
+    const obj = {};
+    labelDefs.forEach(({ key }) => {
+      const idx = colIndex[key];
+      obj[key] = (idx != null && idx < cells.length) ? cells[idx] : '';
+    });
+    out.push(obj);
+  });
+  return { colIndex, rows: out };
+}
+
+function rowsAfterHeader(table) {
+  const rows = Array.from(table.querySelectorAll('tr'));
+  return rows.slice(1).map(r => Array.from(r.querySelectorAll('td')).map(td => td.textContent.trim()));
+}
+
+/* ---------- Page classifiers & extractors ---------- */
+
+function classifyAndExtract(docEntry) {
+  const { doc } = docEntry;
+  const results = { kind: 'unknown' };
+
+  // 1) Member profile page: has ENTRY175125 (first name) or similar personal-info fields
+  if (doc.querySelector('[name="ENTRY175125"]') || doc.querySelector('[name="ENTRY175128"]')) {
+    results.kind = 'profile';
+    results.data = extractProfile(doc);
+    return results;
+  }
+
+  // 1b) "Contact Information" self-service variant (Scout/parent logins) -
+  //     same kind of data, different field IDs.
+  if (doc.querySelector('[name="ENTRY310425"]') || doc.querySelector('[name="ENTRY310428"]')) {
+    results.kind = 'profile';
+    results.data = extractProfileAlt(doc);
+    return results;
+  }
+
+  // 2) Eagle rank requirements checklist: inputs named like CB123ROW4DATA5678
+  //    with title "The date on which this requirement was achieved."
+  const reqDateInputs = Array.from(doc.querySelectorAll('input[type="text"]'))
+    .filter(el => /^CB\d+ROW\d+DATA\d+$/.test(el.getAttribute('name') || '') &&
+                  /requirement was achieved/i.test(el.getAttribute('title') || ''));
+  if (reqDateInputs.length > 0) {
+    results.kind = 'requirements';
+    results.data = extractRequirements(doc, reqDateInputs);
+    return results;
+  }
+
+  // 2b) Read-only "Award | Code | Requirement | Earned | Note" requirements
+  //     view (Scout/parent self-service). Filter to the Eagle award's rows.
+  const tablesForReq = Array.from(doc.querySelectorAll('table'));
+  for (const t of tablesForReq) {
+    if (tableHasHeaders(t, ['Award', 'Code', 'Requirement', 'Earned'])) {
+      results.kind = 'requirements';
+      results.data = extractRequirementsAlt(t);
+      return results;
+    }
+  }
+
+  // 3) Advancement report pages: contain tables. Could have Rank+Position table(s)
+  //    and/or Merit Badge table. A single export page can contain either or both.
+  const tables = Array.from(doc.querySelectorAll('table'));
+  let foundRank = false, foundPosition = false, foundBadges = false;
+  let rankRows = [], positionRows = [], badgeRows = [];
+
+  for (const t of tables) {
+    if (!foundRank && tableHasHeaders(t, ['Rank', 'Date Earned'])) {
+      const { rows } = extractTableByLabels(t, [
+        { key: 'rank', match: 'rank' },
+        { key: 'dateEarned', match: 'date earned' },
+      ]);
+      rankRows = rows.filter(r => r.rank);
+      foundRank = true;
+    } else if (!foundPosition && tableHasHeaders(t, ['Position', 'Start', 'End'])) {
+      const { rows } = extractTableByLabels(t, [
+        { key: 'position', match: 'position' },
+        { key: 'start', match: 'start' },
+        { key: 'end', match: 'end' },
+      ]);
+      positionRows = rows.filter(r => r.position);
+      foundPosition = true;
+    } else if (!foundBadges && tableHasHeaders(t, ['Merit Badge', 'Started', 'Earned'])) {
+      const { rows } = extractTableByLabels(t, [
+        { key: 'name', match: 'merit badge' },
+        { key: 'started', match: 'started' },
+        { key: 'earned', match: 'earned' },
+        { key: 'awarded', match: 'awarded' },
+        { key: 'coh', match: 'coh' },
+        { key: 'appliedToRank', match: 'applied to rank' },
+        { key: 'counselor', match: 'counselor' },
+        { key: 'comment', match: 'comment' },
+      ]);
+      badgeRows = rows.filter(r => r.name);
+      foundBadges = true;
+    }
+  }
+
+  if (foundRank || foundPosition || foundBadges) {
+    results.kind = 'advancement';
+    results.data = { rankRows, positionRows, badgeRows, foundRank, foundPosition, foundBadges };
+    return results;
+  }
+
+  return results;
+}
+
+const US_STATE_ABBR = {
+  alabama:'AL',alaska:'AK',arizona:'AZ',arkansas:'AR',california:'CA',colorado:'CO',
+  connecticut:'CT',delaware:'DE','district of columbia':'DC',florida:'FL',georgia:'GA',
+  hawaii:'HI',idaho:'ID',illinois:'IL',indiana:'IN',iowa:'IA',kansas:'KS',kentucky:'KY',
+  louisiana:'LA',maine:'ME',maryland:'MD',massachusetts:'MA',michigan:'MI',minnesota:'MN',
+  mississippi:'MS',missouri:'MO',montana:'MT',nebraska:'NE',nevada:'NV','new hampshire':'NH',
+  'new jersey':'NJ','new mexico':'NM','new york':'NY','north carolina':'NC','north dakota':'ND',
+  ohio:'OH',oklahoma:'OK',oregon:'OR',pennsylvania:'PA','rhode island':'RI','south carolina':'SC',
+  'south dakota':'SD',tennessee:'TN',texas:'TX',utah:'UT',vermont:'VT',virginia:'VA',
+  washington:'WA','west virginia':'WV',wisconsin:'WI',wyoming:'WY',
+};
+function toStateAbbr(s) {
+  const t = (s || '').trim();
+  if (/^[A-Za-z]{2}$/.test(t)) return t.toUpperCase();
+  return US_STATE_ABBR[t.toLowerCase()] || t;
+}
+
+function extractProfileAlt(doc) {
+  const first = getInputValue(doc, 'ENTRY310425') || '';
+  const middle = getInputValue(doc, 'ENTRY310427') || '';
+  const last = getInputValue(doc, 'ENTRY310428') || '';
+  const street = getInputValue(doc, 'ENTRY310629') || '';
+  const city = getInputValue(doc, 'ENTRY310631') || '';
+  const state = toStateAbbr(getInputValue(doc, 'ENTRY310632') || '');
+  const zip = getInputValue(doc, 'ENTRY310633') || '';
+  const phone = getInputValue(doc, 'ENTRY310752') || '';
+  const email = getInputValue(doc, 'ENTRY311235') || '';
+  const dob = getInputValue(doc, 'ENTRY310516') || '';
+  // "Date Joined Unit" on this page - maps to "Date joined Scouts BSA" on
+  // the application. Confirmed via HAR capture (Form_ID=209): ENTRY312316.
+  // Falls back to a label-text lookup in case TWH ever renumbers the field.
+  const dateJoinedUnit = getInputValue(doc, 'ENTRY312316')
+    || getValueByLabelText(doc, 'Date Joined Unit')
+    || getValueByLabelText(doc, 'Date Joined Scouts BSA')
+    || '';
+
+  let troopNo = '', troopCity = '';
+  const headerText = doc.body ? doc.body.textContent : '';
+  const m = headerText.match(/Troop\s+(\d+)\s+([A-Za-z][A-Za-z .'-]*)/);
+  if (m) { troopNo = m[1]; troopCity = m[2].trim(); }
+
+  return {
+    fullName: [first, middle, last].filter(Boolean).join(' '),
+    street, city, state, zip, phone, email, dob,
+    dateJoinedUnit, cubPack: '', parents: [], troopNo, troopCity,
+  };
+}
+
+// Read-only "Award | Code | Requirement | Earned | Note" table, used by the
+// Scout/parent self-service view. Only the rows where Award == "Eagle" are
+// relevant here; Code "5"/"6"/"7" map directly to requirements 5/6/7.
+function extractRequirementsAlt(table) {
+  const { rows } = extractTableByLabels(table, [
+    { key: 'award', match: 'award' },
+    { key: 'code', match: 'code' },
+    { key: 'earned', match: 'earned' },
+  ]);
+  const out = {};
+  rows.forEach(r => {
+    if (normName(r.award) !== 'eagle') return;
+    const code = (r.code || '').replace(/\.$/, '').trim();
+    const date = (r.earned || '').trim();
+    if (!date) return;
+    if (code === '2') out.req2date = date;
+    else if (code === '3') out.req3date = date;
+    else if (code === '4') out.req4date = date;
+    else if (code === '5') out.req5date = date;
+    else if (code === '6') out.req6date = date;
+    else if (code === '7') out.req7date = date;
+    else if (code === '1') out.req1date = date;
+  });
+  return out;
+}
+
+function extractProfile(doc) {
+  const first = getInputValue(doc, 'ENTRY175125') || '';
+  const middle = getInputValue(doc, 'ENTRY175127') || '';
+  const last = getInputValue(doc, 'ENTRY175128') || '';
+  const street = getInputValue(doc, 'ENTRY175329') || '';
+  const city = getInputValue(doc, 'ENTRY175331') || '';
+  const state = getInputValue(doc, 'ENTRY175332') || '';
+  const zip = getInputValue(doc, 'ENTRY175333') || '';
+  const homePhone = getInputValue(doc, 'ENTRY175552') || '';
+  const cellPhone = getInputValue(doc, 'ENTRY176352') || '';
+  const email = getInputValue(doc, 'ENTRY176535') || '';
+  const dob = getInputValue(doc, 'ENTRY175216') || '';
+  const dateJoinedUnit = getInputValue(doc, 'ENTRY175416') || '';
+  const cubPack = getInputValue(doc, 'ENTRY1542201') || '';
+
+  // Parent/guardian relationship table: header row containing "Adult" and "Relationship"
+  let parents = [];
+  const tables = Array.from(doc.querySelectorAll('table'));
+  for (const t of tables) {
+    if (tableHasHeaders(t, ['Adult', 'Relationship'])) {
+      const { rows } = extractTableByLabels(t, [
+        { key: 'adult', match: 'adult' },
+        { key: 'relationship', match: 'relationship' },
+      ]);
+      for (const r of rows) {
+        if (r.adult && /parent|guardian/i.test(r.relationship)) parents.push(flipLastFirst(r.adult));
+      }
+    }
+  }
+
+  // Troop number, from header text like "Troop 997 Ashburn"
+  let troopNo = '', troopCity = '';
+  const headerText = doc.body ? doc.body.textContent : '';
+  const m = headerText.match(/Troop\s+(\d+)\s+([A-Za-z][A-Za-z .'-]*)/);
+  if (m) { troopNo = m[1]; troopCity = m[2].trim(); }
+
+  return {
+    fullName: [first, middle, last].filter(Boolean).join(' '),
+    street, city, state, zip,
+    phone: homePhone || cellPhone,
+    email, dob, dateJoinedUnit,
+    cubPack, parents, troopNo, troopCity
+  };
+}
+
+function extractRequirements(doc, reqDateInputs) {
+  const out = {};
+  for (const input of reqDateInputs) {
+    const name = input.getAttribute('name');
+    const m = name.match(/^(CB\d+ROW\d+)DATA(\d+)$/);
+    if (!m) continue;
+    const rowPrefix = m[1];
+    const dateVal = (input.getAttribute('value') || '').trim();
+    if (!dateVal) continue;
+    // Find sibling hidden fields with same rowPrefix, different DATA id, containing long descriptive text
+    const siblings = Array.from(doc.querySelectorAll(`input[name^="OLD${rowPrefix}DATA"]`));
+    let reqText = '';
+    for (const s of siblings) {
+      const v = (s.getAttribute('value') || '');
+      if (v.length > reqText.length) reqText = v;
+    }
+    const lower = reqText.toLowerCase();
+    if (lower.includes('scout oath') && lower.includes('scout law')) {
+      out.req2date = dateVal;
+    } else if (lower.includes('21 merit badges')) {
+      out.req3date = dateVal;
+    } else if (lower.includes('positions of responsibility')) {
+      out.req4date = dateVal;
+    } else if (lower.includes('service') && lower.includes('project')) {
+      out.req5date = dateVal;
+    } else if (lower.includes('conference')) {
+      out.req6date = dateVal;
+    } else if (lower.includes('board of review for the eagle')) {
+      out.req7date = dateVal;
+    } else if (lower.includes('life scout') && lower.includes('six months')) {
+      out.req1date = dateVal;
+    }
+  }
+  return out;
+}
+
+/* ---------- Merge extracted docs into STATE ---------- */
+
+function ingestDocs(docEntries) {
+  const summary = [];
+  for (const entry of docEntries) {
+    const classified = classifyAndExtract(entry);
+    summary.push({ url: entry.url, kind: classified.kind });
+    if (classified.kind === 'profile') {
+      Object.assign(STATE.scout, classified.data);
+    } else if (classified.kind === 'requirements') {
+      Object.assign(STATE.requirements, classified.data);
+    } else if (classified.kind === 'advancement') {
+      const d = classified.data;
+      if (d.foundRank && d.rankRows.length) {
+        for (const r of d.rankRows) {
+          STATE.ranks.push({ rank: r.rank, dateEarned: r.dateEarned || '' });
+        }
+      }
+      if (d.foundPosition && d.positionRows.length) {
+        for (const r of d.positionRows) {
+          STATE.positions.push({ position: r.position, start: r.start || '', end: r.end || '' });
+        }
+      }
+      if (d.foundBadges && d.badgeRows.length) {
+        for (const r of d.badgeRows) {
+          let name = r.name;
+          const starred = name.trim().startsWith('*');
+          if (starred) name = name.replace(/^\*/, '').trim();
+          name = name.replace(/\s*\(\d{4} rqmts\)\s*$/i, '').trim();
+          const earned = r.earned || '';
+          if (!earned) continue; // not actually earned yet
+          STATE.meritBadges.push({
+            name, started: r.started || '', earned,
+            awarded: r.awarded || '', coh: r.coh || '',
+            appliedToRank: r.appliedToRank || '', counselor: r.counselor || '', comment: r.comment || '',
+            starred
+          });
+        }
+      }
+    }
+  }
+  return summary;
+}
+
+/* ---------- Live theme detection ----------
+   Rather than hardcoding this troop's current colors, probe the
+   actual CSS rules in effect on the page this script is running on
+   (TroopWebHost's own stylesheet, already loaded in this document)
+   by creating throwaway elements with the same classes TroopWebHost
+   uses for its nav bar, tabs, grids, etc., reading their computed
+   styles, then removing them. If the troop ever changes their color
+   scheme or custom CSS, this adapts automatically on next page load
+   - no code edit needed. Falls back to the defaults below (this
+   troop's colors as of when this page was built) if detection finds
+   nothing usable, e.g. when opened outside its usual page context. */
+
+function safeColor(v) {
+  if (!v) return null;
+  if (/rgba?\(\s*0,\s*0,\s*0,\s*0\s*\)/.test(v) || v === 'transparent') return null;
+  return v;
+}
+
+function darkenColor(rgbStr, amt) {
+  const m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!m) return null;
+  const [r, g, b] = [1, 2, 3].map(i => Math.round(parseInt(m[i], 10) * (1 - amt)));
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function probeSiteTheme() {
+  const SENTINEL = 'rgb(1, 2, 3)';
+  const wrap = document.createElement('div');
+  wrap.style.cssText = `position:absolute; left:-9999px; top:-9999px; visibility:hidden; pointer-events:none; color:${SENTINEL}; border-color:${SENTINEL};`;
+  wrap.innerHTML = `
+    <div class="navtable" id="__probe_navtable">
+      <span class="navicon" id="__probe_navicon"></span>
+      <span class="navlink" id="__probe_navlink"><a href="#" id="__probe_navlink_a">x</a></span>
+    </div>
+    <div class="banner-div" id="__probe_banner"></div>
+    <ul class="nav-tabs"><li><a href="#" id="__probe_tab">x</a></li></ul>
+    <table class="table-striped"><thead><tr id="__probe_gridhead"><th>x</th></tr></thead></table>
+    <table class="table-curved"><tbody><tr><td id="__probe_border">x</td></tr></tbody></table>
+    <input class="form-control" id="__probe_input">
+    <span class="RequiredIndicator" id="__probe_required">*</span>
+  `;
+  document.body.appendChild(wrap);
+
+  const byId = id => document.getElementById(id);
+  const cs = el => el ? getComputedStyle(el) : null;
+  // background-color reliably defaults to transparent when unset - safeColor covers it.
+  const bg = v => safeColor(v);
+  // color/border-color inherit or default to currentColor, so an un-styled probe will
+  // still report the sentinel we set on the wrapper rather than a "blank" value - only
+  // trust it if something in the page's real CSS actually overrode that sentinel.
+  const inherited = v => (v && v !== SENTINEL) ? v : null;
+
+  const result = {
+    navy: bg(cs(byId('__probe_navtable'))?.backgroundColor),
+    navyDark: bg(cs(byId('__probe_banner'))?.backgroundColor),
+    yellow: inherited(cs(byId('__probe_navlink_a'))?.color),
+    gold: bg(cs(byId('__probe_tab'))?.backgroundColor),
+    gridHead: bg(cs(byId('__probe_gridhead'))?.backgroundColor),
+    line: inherited(cs(byId('__probe_border'))?.borderLeftColor),
+    card: bg(cs(byId('__probe_input'))?.backgroundColor),
+    red: inherited(cs(byId('__probe_required'))?.color),
+    paper: bg(getComputedStyle(document.body).backgroundColor),
+    ink: inherited(getComputedStyle(document.body).color),
+  };
+
+  wrap.remove();
+
+  if (!result.navyDark && result.navy) result.navyDark = darkenColor(result.navy, 0.35);
+  if (result.ink) result.muted = mixWithWhite(result.ink, 0.45);
+
+  return result;
+}
+
+function mixWithWhite(rgbStr, amount) {
+  const m = rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if (!m) return null;
+  const clamp = v => Math.max(0, Math.min(255, Math.round(v)));
+  const [r, g, b] = [1, 2, 3].map(i => clamp(parseInt(m[i], 10) * (1 - amount) + 255 * amount));
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
+function applyLiveSiteTheme() {
+  let detected;
+  try {
+    detected = probeSiteTheme();
+  } catch (e) {
+    console.warn('Theme detection failed, using built-in defaults:', e);
+    return 0;
+  }
+  const varMap = {
+    navy: '--navy', navyDark: '--navy-dark', yellow: '--yellow', gold: '--gold',
+    gridHead: '--grid-head', line: '--line', card: '--card', red: '--warn', paper: '--paper',
+  };
+  const scopeEl = document.querySelector('.eagle-scope');
+  const root = (scopeEl || document.documentElement).style;
+  let count = 0;
+  Object.keys(varMap).forEach(key => {
+    if (detected[key]) { root.setProperty(varMap[key], detected[key]); count++; }
+  });
+  if (detected.red) root.setProperty('--red', detected.red);
+  if (detected.ink) root.setProperty('--ink', detected.ink);
+  if (detected.muted) root.setProperty('--muted', detected.muted);
+  if (count) console.info(`Eagle Scout Rank Application Form: matched ${count} color(s) from this site's current CSS.`);
+  else console.info('Eagle Scout Rank Application Form: no live site colors detected, using built-in defaults.');
+  return count;
+}
+
+document.addEventListener('DOMContentLoaded', applyLiveSiteTheme);
+
+/* ---------- Merit badge required-slot definitions ---------- */
+
+const REQUIRED_SLOTS = [
+  { key: 'slot1',  label: '1. Camping',                         match: ['camping'] },
+  { key: 'slot2',  label: '2. Citizenship in the Community',     match: ['citizenship in the community'] },
+  { key: 'slot3',  label: '3. Citizenship in the Nation',        match: ['citizenship in the nation'] },
+  { key: 'slot4',  label: '4. Citizenship in the World',         match: ['citizenship in the world'] },
+  { key: 'slot5',  label: '5. Communication',                    match: ['communication'] },
+  { key: 'slot6',  label: '6. Cooking',                          match: ['cooking'] },
+  { key: 'slot7',  label: '7. Emergency Preparedness OR Lifesaving', match: ['emergency preparedness', 'lifesaving'] },
+  { key: 'slot8',  label: '8. Environmental Science OR Sustainability', match: ['environmental science', 'sustainability'] },
+  { key: 'slot9',  label: '9. First Aid',                        match: ['first aid'] },
+  { key: 'slot10', label: '10. Swimming OR Hiking OR Cycling',   match: ['swimming', 'hiking', 'cycling'] },
+  { key: 'slot11', label: '11. Personal Management',             match: ['personal management'] },
+  { key: 'slot12', label: '12. Personal Fitness',                match: ['personal fitness'] },
+  { key: 'slot13', label: '13. Family Life',                     match: ['family life'] },
+];
+
+function normName(s) { return (s || '').toLowerCase().trim(); }
+
+function computeAssignment() {
+  const badges = STATE.meritBadges;
+  const used = new Set(); // indices into badges[] already consumed by a required slot
+  const perSlotCandidates = {};
+
+  REQUIRED_SLOTS.forEach(slot => {
+    const candidates = [];
+    badges.forEach((b, i) => {
+      if (slot.match.includes(normName(b.name))) candidates.push(i);
+    });
+    // Earliest-earned first, so the default pick (and the dropdown order, when
+    // there's a choice) both favor whichever badge the Scout completed first.
+    candidates.sort((a, b) => (parseUsDate(badges[a].earned) || 0) - (parseUsDate(badges[b].earned) || 0));
+    perSlotCandidates[slot.key] = candidates;
+  });
+
+  // Restore a previous choice only if the USER explicitly picked it via the
+  // dropdown; otherwise always default to the earliest-earned candidate. This
+  // avoids an auto-pick ever "sticking" across re-renders once fresher data
+  // (or a fuller candidate list) is available.
+  REQUIRED_SLOTS.forEach(slot => {
+    const candidates = perSlotCandidates[slot.key];
+    const userChoice = STATE.assignment.userOverridden[slot.key];
+    let chosen = (userChoice != null && candidates.includes(userChoice))
+      ? userChoice
+      : (candidates.length >= 1 ? candidates[0] : null);
+    STATE.assignment.required[slot.key] = chosen;
+    if (chosen != null) used.add(chosen);
+  });
+
+  // Elective pool = all earned badges not used in a required slot
+  const electivePool = badges.map((b, i) => i).filter(i => !used.has(i));
+
+  // Reconcile the checked elective list against the pool: drop anything that
+  // just got promoted into a required slot (it would otherwise sit as an
+  // invisible phantom entry, silently eating one of the 8 elective slots),
+  // and auto-fill with anything that just got freed FROM a required slot so
+  // switching a choice-slot dropdown doesn't cost the Scout credit for a
+  // badge they already earned.
+  if (STATE._electiveInit) {
+    const prevUsed = STATE._prevUsed || new Set();
+    const freed = [...prevUsed].filter(i => !used.has(i));
+    STATE.assignment.electiveChoices = STATE.assignment.electiveChoices.filter(i => electivePool.includes(i));
+    freed.forEach(i => {
+      if (STATE.assignment.electiveChoices.length < 8 &&
+          electivePool.includes(i) &&
+          !STATE.assignment.electiveChoices.includes(i)) {
+        STATE.assignment.electiveChoices.push(i);
+      }
+    });
+  }
+  STATE._prevUsed = used;
+
+  return { perSlotCandidates, used, electivePool };
+}
+
+/* ---------- Positions ---------- */
+
+function parseUsDate(s) {
+  if (!s) return null;
+  const m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (!m) return null;
+  let [, mo, da, yr] = m;
+  if (yr.length === 2) yr = '20' + yr;
+  return new Date(parseInt(yr), parseInt(mo) - 1, parseInt(da));
+}
+
+function fmtDateParts(d) {
+  if (!d) return { m: '', d: '', y: '' };
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const yy = String(d.getFullYear()).slice(-2);
+  return { m: mm, d: dd, y: yy };
+}
+
+// Most troop-level positions (SPL, PL, Scribe, Instructor, etc.) count
+// toward the Eagle position-of-responsibility requirement automatically.
+// Order of the Arrow positions are a special case: BSA only recognizes the
+// "OA Troop Representative" role for this requirement - other OA offices
+// (Chapter/Lodge officer roles, Vice Chief, etc.) do NOT count, even though
+// they show up in the same advancement history and look like a qualifying
+// position at a glance. Filter those out here so they're never silently
+// pre-selected (or even offered) as satisfying the requirement.
+function isQualifyingPosition(title) {
+  const t = normName(title);
+  const isOA = /\bo\.?\s*\/?\s*a\.?\b|order of the arrow/.test(t);
+  if (!isOA) return true;
+  return /representative/.test(t);
+}
+
+// Duration served, in months, counting an open-ended position (no end date
+// on file yet) as ongoing through today.
+function monthsBetween(start, end) {
+  if (!start) return 0;
+  const endDate = end || new Date();
+  const ms = endDate - start;
+  if (ms <= 0) return 0;
+  return ms / (1000 * 60 * 60 * 24 * 30.4375);
+}
+
+function getLifeBorDate() {
+  const life = STATE.ranks.find(r => normName(r.rank) === 'life');
+  return life ? parseUsDate(life.dateEarned) : null;
+}
+
+function computeOverlappingPositions() {
+  const lifeBor = getLifeBorDate();
+  const candidates = STATE.positions
+    .filter(p => isQualifyingPosition(p.position))
+    .map(p => {
+      const start = parseUsDate(p.start);
+      const end = parseUsDate(p.end);
+      const overlaps = !lifeBor || !end || end >= lifeBor;
+      const effectiveStart = (lifeBor && start && start < lifeBor) ? lifeBor : start;
+      return { ...p, startDate: start, endDate: end, overlaps, effectiveStart };
+    })
+    .filter(p => p.overlaps)
+    // Chronological order (earliest first) - the requirement is satisfied by
+    // whichever position(s) came first after the Life board of review, not
+    // by whatever is most recent.
+    .sort((a, b) => (a.effectiveStart || 0) - (b.effectiveStart || 0));
+
+  // Walk forward in time accumulating months served, and mark the first
+  // ones that together reach the Eagle 6-month position-of-responsibility
+  // requirement. Capped at 2, since BSA form 512-728 only has two Position
+  // rows to fill in.
+  let cumulativeMonths = 0;
+  let selectedCount = 0;
+  candidates.forEach(p => {
+    p.monthsServed = monthsBetween(p.effectiveStart, p.endDate);
+    if (selectedCount < 2 && cumulativeMonths < 6) {
+      p.selected = true;
+      cumulativeMonths += p.monthsServed;
+      selectedCount++;
+    } else {
+      p.selected = false;
+    }
+  });
+  return candidates;
+}
+
+/* ---------- UI wiring ---------- */
+
+const els = {};
+function byId(id) { return document.getElementById(id); }
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Defensive: TroopWebHost wraps the whole page in an ASP.NET <form>, so make
+  // sure nothing we do can trigger an implicit submit/postback out from under us.
+  const scopeRoot = document.querySelector('.eagle-scope');
+  if (scopeRoot) {
+    scopeRoot.addEventListener('submit', e => e.preventDefault());
+    scopeRoot.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && e.target.tagName === 'INPUT' && e.target.type !== 'button') {
+        e.preventDefault();
+      }
+    });
+  }
+
+  const onClick = (id, fn) => {
+    const el = byId(id);
+    if (!el) return;
+    el.addEventListener('click', e => { e.preventDefault(); fn(); });
+  };
+
+  onClick('btnReset', () => location.reload());
+  onClick('back-1b', () => goToStep(1));
+  onClick('next-2', () => { collectStepInfo(); goToStep(3); });
+  onClick('back-2b', () => goToStep(2));
+  onClick('next-3', () => { if (validateBadges()) goToStep(4); });
+  onClick('back-3b', () => goToStep(3));
+  onClick('next-4', () => { collectStepPositions(); goToStep(5); });
+  onClick('back-4b', () => goToStep(4));
+  onClick('btnGenerate', generatePdf);
+});
+
+/* ---------- Step navigation ---------- */
+
+function goToStep(n) {
+  ['upload','info','badges','positions','download'].forEach((id, idx) => {
+    byId('step-' + id).classList.toggle('eagle-hidden', idx !== (n - 1));
+  });
+  for (let i = 1; i <= 5; i++) {
+    const pill = byId('nav-' + i);
+    pill.classList.toggle('eagle-active', i === n);
+    pill.classList.toggle('eagle-done', i < n);
+  }
+  if (n === 3) renderBadgeStep();
+  if (n === 4) renderPositionsStep();
+  if (n === 5) renderDownloadStep();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+/* ---------- Step 2: scout info ---------- */
+
+function populateInfoStep() {
+  const s = STATE.scout;
+  byId('f_fullname').value = s.fullName || '';
+  byId('f_street').value = s.street || '';
+  byId('f_city').value = s.city || '';
+  byId('f_state').value = s.state || '';
+  byId('f_zip').value = s.zip || '';
+  byId('f_phone').value = s.phone || '';
+  byId('f_email').value = s.email || '';
+  const dob = fmtDateParts(parseUsDate(s.dob));
+  byId('f_dob_m').value = dob.m; byId('f_dob_d').value = dob.d; byId('f_dob_y').value = dob.y;
+
+  byId('f_unitno').value = s.troopNo || '';
+  byId('f_unitcity').value = s.troopCity || s.city || '';
+  byId('f_unitstate').value = s.state || '';
+  byId('f_unitzip').value = s.zip || '';
+  byId('f_parent').value = (s.parents || []).join(' / ');
+
+  if (s.cubPack) byId('f_cub').value = 'Y';
+
+  // Rank table
+  const tbody = document.querySelector('#rankTable tbody');
+  tbody.innerHTML = '';
+  const order = ['scout','tenderfoot','second class','first class','star','life','eagle'];
+  const sorted = [...STATE.ranks].sort((a,b) => order.indexOf(normName(a.rank)) - order.indexOf(normName(b.rank)));
+  sorted.forEach(r => {
+    const d = fmtDateParts(parseUsDate(r.dateEarned));
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${r.rank}</td>
+      <td><input type="text" maxlength="2" style="width:44px" value="${d.m}" data-rank="${r.rank}" data-part="m"></td>
+      <td><input type="text" maxlength="2" style="width:44px" value="${d.d}" data-rank="${r.rank}" data-part="d"></td>
+      <td><input type="text" maxlength="2" style="width:44px" value="${d.y}" data-rank="${r.rank}" data-part="y"></td>`;
+    tbody.appendChild(tr);
+  });
+
+  // Pre-fill req7 (Eagle BOR) from rank table if present
+  const eagle = STATE.ranks.find(r => normName(r.rank) === 'eagle');
+  if (eagle) {
+    const d = fmtDateParts(parseUsDate(eagle.dateEarned));
+    byId('f_eaglebor_m').value = d.m; byId('f_eaglebor_d').value = d.d; byId('f_eaglebor_y').value = d.y;
+  }
+  if (STATE.requirements.req7date) {
+    const d = fmtDateParts(parseUsDate(STATE.requirements.req7date));
+    byId('f_eaglebor_m').value = d.m; byId('f_eaglebor_d').value = d.d; byId('f_eaglebor_y').value = d.y;
+  }
+  if (STATE.requirements.req5date) {
+    const d = fmtDateParts(parseUsDate(STATE.requirements.req5date));
+    byId('f_proj_m').value = d.m; byId('f_proj_d').value = d.d; byId('f_proj_y').value = d.y;
+  }
+  if (STATE.requirements.req6date) {
+    const d = fmtDateParts(parseUsDate(STATE.requirements.req6date));
+    byId('f_conf_m').value = d.m; byId('f_conf_d').value = d.d; byId('f_conf_y').value = d.y;
+  }
+}
+
+function collectStepInfo() {
+  STATE.scoutFinal = {
+    fullName: byId('f_fullname').value.trim(),
+    street: byId('f_street').value.trim(),
+    city: byId('f_city').value.trim(),
+    state: byId('f_state').value.trim(),
+    zip: byId('f_zip').value.trim(),
+    phone: byId('f_phone').value.trim(),
+    email: byId('f_email').value.trim(),
+    dob: [byId('f_dob_m').value, byId('f_dob_d').value, byId('f_dob_y').value],
+    unitNo: byId('f_unitno').value.trim(),
+    unitCity: byId('f_unitcity').value.trim(),
+    unitState: byId('f_unitstate').value.trim(),
+    unitZip: byId('f_unitzip').value.trim(),
+    parent: byId('f_parent').value.trim(),
+    employer: byId('f_employer').value.trim(),
+    cub: byId('f_cub').value, webelos: byId('f_webelos').value,
+    aol: byId('f_aol').value, fifthGrade: byId('f_5thgrade').value,
+    ranks: {}
+  };
+  document.querySelectorAll('#rankTable input[data-rank]').forEach(inp => {
+    const rank = inp.getAttribute('data-rank');
+    const part = inp.getAttribute('data-part');
+    STATE.scoutFinal.ranks[rank] = STATE.scoutFinal.ranks[rank] || {};
+    STATE.scoutFinal.ranks[rank][part] = inp.value.trim();
+  });
+}
+
+/* ---------- Step 3: merit badges ---------- */
+
+function renderBadgeStep() {
+  const { perSlotCandidates, electivePool } = computeAssignment();
+  const badges = STATE.meritBadges;
+  const area = byId('requiredBadgesArea');
+  area.innerHTML = '';
+
+  const table = document.createElement('table');
+  table.className = 'eagle-mb-table';
+  table.innerHTML = `<thead><tr><th>Requirement</th><th>Badge earned</th><th>Date earned</th><th>Unit</th></tr></thead><tbody></tbody>`;
+  const tbody = table.querySelector('tbody');
+
+  REQUIRED_SLOTS.forEach(slot => {
+    const candidates = perSlotCandidates[slot.key];
+    const chosenIdx = STATE.assignment.required[slot.key];
+    const tr = document.createElement('tr');
+    tr.className = chosenIdx != null ? 'eagle-assigned' : '';
+    let middleCell;
+    if (candidates.length > 1) {
+      const opts = candidates.map(i => {
+        const b = badges[i];
+        return `<option value="${i}" ${i === chosenIdx ? 'selected' : ''}>${b.name} (earned ${b.earned})</option>`;
+      }).join('');
+      middleCell = `<select class="eagle-slotpick" data-slot="${slot.key}">${opts}</select>`;
+    } else if (candidates.length === 1) {
+      middleCell = `<span class="eagle-badge-star">*</span> ${badges[candidates[0]].name}`;
+    } else {
+      middleCell = `<span style="color:var(--warn)">Not found - enter manually below</span>`;
+    }
+    const chosen = chosenIdx != null ? badges[chosenIdx] : null;
+    tr.innerHTML = `<td>${slot.label}</td>
+      <td>${middleCell}</td>
+      <td>${chosen ? chosen.earned : ''}</td>
+      <td>${chosen ? (chosen.comment.match(/\b\d{2,4}\b/) ? '' : '') : ''}</td>`;
+    tbody.appendChild(tr);
+  });
+  area.appendChild(table);
+
+  table.querySelectorAll('select.eagle-slotpick').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const slotKey = sel.getAttribute('data-slot');
+      const idx = parseInt(sel.value, 10);
+      STATE.assignment.required[slotKey] = idx;
+      STATE.assignment.userOverridden[slotKey] = idx;
+      renderBadgeStep();
+    });
+  });
+
+  // Manual fallback inputs for any unmatched slots
+  const missing = REQUIRED_SLOTS.filter(s => STATE.assignment.required[s.key] == null);
+  if (missing.length) {
+    const box = document.createElement('div');
+    box.className = 'eagle-note eagle-warn';
+    box.innerHTML = `No earned badge was found for: <strong>${missing.map(m=>m.label).join(', ')}</strong>. You'll need to fill these in by hand on the printed form, or check your merit badge export was included.`;
+    area.appendChild(box);
+  }
+
+  renderElectiveTable(electivePool);
+}
+
+function renderElectiveTable(electivePool) {
+  const badges = STATE.meritBadges;
+  const tbody = document.querySelector('#electiveTable tbody');
+  tbody.innerHTML = '';
+
+  // sort electives by earned date ascending
+  const sorted = [...electivePool].sort((a, b) => {
+    const da = parseUsDate(badges[a].earned) || 0;
+    const db = parseUsDate(badges[b].earned) || 0;
+    return da - db;
+  });
+
+  // Initialize default selection (first 8) on first render. On later renders
+  // (e.g. after a required-slot swap changes which badges are available as
+  // electives), prune any choices that are no longer in the pool and
+  // backfill the freed slot(s) with the next earliest-earned candidate(s),
+  // so a badge bumped out of "required" doesn't silently vanish from the
+  // count without a replacement.
+  if (!STATE._electiveInit) {
+    STATE.assignment.electiveChoices = sorted.slice(0, 8);
+    STATE._electiveInit = true;
+  } else {
+    const poolSet = new Set(electivePool);
+    const before = STATE.assignment.electiveChoices.length;
+    STATE.assignment.electiveChoices = STATE.assignment.electiveChoices.filter(i => poolSet.has(i));
+    const freed = before - STATE.assignment.electiveChoices.length;
+    if (freed > 0) {
+      const chosenSet = new Set(STATE.assignment.electiveChoices);
+      for (const i of sorted) {
+        if (STATE.assignment.electiveChoices.length >= 8) break;
+        if (!chosenSet.has(i)) {
+          STATE.assignment.electiveChoices.push(i);
+          chosenSet.add(i);
+        }
+      }
+    }
+  }
+
+  sorted.forEach(i => {
+    const b = badges[i];
+    const checked = STATE.assignment.electiveChoices.includes(i);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><input type="checkbox" data-idx="${i}" ${checked ? 'checked' : ''}></td>
+      <td>${b.starred ? '<span class="eagle-badge-star">*</span> ' : ''}${b.name}</td>
+      <td>${b.earned}</td>
+      <td>997</td>`;
+    tbody.appendChild(tr);
+  });
+
+  tbody.querySelectorAll('input[type=checkbox]').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const idx = parseInt(cb.getAttribute('data-idx'), 10);
+      if (cb.checked) {
+        if (STATE.assignment.electiveChoices.length >= 8) {
+          cb.checked = false;
+          alert('You can only pick 8 electives (slots 14-21). Uncheck one first.');
+          return;
+        }
+        STATE.assignment.electiveChoices.push(idx);
+      } else {
+        STATE.assignment.electiveChoices = STATE.assignment.electiveChoices.filter(x => x !== idx);
+      }
+      updateElectiveCount();
+    });
+  });
+  updateElectiveCount();
+}
+
+function updateElectiveCount() {
+  const n = STATE.assignment.electiveChoices.length;
+  const pill = byId('electiveCount');
+  pill.textContent = `${n} / 8 selected`;
+  pill.className = 'eagle-pill-count' + (n === 8 ? ' eagle-full' : n > 8 ? ' eagle-over' : '');
+}
+
+function validateBadges() {
+  if (STATE.assignment.electiveChoices.length > 8) {
+    alert('You have more than 8 electives selected - uncheck some before continuing.');
+    return false;
+  }
+  return true;
+}
+
+/* ---------- Step 4: positions ---------- */
+
+function renderPositionsStep() {
+  const overlapping = computeOverlappingPositions();
+  const area = byId('positionsArea');
+  area.innerHTML = '';
+
+  if (!overlapping.length) {
+    area.innerHTML = `<div class="eagle-note eagle-warn">No qualifying positions of responsibility were found that overlap the Life board-of-review date. (Note: OA positions other than "OA Troop Representative" don't count toward this requirement and are excluded here.) Add one manually if needed - the PDF still has two blank Position rows you can fill by hand.</div>`;
+  }
+
+  overlapping.slice(0, 6).forEach((p, idx) => {
+    const startParts = fmtDateParts(p.effectiveStart);
+    const endParts = fmtDateParts(p.endDate);
+    const card = document.createElement('div');
+    card.className = 'eagle-pos-card';
+    const checked = p.selected ? 'checked' : '';
+    const monthsNote = p.monthsServed ? ` &middot; ~${Math.round(p.monthsServed)} mo` : '';
+    card.innerHTML = `
+      <input type="checkbox" class="eagle-pos-check" data-idx="${idx}" ${checked}>
+      <div style="flex:1">
+        <div class="eagle-title">${p.position}${p.selected ? ' <span style="font-weight:normal;color:var(--muted);">(pre-selected: earliest qualifying, toward 6-mo requirement)</span>' : ''}</div>
+        <div class="eagle-dates">On file: ${p.start || '?'} - ${p.end || 'present'}${monthsNote}${p.effectiveStart && p.startDate && p.effectiveStart.getTime() !== p.startDate.getTime() ? ' (adjusted to start at Life board of review)' : ''}</div>
+        <div class="eagle-editrow">
+          <div>
+            <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px;">From</label>
+            <div class="eagle-datepart">
+              <input type="text" maxlength="2" class="eagle-pos-from-m" value="${startParts.m}">
+              <input type="text" maxlength="2" class="eagle-pos-from-d" value="${startParts.d}">
+              <input type="text" maxlength="2" class="eagle-pos-from-y" value="${startParts.y}">
+            </div>
+          </div>
+          <div>
+            <label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px;">To</label>
+            <div class="eagle-datepart">
+              <input type="text" maxlength="2" class="eagle-pos-to-m" value="${endParts.m}">
+              <input type="text" maxlength="2" class="eagle-pos-to-d" value="${endParts.d}">
+              <input type="text" maxlength="2" class="eagle-pos-to-y" value="${endParts.y}">
+            </div>
+          </div>
+        </div>
+      </div>`;
+    card.dataset.position = p.position;
+    area.appendChild(card);
+  });
+}
+
+function collectStepPositions() {
+  const cards = Array.from(document.querySelectorAll('.eagle-pos-card'));
+  STATE.positionSelections = cards
+    .filter(c => c.querySelector('.eagle-pos-check').checked)
+    .slice(0, 2)
+    .map(c => ({
+      position: c.dataset.position,
+      fromM: c.querySelector('.eagle-pos-from-m').value.trim(),
+      fromD: c.querySelector('.eagle-pos-from-d').value.trim(),
+      fromY: c.querySelector('.eagle-pos-from-y').value.trim(),
+      toM: c.querySelector('.eagle-pos-to-m').value.trim(),
+      toD: c.querySelector('.eagle-pos-to-d').value.trim(),
+      toY: c.querySelector('.eagle-pos-to-y').value.trim(),
+    }));
+
+  STATE.reqDates = {
+    projectName: byId('f_projectname').value.trim(),
+    beneficiary: byId('f_beneficiary').value.trim(),
+    hours: byId('f_hours').value.trim(),
+    projM: byId('f_proj_m').value.trim(), projD: byId('f_proj_d').value.trim(), projY: byId('f_proj_y').value.trim(),
+    confM: byId('f_conf_m').value.trim(), confD: byId('f_conf_d').value.trim(), confY: byId('f_conf_y').value.trim(),
+    borM: byId('f_eaglebor_m').value.trim(), borD: byId('f_eaglebor_d').value.trim(), borY: byId('f_eaglebor_y').value.trim(),
+  };
+}
+
+/* ---------- Step 5: download ---------- */
+
+function renderDownloadStep() {
+  const box = byId('finalChecklist');
+  const missingReqSlots = REQUIRED_SLOTS.filter(s => STATE.assignment.required[s.key] == null);
+  const items = [];
+  items.push(`<li>${STATE.scoutFinal.fullName ? '[OK]' : '[!]'} Scout name: <strong>${STATE.scoutFinal.fullName || '(missing)'}</strong></li>`);
+  items.push(`<li>${missingReqSlots.length === 0 ? '[OK]' : '[!]'} Required merit badges ${missingReqSlots.length ? ` -  missing: ${missingReqSlots.map(s=>s.label).join(', ')}` : 'all assigned'}</li>`);
+  items.push(`<li>${STATE.assignment.electiveChoices.length === 8 ? '[OK]' : '[!]'} Electives selected: ${STATE.assignment.electiveChoices.length} / 8</li>`);
+  items.push(`<li>${STATE.positionSelections.length ? '[OK]' : '[!]'} Position(s) of responsibility: ${STATE.positionSelections.length || 'none selected'}</li>`);
+  items.push(`<li>${STATE.reqDates.projectName ? '[OK]' : '[!]'} Service project name/beneficiary ${STATE.reqDates.projectName ? '' : ' -  not found, add by hand'}</li>`);
+  items.push(`<li>[!] Parent/guardian phone and email: not auto-filled - add by hand on the PDF (this tool only has the Scout's own contact info, not the parent's)</li>`);
+  box.innerHTML = `<ul style="font-family:'Helvetica Neue',Arial,sans-serif;font-size:13.5px;line-height:1.9;color:var(--ink);padding-left:20px;">${items.join('')}</ul>`;
+}
+
+/* ---------- PDF generation ---------- */
+
+// Default location of the official BSA form. If Scouting America moves the
+// file, an admin of this custom page can update it two ways:
+//  1. Quick fix, no code edit: use the "Application form source" box at the
+//     top of the page - it's saved in this browser's localStorage.
+//  2. Permanent fix: edit DEFAULT_EAGLE_PDF_URL below and re-save this page.
+const DEFAULT_EAGLE_PDF_URL = 'https://www.scouting.org/wp-content/uploads/2026/02/512-728_26-Eagle-Scout-Application_WEB.pdf';
+const PDF_URL_STORAGE_KEY = 'eagleAppFillerPdfUrl';
+
+function getConfiguredPdfUrl() {
+  return localStorage.getItem(PDF_URL_STORAGE_KEY) || DEFAULT_EAGLE_PDF_URL;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const input = byId('pdfSourceUrl');
+  const status = byId('pdfSourceStatus');
+  const saveBtn = byId('pdfSourceSave');
+  const resetBtn = byId('pdfSourceReset');
+  if (!input) return;
+
+  input.value = getConfiguredPdfUrl();
+
+  saveBtn.addEventListener('click', e => {
+    e.preventDefault();
+    const val = input.value.trim();
+    if (!val) { status.innerHTML = '<div class="eagle-note eagle-warn">Enter a URL first.</div>'; return; }
+    localStorage.setItem(PDF_URL_STORAGE_KEY, val);
+    status.innerHTML = '<div class="eagle-note eagle-ok">Saved. This page will fetch the form from this URL from now on (in this browser).</div>';
+  });
+
+  resetBtn.addEventListener('click', e => {
+    e.preventDefault();
+    localStorage.removeItem(PDF_URL_STORAGE_KEY);
+    input.value = DEFAULT_EAGLE_PDF_URL;
+    status.innerHTML = '<div class="eagle-note eagle-info">Reset to the built-in default.</div>';
+  });
+});
+
+// Slot -> [monthField, dayField, yearField, unitField, nameFieldOrNull]
+const SLOT_FIELD_MAP = {
+  slot1:  ['Text Field 65','Text Field 66','Text Field 67','Text Field 68', null],
+  slot2:  ['Text Field 69','Text Field 70','Text Field 71','Text Field 72', null],
+  slot3:  ['Text Field 76','Text Field 75','Text Field 74','Text Field 73', null],
+  slot4:  ['Text Field 77','Text Field 78','Text Field 79','Text Field 80', null],
+  slot5:  ['Text Field 84','Text Field 83','Text Field 82','Text Field 81', null],
+  slot6:  ['Text Field 85','Text Field 86','Text Field 87','Text Field 88', null],
+  slot7:  ['Text Field 92','Text Field 91','Text Field 90','Text Field 89', null],
+  slot8:  ['Text Field 93','Text Field 94','Text Field 95','Text Field 96', null],
+  slot9:  ['Text Field 100','Text Field 99','Text Field 98','Text Field 97', null],
+  slot10: ['Text Field 101','Text Field 102','Text Field 103','Text Field 104', null],
+  slot11: ['Text Field 108','Text Field 107','Text Field 106','Text Field 105', null],
+  slot12: ['Text Field 109','Text Field 110','Text Field 111','Text Field 112', null],
+  slot13: ['Text Field 116','Text Field 115','Text Field 114','Text Field 113', null],
+};
+
+// Elective slots 14-21: [monthField, dayField, yearField, unitField, nameField]
+const ELECTIVE_FIELD_MAP = [
+  ['Text Field 117','Text Field 118','Text Field 119','Text Field 120','Text Field 213'], // 14
+  ['Text Field 128','Text Field 129','Text Field 130','Text Field 131','Text Field 127'], // 15
+  ['Text Field 135','Text Field 134','Text Field 133','Text Field 132','Text Field 126'], // 16
+  ['Text Field 136','Text Field 137','Text Field 138','Text Field 139','Text Field 125'], // 17
+  ['Text Field 143','Text Field 142','Text Field 141','Text Field 140','Text Field 124'], // 18
+  ['Text Field 144','Text Field 145','Text Field 146','Text Field 147','Text Field 123'], // 19
+  ['Text Field 151','Text Field 150','Text Field 149','Text Field 148','Text Field 122'], // 20
+  ['Text Field 152','Text Field 153','Text Field 154','Text Field 155','Text Field 121'], // 21
+];
+
+const RANK_DATE_FIELDS = {
+  'first class': ['Text Field 20','Text Field 25','Text Field 32'],
+  'star':        ['Text Field 21','Text Field 24','Text Field 33'],
+};
+
+async function generatePdf() {
+  const statusEl = byId('genStatus');
+  statusEl.innerHTML = `<div class="eagle-note eagle-info">Fetching the application form...</div>`;
+  try {
+    const { PDFDocument } = PDFLib;
+    const sourceUrl = getConfiguredPdfUrl();
+
+    let bytes;
+    try {
+      const res = await fetch(sourceUrl);
+      if (!res.ok) throw new Error(`server responded ${res.status}`);
+      const buf = await res.arrayBuffer();
+      const head = new Uint8Array(buf.slice(0, 5));
+      const isPdf = String.fromCharCode(...head) === '%PDF-';
+      if (!isPdf) throw new Error('response was not a PDF file');
+      bytes = new Uint8Array(buf);
+    } catch (fetchErr) {
+      statusEl.innerHTML = `<div class="eagle-note eagle-warn">Couldn't fetch the application form from <code>${sourceUrl}</code> (${fetchErr.message}). Check the "Application form source" link at the top of the page is correct and reachable, then try again.</div>`;
+      return;
+    }
+
+    statusEl.innerHTML = `<div class="eagle-note eagle-info">Building PDF...</div>`;
+    const pdfDoc = await PDFDocument.load(bytes);
+    const form = pdfDoc.getForm();
+
+    const setText = (name, value) => {
+      if (!value) return;
+      try { form.getTextField(name).setText(String(value)); } catch (e) { /* field not found - skip */ }
+    };
+    const setCheck = (name, on) => {
+      try {
+        const cb = form.getCheckBox(name);
+        if (on) cb.check(); else cb.uncheck();
+      } catch (e) {}
+    };
+
+    const s = STATE.scoutFinal;
+    setText('Text Field 6', s.fullName);          // Full name (both pages)
+    setText('Text Field 7', s.street);
+    setText('Text Field 8', s.city);
+    setText('Text Field 9', s.state);
+    setText('Text Field 10', s.zip);
+    setText('Text Field 12', s.phone);
+    setText('Text Field 11', s.email);
+    setText('Text Field 13', s.unitNo);
+    setText('Text Field 14', s.unitCity);
+    setText('Text Field 15', s.unitState);
+    setText('Text Field 16', s.unitZip);
+    setText('Text Field 205', s.parent);
+    setText('Text Field 206', s.employer);
+
+    setText('Text Field 35', s.dob[0]); setText('Text Field 36', s.dob[1]); setText('Text Field 37', s.dob[2]);
+
+    // Rank board of review dates
+    const dj = s.ranks['Scout'] || s.ranks['scout'];
+    // Date joined Scouts BSA: use scout's dateJoinedUnit from profile if present
+    const joined = fmtDateParts(parseUsDate(STATE.scout.dateJoinedUnit));
+    setText('Text Field 17', joined.m); setText('Text Field 28', joined.d); setText('Text Field 29', joined.y);
+
+    Object.keys(s.ranks).forEach(rankName => {
+      const key = normName(rankName);
+      const parts = s.ranks[rankName];
+      if (RANK_DATE_FIELDS[key]) {
+        const [mf, df, yf] = RANK_DATE_FIELDS[key];
+        setText(mf, parts.m); setText(df, parts.d); setText(yf, parts.y);
+      }
+      if (key === 'life') {
+        setText('Text Field 40', parts.m); setText('Text Field 39', parts.d); setText('Text Field 38', parts.y);
+      }
+    });
+
+    // Cub scout / webelos / AOL / 5th grade checkboxes
+    if (s.cub === 'Y') setCheck('Check Box 10', true);
+    if (s.cub === 'N') setCheck('Check Box 11', true);
+    if (s.webelos === 'Y') setCheck('Check Box 12', true);
+    if (s.webelos === 'N') setCheck('Check Box 13', true);
+    if (s.aol === 'Y') setCheck('Check Box 14', true);
+    if (s.aol === 'N') setCheck('Check Box 15', true);
+    if (s.fifthGrade === 'Y') setCheck('Check Box 16', true);
+    if (s.fifthGrade === 'N') setCheck('Check Box 17', true);
+
+    // Parents/guardians reference row. Only the name and the shared home
+    // address are things we actually know about the parent/guardian - their
+    // phone and email are NOT the same as the Scout's own (this tool has no
+    // source for actual parent contact info), so those two are deliberately
+    // left blank rather than silently filled with the Scout's phone/email.
+    setText('Text Field 207', s.parent);
+    setText('Text Field 208', [s.street, s.city, s.state, s.zip].filter(Boolean).join(', '));
+
+    // Required merit badges
+    const badges = STATE.meritBadges;
+    REQUIRED_SLOTS.forEach(slot => {
+      const idx = STATE.assignment.required[slot.key];
+      if (idx == null) return;
+      const b = badges[idx];
+      const d = fmtDateParts(parseUsDate(b.earned));
+      const [mf, df, yf, uf] = SLOT_FIELD_MAP[slot.key];
+      setText(mf, d.m); setText(df, d.d); setText(yf, d.y); setText(uf, '997');
+    });
+
+    // Electives
+    STATE.assignment.electiveChoices.forEach((idx, i) => {
+      if (i >= 8) return;
+      const b = badges[idx];
+      const d = fmtDateParts(parseUsDate(b.earned));
+      const [mf, df, yf, uf, nf] = ELECTIVE_FIELD_MAP[i];
+      setText(nf, b.name);
+      setText(mf, d.m); setText(df, d.d); setText(yf, d.y); setText(uf, '997');
+    });
+
+    // Positions of responsibility (req 4)
+    const posFields = [
+      { name: 'Text Field 157', fm: 'Text Field 159', fd: 'Text Field 162', fy: 'Text Field 163', tm: 'Text Field 166', td: 'Text Field 169', ty: 'Text Field 172' },
+      { name: 'Text Field 158', fm: 'Text Field 160', fd: 'Text Field 161', fy: 'Text Field 164', tm: 'Text Field 165', td: 'Text Field 170', ty: 'Text Field 171' },
+    ];
+    STATE.positionSelections.forEach((p, i) => {
+      if (i >= 2) return;
+      const f = posFields[i];
+      setText(f.name, p.position);
+      setText(f.fm, p.fromM); setText(f.fd, p.fromD); setText(f.fy, p.fromY);
+      setText(f.tm, p.toM); setText(f.td, p.toD); setText(f.ty, p.toY);
+    });
+
+    // Requirement 5, 6, 7
+    const r = STATE.reqDates;
+    setText('Text Field 212', r.projectName);
+    setText('Text Field 175', r.beneficiary);
+    setText('Text Field 174', r.hours);
+    setText('Text Field 176', r.projM); setText('Text Field 177', r.projD); setText('Text Field 178', r.projY);
+    setText('Text Field 181', r.confM); setText('Text Field 180', r.confD); setText('Text Field 179', r.confY);
+    setText('Text Field 194', r.borM); setText('Text Field 195', r.borD); setText('Text Field 196', r.borY);
+
+    form.updateFieldAppearances();
+
+    const outBytes = await pdfDoc.save();
+    const blob = new Blob([outBytes], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    const safeName = (s.fullName || 'Scout').replace(/[^a-z0-9]+/gi, '_');
+    a.href = url;
+    a.download = `${safeName}_Eagle_Scout_Application.pdf`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    statusEl.innerHTML = `<div class="eagle-note eagle-ok">Done - fetched the current form from ${sourceUrl.replace(/^https?:\/\//,'').split('/')[0]} and filled it. Your download should start automatically. Double-check every field once it's open, then get it in front of your unit leader for references, signatures, and the service-project details.</div>`;
+  } catch (err) {
+    console.error(err);
+    statusEl.innerHTML = `<div class="eagle-note eagle-warn">Something went wrong generating the PDF: ${err.message}. Try again, or check the browser console for details.</div>`;
+  }
+}
+
+/* ============================================================
+   LIVE MODE - this page runs as a custom TroopWebHost page.
+   Same-origin fetch() carries the logged-in session automatically.
+   ============================================================ */
+
+// Adjust these if your troop's menu layout uses different IDs.
+// Find them by opening the relevant report and checking the URL bar.
+const TWH_CONFIG = {
+  rosterUrl: 'formCustom.aspx?Menu_Item_ID=56926&Stack=0',           // Advancement Hub landing page (leaders only)
+  myScoutsUrl: 'FormList.aspx?Menu_Item_ID=45899&Stack=1',           // "My Scouts" - available to Scouts/parents too
+
+  // Leader-access versions (Advancement Hub / Membership Hub)
+  profileUrl: id => `FormDetail.aspx?Menu_Item_ID=56934&ID=${id}&FK=${id}&Form_ID=110&Stack=2`,
+  rankPositionUrl: id => `FormDetail.aspx?Menu_Item_ID=56926&ID=${id}&FK=${id}&Form_ID=190&Stack=2`,
+  meritBadgeUrl: id => `FormDetail.aspx?Menu_Item_ID=56926&ID=${id}&FK=${id}&Form_ID=228&Stack=2`,
+  eagleReqUrl: id => `FormDetail.aspx?Menu_Item_ID=56926&Form_ID=213&Stack=2&ID=${id}&FK=0`,
+
+  // Self-service versions (under "My Scouts") - what a Scout or parent login
+  // can reach for their own record even without Advancement Hub access.
+  selfProfileUrl: id => `FormDetail.aspx?Menu_Item_ID=45899&Form_ID=209&FK=0&ID=${id}&Stack=2`,
+  selfRankPositionUrl: id => `FormDetail.aspx?Menu_Item_ID=45899&Form_ID=432&FK=0&ID=${id}&Stack=2`,
+  selfMeritBadgeUrl: id => `FormDetail.aspx?Menu_Item_ID=45899&Form_ID=425&FK=0&ID=${id}&Stack=2`,
+  selfEagleReqUrl: id => `FormDetail.aspx?Menu_Item_ID=45899&Form_ID=427&FK=0&ID=${id}&Stack=2`,
+};
+
+// How long to wait on any single TWH request before giving up. Some
+// leader-only pages appear to hang rather than cleanly 403/redirect when
+// hit by a login with zero access to them (seen with parent/Scout logins
+// against the Advancement Hub landing page) - without a timeout, a single
+// stuck request freezes the whole "Looking up available Scout(s)..." step
+// forever with no error shown. 15s is generous for a normal TWH page load
+// but short enough that a hang doesn't feel broken.
+const TWH_FETCH_TIMEOUT_MS = 15000;
+
+async function fetchDoc(url) {
+  console.debug(`[Eagle tool] fetching: ${url}`);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TWH_FETCH_TIMEOUT_MS);
+  let res;
+  try {
+    res = await fetch(url, { credentials: 'same-origin', signal: controller.signal });
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      throw new Error(`${url} timed out after ${TWH_FETCH_TIMEOUT_MS / 1000}s (likely no access, or TWH is slow to respond)`);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+  if (!res.ok) throw new Error(`${url} responded ${res.status}`);
+  // TroopWebHost responds to an access-denied request with a 302 redirect to
+  // some other page (a "denied" or default landing page) rather than a 403.
+  // fetch() follows that redirect transparently and still reports res.ok, so
+  // without this check we'd silently parse the WRONG page and come away with
+  // no data and no error - exactly what "identified the Scout but nothing
+  // loaded" looks like. Treat any redirect away from the requested path as
+  // a failure so callers can fall back to another URL.
+  if (res.redirected) {
+    throw new Error(`${url} redirected to ${res.url} (likely no access)`);
+  }
+  const text = await res.text();
+  const doc = new DOMParser().parseFromString(text, 'text/html');
+  console.debug(`[Eagle tool] loaded ok: ${url} (${text.length} chars)`);
+  return { url, doc };
+}
+
+// Full troop roster - works for leaders, typically 403s or comes back empty
+// for Scout/parent-level logins (they don't have Advancement Hub access).
+async function fetchRoster() {
+  const { doc } = await fetchDoc(TWH_CONFIG.rosterUrl);
+  const tables = Array.from(doc.querySelectorAll('table'));
+  const roster = [];
+  const eligibleRanks = ['life', 'eagle'];
+  for (const t of tables) {
+    if (!tableHasHeaders(t, ['Name', 'Current Rank', 'Earned'])) continue;
+    const rows = Array.from(t.querySelectorAll('tr'));
+    for (const r of rows) {
+      const cells = Array.from(r.querySelectorAll('td'));
+      if (cells.length < 4) continue;
+      let id = null;
+      for (const c of cells) {
+        const a = c.querySelector('a[href*="Form_ID=190"]');
+        if (a) {
+          const m = (a.getAttribute('href') || '').match(/[?&]ID=(\d+)/);
+          if (m) id = m[1];
+        }
+      }
+      const name = (cells[2] && cells[2].textContent || '').trim();
+      const rank = (cells[3] && cells[3].textContent || '').trim();
+      // Only Life and Eagle Scouts are eligible to work on/hold this application.
+      if (id && name && eligibleRanks.includes(normName(rank))) roster.push({ name, id, rank });
+    }
+    break; // first matching table is the one we want
+  }
+  return roster;
+}
+
+// "My Scouts" - the Scout's own record (if logged in as the Scout) or their
+// linked child/children (if logged in as a parent). This page uses onclick
+// buttons instead of plain links, so the ID has to be pulled out of the
+// onclick attribute rather than an href.
+async function fetchMyScoutsRoster() {
+  const { doc } = await fetchDoc(TWH_CONFIG.myScoutsUrl);
+  const tables = Array.from(doc.querySelectorAll('table'));
+  console.debug(`[Eagle tool] My Scouts page has ${tables.length} table(s)`);
+  const roster = [];
+  let matchedTable = false;
+  for (const t of tables) {
+    if (!tableHasHeaders(t, ['Name', 'Rank'])) continue;
+    matchedTable = true;
+    const { rows } = extractTableByLabels(t, [
+      { key: 'name', match: 'name' },
+      { key: 'rank', match: 'rank' },
+    ]);
+    const rowEls = Array.from(t.querySelectorAll('tr')).slice(1);
+    rowEls.forEach((rowEl, i) => {
+      const name = (rows[i] && rows[i].name || '').trim();
+      const rank = (rows[i] && rows[i].rank || '').trim();
+      if (!name) return;
+      let id = null;
+      rowEl.querySelectorAll('[onclick]').forEach(el => {
+        const m = (el.getAttribute('onclick') || '').match(/[?&]ID=(\d+)/);
+        if (m && !id) id = m[1];
+      });
+      if (id) roster.push({ name, id, rank });
+    });
+    break;
+  }
+  if (!matchedTable) {
+    console.warn('[Eagle tool] No table on the My Scouts page matched expected "Name"/"Rank" headers - the page layout may differ from what this tool expects.');
+  }
+  return roster;
+}
+
+// Tries the leader-only full roster first; falls back to "My Scouts" for
+// Scout/parent-level logins that can't see the full roster. Returns
+// { roster, source } where source is 'roster' or 'myScouts' so the UI can
+// explain what's showing.
+async function fetchAvailableScouts() {
+  console.debug('[Eagle tool] fetchAvailableScouts: trying leader roster first...');
+  try {
+    const roster = await fetchRoster();
+    console.debug(`[Eagle tool] leader roster returned ${roster.length} Life/Eagle Scout(s)`);
+    if (roster.length > 0) return { roster, source: 'roster' };
+  } catch (e) {
+    console.warn('[Eagle tool] Full roster not available (expected for Scout/parent logins):', e);
+  }
+  console.debug('[Eagle tool] falling back to My Scouts...');
+  const myScouts = await fetchMyScoutsRoster();
+  console.debug(`[Eagle tool] My Scouts returned ${myScouts.length} record(s)`);
+  return { roster: myScouts, source: 'myScouts' };
+}
+
+// Fetches whatever detail pages the current login has access to. A leader
+// gets all four via the Advancement/Membership Hub URLs; a Scout or parent
+// doesn't have those, so each one that fails falls back to the equivalent
+// "My Scouts" self-service page instead. Failures are collected rather than
+// aborting the whole load, so partial data still reaches the review screen
+// with a clear note about anything that couldn't be reached either way.
+async function fetchDocWithFallback(primaryUrl, fallbackUrl) {
+  try {
+    return await fetchDoc(primaryUrl);
+  } catch (e) {
+    if (!fallbackUrl) throw e;
+    return await fetchDoc(fallbackUrl);
+  }
+}
+
+async function fetchScoutByIdLive(id) {
+  const jobs = [
+    { name: 'profile', url: TWH_CONFIG.profileUrl(id), fallback: TWH_CONFIG.selfProfileUrl(id) },
+    { name: 'rank & position history', url: TWH_CONFIG.rankPositionUrl(id), fallback: TWH_CONFIG.selfRankPositionUrl(id) },
+    { name: 'merit badges', url: TWH_CONFIG.meritBadgeUrl(id), fallback: TWH_CONFIG.selfMeritBadgeUrl(id) },
+    { name: 'Eagle requirements', url: TWH_CONFIG.eagleReqUrl(id), fallback: TWH_CONFIG.selfEagleReqUrl(id) },
+  ];
+  const settled = await Promise.allSettled(jobs.map(j => fetchDocWithFallback(j.url, j.fallback)));
+  const docs = [];
+  const failed = [];
+  settled.forEach((r, i) => {
+    if (r.status === 'fulfilled') docs.push(r.value);
+    else failed.push(jobs[i].name);
+  });
+  const summary = ingestDocs(docs);
+  return { summary, failed };
+}
+
+/* ---------- Live mode UI wiring ---------- */
+
+document.addEventListener('DOMContentLoaded', () => {
+  const liveBox = byId('liveModeBox');
+  if (!liveBox) return;
+
+  const searchInput = byId('liveScoutSearch');
+  const datalist = byId('liveScoutList');
+  const loadBtn = byId('liveLoadBtn');
+  const statusEl = byId('liveStatus');
+  let rosterMap = {};
+
+  async function loadScout(id, name) {
+    loadBtn.disabled = true;
+    statusEl.innerHTML = '<div class="eagle-note eagle-info">Fetching profile, ranks, merit badges, and requirement dates...</div>';
+    try {
+      resetScoutState();
+      const { failed } = await fetchScoutByIdLive(id);
+      if (failed.length === 4) {
+        statusEl.innerHTML = `<div class="eagle-note eagle-warn">Couldn't load any details for ${name} - your login may not have access to these pages. Check with a unit leader, or try again if you think this is a mistake.</div>`;
+        loadBtn.disabled = false;
+        return;
+      }
+      const okMsg = `Loaded ${name}. Review the details below.`;
+      statusEl.innerHTML = failed.length
+        ? `<div class="eagle-note eagle-warn">${okMsg} Note: couldn't access ${failed.join(', ')} - your login may not have permission for ${failed.length > 1 ? 'those' : 'that'}, so double-check ${failed.length > 1 ? 'those sections' : 'that section'} by hand.</div>`
+        : `<div class="eagle-note eagle-ok">${okMsg}</div>`;
+      populateInfoStep();
+      goToStep(2);
+    } catch (err) {
+      statusEl.innerHTML = `<div class="eagle-note eagle-warn">Something went wrong: ${err.message}</div>`;
+    } finally {
+      loadBtn.disabled = false;
+    }
+  }
+
+  statusEl.innerHTML = '<div class="eagle-note eagle-info">Looking up available Scout(s)...</div>';
+  fetchAvailableScouts().then(({ roster, source }) => {
+    if (!roster.length) {
+      statusEl.innerHTML = '<div class="eagle-note eagle-warn">Couldn\'t find any Scouts available to this login. If you\'re a Scout or parent, make sure you\'re logged in with the right account. If you\'re a leader, your menu IDs may differ - see the TWH_CONFIG comment near the top of the script.</div>';
+      return;
+    }
+
+    if (source === 'myScouts' && roster.length === 1) {
+      // Scout viewing their own record, or a parent with exactly one linked
+      // Scout - skip the picker entirely and load straight away.
+      const only = roster[0];
+      searchInput.value = only.name;
+      searchInput.parentElement.classList.add('eagle-hidden');
+      statusEl.innerHTML = `<div class="eagle-note eagle-info">Loading ${only.name}...</div>`;
+      loadScout(only.id, only.name);
+      return;
+    }
+
+    roster.sort((a, b) => a.name.localeCompare(b.name));
+    datalist.innerHTML = roster.map(r => `<option value="${r.name}">`).join('');
+    roster.forEach(r => { rosterMap[r.name] = r.id; });
+    const scoutWord = roster.length === 1 ? 'Scout' : 'Scouts';
+    statusEl.innerHTML = source === 'roster'
+      ? `<div class="eagle-note eagle-ok">Found ${roster.length} Life/Eagle ${scoutWord}. Type a name below and click Load.</div>`
+      : `<div class="eagle-note eagle-ok">Found ${roster.length} linked ${scoutWord} on your account. Pick one below and click Load.</div>`;
+    loadBtn.disabled = false;
+  }).catch(err => {
+    statusEl.innerHTML = `<div class="eagle-note eagle-warn">Could not reach TroopWebHost (${err.message}). Make sure you're logged in and this page is embedded on troopwebhost.org.</div>`;
+  });
+
+  loadBtn.addEventListener('click', e => {
+    e.preventDefault();
+    const name = searchInput.value.trim();
+    const id = rosterMap[name];
+    if (!id) {
+      statusEl.innerHTML = '<div class="eagle-note eagle-warn">Pick a name from the list (start typing to see matches).</div>';
+      return;
+    }
+    loadScout(id, name);
+  });
+});
+
+function resetScoutState() {
+  STATE.scout = {};
+  STATE.ranks = [];
+  STATE.positions = [];
+  STATE.meritBadges = [];
+  STATE.requirements = {};
+  STATE.assignment = { required: {}, userOverridden: {}, electiveChoices: [] };
+  STATE._electiveInit = false;
+  STATE._prevUsed = null;
+}
+
+})();
+
+</script>
