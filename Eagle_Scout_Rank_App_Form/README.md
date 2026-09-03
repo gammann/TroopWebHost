@@ -47,6 +47,16 @@ signatures, and parent/guardian contact info this tool has no way to know).
 
 ![Step 5: Generate and download](./screenshots/05-download.png)
 
+**The filled PDF itself.** Clicking "Generate & download" produces the
+actual filled application. The layout below is a stand-in built for this
+demo (this repo can't ship or fetch the real, copyrighted BSA form without
+network access) - but the filled-in values are the tool's real output
+against the same fake Scout data as above, run through the same pdf-lib
+fill logic that runs against the real 512-728 form in production.
+
+![Filled PDF, page 1](./screenshots/06-filled-pdf-page1.png)
+![Filled PDF, page 2](./screenshots/07-filled-pdf-page2.png)
+
 ## What it does
 
 - Looks up a Scout by name (leaders see the full roster filtered to Life and
