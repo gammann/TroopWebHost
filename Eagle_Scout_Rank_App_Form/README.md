@@ -20,18 +20,24 @@ so you can see the wizard end-to-end without any real Scout's information.
 **Step 1 - Load a Scout.** Type a name to search the roster (leaders) or
 pick from your own linked Scout(s) (parents/Scouts).
 
-![Step 1: Load a Scout](./screenshots/01-load-scout.png)
+<p align="center">
+<img src="./screenshots/01-load-scout.png" width="50%">
+</p>
 
 **Step 2 - Review Scout & unit info.** Everything pulled straight from
 TroopWebHost, editable before it goes any further.
 
-![Step 2: Scout and unit information](./screenshots/02-scout-info.png)
+<p align="center">
+<img src="./screenshots/02-scout-info.png" width="50%">
+</p>
 
 **Step 3 - Merit badges.** Required badges are auto-assigned when there's
 exactly one earned candidate for a slot; choice requirements (like #10:
 Swimming/Hiking/Cycling) let you pick which earned badge fills the slot.
 
-![Step 3: Merit badges](./screenshots/03-merit-badges.png)
+<p align="center">
+<img src="./screenshots/03-merit-badges.png" width="50%">
+</p>
 
 **Step 4 - Positions of responsibility.** Pre-selected chronologically,
 earliest-first after the Life board of review, picking just enough to
@@ -39,21 +45,30 @@ satisfy the 6-month requirement. Note in this demo data a fake "OA Vice
 Chief" position was deliberately included to confirm it's correctly
 excluded - only "OA Troop Representative" counts toward this requirement.
 
-![Step 4: Positions of responsibility](./screenshots/04-positions.png)
+<p align="center">
+<img src="./screenshots/04-positions.png" width="50%">
+</p>
 
 **Step 5 - Generate & download.** A final checklist flags anything that
 still needs a human's attention (references, the service project writeup,
 signatures, and parent/guardian contact info this tool has no way to know).
 
-![Step 5: Generate and download](./screenshots/05-download.png)
+<p align="center">
+<img src="./screenshots/05-download.png" width="50%">
+</p>
 
 **The filled PDF itself.** Clicking "Generate & download" produces the
 actual filled application - this is the real, official 512-728 form (Jan
 2026 revision), filled by the tool's real pdf-lib logic against the same
 fake Scout data as above.
 
-![Filled PDF, page 1](./screenshots/06-filled-pdf-page1.png)
-![Filled PDF, page 2](./screenshots/07-filled-pdf-page2.png)
+<p align="center">
+<img src="./screenshots/06-filled-pdf-page1.png" width="50%">
+</p>
+
+<p align="center">
+<img src="./screenshots/07-filled-pdf-page2.png" width="50%">
+</p>
 
 ## What it does
 
