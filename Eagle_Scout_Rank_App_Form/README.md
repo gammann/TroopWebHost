@@ -52,7 +52,7 @@ actual filled application - this is the real, official 512-728 form (Jan
 2026 revision), filled by the tool's real pdf-lib logic against the same
 fake Scout data as above.
 
-![Filled PDF, page 1](./screenshots/06-filled-pdf-page1.png)
+![Filled PDF, page 1](./screenshots/)
 ![Filled PDF, page 2](./screenshots/07-filled-pdf-page2.png)
 
 ## What it does
