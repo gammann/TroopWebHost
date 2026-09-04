@@ -302,6 +302,75 @@
 <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 
 <script>
+// ---- THEME DETECTION ---------------------------------------------------
+// The 5 base colors above (--forest/--canvas/--ember/--ink/--moss) are
+// only a FALLBACK palette. On load, this probes TroopWebHost's own
+// Bootstrap-based markup (classes like .navtable, .btn-primary,
+// .form-control) using getComputedStyle() and re-points each CSS
+// variable at the real site's rendered colors, so this page blends in
+// on any troop's site instead of always showing this fixed palette.
+// If a probe comes back empty/transparent/unusable, that one variable
+// just keeps its fallback value above -- this never throws or blocks
+// the rest of the page from loading.
+(function applyTwhTheme() {
+  try {
+    var root = document.getElementById('twl-root');
+    if (!root) return;
+
+    var probe = document.createElement('div');
+    probe.style.cssText = 'position:absolute;left:-9999px;top:-9999px;width:1px;height:1px;overflow:hidden;visibility:hidden;pointer-events:none;';
+    // Real TWH class names are applied DIRECTLY to each probe element
+    // (not nested inside a parent bearing the class) -- background-color
+    // does not inherit from parent to child in CSS, so a wrapper/child
+    // split would silently read the wrong element's style.
+    probe.innerHTML =
+      '<div class="navtable twl-probe-nav">x</div>' +
+      '<div class="panel-heading twl-probe-panelhead">x</div>' +
+      '<input class="form-control twl-probe-input" />' +
+      '<button type="button" class="btn btn-primary twl-probe-btn">x</button>' +
+      '<a href="#" class="twl-probe-link">x</a>';
+    document.body.appendChild(probe);
+
+    function usableColor(v) {
+      if (!v) return null;
+      var t = v.replace(/\s+/g, '');
+      if (t === 'transparent' || t === 'rgba(0,0,0,0)') return null;
+      return v;
+    }
+    function colorOf(sel, prop) {
+      var el = probe.querySelector(sel);
+      return el ? usableColor(getComputedStyle(el)[prop]) : null;
+    }
+
+    // Candidates, each falling back through a couple of TWH class
+    // possibilities before giving up and leaving the CSS default alone.
+    var forestC = colorOf('.twl-probe-nav', 'backgroundColor') ||
+                  colorOf('.twl-probe-panelhead', 'backgroundColor');
+    var emberC  = colorOf('.twl-probe-btn', 'backgroundColor');
+    var canvasC = colorOf('.twl-probe-input', 'backgroundColor') ||
+                  usableColor(getComputedStyle(document.body).backgroundColor);
+    var inkC    = usableColor(getComputedStyle(document.body).color) ||
+                  colorOf('.twl-probe-input', 'color');
+    var mossC   = colorOf('.twl-probe-link', 'color');
+
+    document.body.removeChild(probe);
+
+    // Guard against a probe returning a color identical to another
+    // role's color (e.g. a theme with no distinct nav background) --
+    // in that case skip it rather than flatten the palette.
+    var applied = {};
+    if (forestC) { root.style.setProperty('--forest', forestC); applied.forest = forestC; }
+    if (canvasC && canvasC !== forestC) { root.style.setProperty('--canvas', canvasC); applied.canvas = canvasC; }
+    if (inkC) { root.style.setProperty('--ink', inkC); applied.ink = inkC; }
+    if (emberC && emberC !== forestC) { root.style.setProperty('--ember', emberC); applied.ember = emberC; }
+    if (mossC && mossC !== inkC) { root.style.setProperty('--moss', mossC); applied.moss = mossC; }
+
+    console.log('[TWL theme] applied from site colors:', applied, '(anything omitted kept the built-in fallback)');
+  } catch (e) {
+    console.log('[TWL theme] probe failed, using built-in fallback palette:', e.message);
+  }
+})();
+
 (function () {
   // ---- CONFIGURE THIS ------------------------------------------------
   var MENU_ITEM_ID = "46097"; // Event Participation Summary For Date Range
