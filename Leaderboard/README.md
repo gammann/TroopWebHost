@@ -95,10 +95,14 @@ pasting it in manually. It needs one site-specific value:
 7. Find the **POST to `formCustomEdit.aspx`** with
    `Selected_Action=SaveContentEdit` in its form data.
 8. Find the `SelectedSectionID` value from that request, typical a 3 digit number (depending on the number of custom sections on your site).
+
+    <img width="749" height="506" alt="image" src="https://github.com/user-attachments/assets/14df8a94-445b-4745-9b24-0b4857db6427" />
+    
 9. Click **Source** for Leaderboard section.
 10. Find `SELF_SECTION_ID` near the top of the script, and enter the number from Step 8.
+11. Save the page.
 
- <img width="749" height="506" alt="image" src="https://github.com/user-attachments/assets/14df8a94-445b-4745-9b24-0b4857db6427" />
+
 
 
 If you'd rather skip this, that's fine — the manual copy/paste flow
