@@ -341,31 +341,57 @@
       var el = probe.querySelector(sel);
       return el ? usableColor(getComputedStyle(el)[prop]) : null;
     }
+    // Blends an "rgb(r,g,b)"/"rgba(r,g,b,a)" string toward a target
+    // (default: white) by `factor` (0 = no change, 1 = fully target).
+    // Used to derive --moss from --forest rather than probing it
+    // independently, since many sites reuse the same stock Bootstrap
+    // blue for both link color and .btn-primary -- probing them as
+    // separate roles risks --ember and --moss silently colliding.
+    function lighten(rgbStr, factor, tr, tg, tb) {
+      if (!rgbStr) return null;
+      var m = rgbStr.match(/(\d+(?:\.\d+)?)/g);
+      if (!m || m.length < 3) return null;
+      tr = tr === undefined ? 255 : tr;
+      tg = tg === undefined ? 255 : tg;
+      tb = tb === undefined ? 255 : tb;
+      var r = Math.round(+m[0] + (tr - +m[0]) * factor);
+      var g = Math.round(+m[1] + (tg - +m[1]) * factor);
+      var b = Math.round(+m[2] + (tb - +m[2]) * factor);
+      return 'rgb(' + r + ', ' + g + ', ' + b + ')';
+    }
 
     // Candidates, each falling back through a couple of TWH class
     // possibilities before giving up and leaving the CSS default alone.
     var forestC = colorOf('.twl-probe-nav', 'backgroundColor') ||
                   colorOf('.twl-probe-panelhead', 'backgroundColor');
     var emberC  = colorOf('.twl-probe-btn', 'backgroundColor');
-    var canvasC = colorOf('.twl-probe-input', 'backgroundColor') ||
-                  usableColor(getComputedStyle(document.body).backgroundColor);
-    var inkC    = usableColor(getComputedStyle(document.body).color) ||
-                  colorOf('.twl-probe-input', 'color');
-    var mossC   = colorOf('.twl-probe-link', 'color');
+    // --canvas is intentionally NOT probed: on nearly every TWH site
+    // this reads back as plain white (the site's own page/input
+    // background), which flattens this card's warm, branded look into
+    // a generic white box. --canvas stays fixed at its built-in value
+    // so the card keeps a consistent identity across every site.
+    var inkC    = usableColor(getComputedStyle(document.body).color);
+    // --moss is meant to be a lighter TINT of --forest (same hue
+    // family, like the original #1f3a2e/#5c7a5a fallback pair) rather
+    // than its own independently-themed color, so derive it from
+    // whatever forest color was actually found. Only fall back to
+    // probing the link color directly if forest itself wasn't found.
+    var mossC = forestC ? lighten(forestC, 0.45) : colorOf('.twl-probe-link', 'color');
 
     document.body.removeChild(probe);
 
     // Guard against a probe returning a color identical to another
-    // role's color (e.g. a theme with no distinct nav background) --
-    // in that case skip it rather than flatten the palette.
+    // role's color (e.g. a theme with no distinct nav background, or
+    // a site where the link color and .btn-primary color are the same
+    // stock Bootstrap blue) -- in that case skip it rather than let
+    // two visually-distinct roles collapse into one color.
     var applied = {};
     if (forestC) { root.style.setProperty('--forest', forestC); applied.forest = forestC; }
-    if (canvasC && canvasC !== forestC) { root.style.setProperty('--canvas', canvasC); applied.canvas = canvasC; }
     if (inkC) { root.style.setProperty('--ink', inkC); applied.ink = inkC; }
     if (emberC && emberC !== forestC) { root.style.setProperty('--ember', emberC); applied.ember = emberC; }
-    if (mossC && mossC !== inkC) { root.style.setProperty('--moss', mossC); applied.moss = mossC; }
+    if (mossC && mossC !== inkC && mossC !== emberC) { root.style.setProperty('--moss', mossC); applied.moss = mossC; }
 
-    console.log('[TWL theme] applied from site colors:', applied, '(anything omitted kept the built-in fallback)');
+    console.log('[TWL theme] applied from site colors:', applied, '(--canvas is fixed by design; anything else omitted kept the built-in fallback)');
   } catch (e) {
     console.log('[TWL theme] probe failed, using built-in fallback palette:', e.message);
   }
