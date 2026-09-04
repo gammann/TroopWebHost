@@ -11,10 +11,9 @@ are published periodically by a leader through a built-in admin panel
 (no addresses, medical info, or other sensitive fields ever leave
 that action — just names and totals).
 
-
-
+<p align="center">
 <img width="421" height="533" alt="image" src="https://github.com/user-attachments/assets/de485f81-6c75-4d15-a3c0-4a85549fcd56" />
-
+</p>
 
 
 The code works by scraping the **Event Participation Summary for Date Range** and the **Export Roster to Excel** reports for the data.  By default only the **Adult Leader** and **Event Planner** roles have access to the **Event Participation Summary for Date Range report**, but you can grant the **View Event Participation Reports** task to other roles, without concern of granting too much access.  The **Export Roster to Excel** report contains more sensitive data, and for that reason, should not be granted to more roles.  By default anyone with the **Rank Advancement** and **Membership** roles should have access to it.
@@ -122,7 +121,7 @@ access).
 
 ## Step 4 — Publish former-member and merit-badge data
 
-When anyone with **View Membership Information** and **Web Page Editor** tasks opens the page, it will automatically update the former member and merit badge data.  If you want to update it manually, you can follow these steps:
+When anyone with **View Membership Information** and **Web Page Editor** tasks opens the page, it will automatically update the former member and merit badge data provided you followed **Step 2 — Set up Auto-Save**.  You only need to do the below steps, if you do not do **Step 2 — Set up Auto-Save** and you want to update the leaderboard manually for former members.  Do do that you can follow these steps:
 
 1. Open the Leaderboard page, scroll down, and open **Admin: Publish former
    member data.**
