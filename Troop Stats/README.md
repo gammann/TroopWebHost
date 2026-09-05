@@ -23,6 +23,20 @@ Everything runs client-side in the browser. No backend, no build step, no file u
 
  <img width="512" height="300" alt="image" src="https://github.com/user-attachments/assets/3210c06f-fbc9-4fc5-a165-90c43ac18ab9" />
 
+## Color scheme
+
+The dashboard's colors follow whatever theme your troop's TroopWebhost site is currently using, since a site administrator can change that at any time from the TroopWebhost admin panel.
+
+On load, the page reads the host site's actual brand colors and derives the dashboard's full palette — header/button color, accent color, muted text, page background, ink, borders, and error-red — from them, verifying WCAG contrast (text stays readable against its background) at every step.
+
+Detection works by creating invisible, throwaway elements using TroopWebhost's own proprietary CSS classes (`.navtable`, `.navlink`, `.banner-div`, `.nav-tabs`, `.table-striped`, `.table-curved`, `.form-control`, `.RequiredIndicator`) and reading their computed styles — the same technique used by the [Eagle Scout Rank Application Form](../Eagle_Scout_Rank_App_Form) tool in this repo, confirmed working against a real TroopWebhost theme stylesheet. This works as long as TroopWebhost's site stylesheet is linked into whatever document the probe runs in, regardless of frame structure, because the stylesheet's rules for those classes apply to any element carrying them — even a throwaway one with no real nav bar on the page.
+
+It tries the current document first. If that finds nothing (e.g. this exact page was rendered without the site's CSS attached — which can happen depending on how a Custom Page is loaded), it climbs the page's frame ancestry and retries the same probe on each accessible parent frame, preferring the outermost one that has real page content. This specifically handles troops whose site uses a classic HTML frameset rather than a plain iframe, where the outermost frame (`window.top`) can be just an empty frameset shell with no stylesheet at all, while the real themed page sits one level in.
+
+If nothing usable is found anywhere in that search, it silently falls back to the dashboard's original built-in palette — nothing breaks either way.
+
+This only re-colors the dashboard to match; it never changes the site's actual color scheme, and it never fails visibly — worst case, you just see the default palette instead of a matched one.
+
 ## Access restriction
 
 The page only shows itself to accounts that can actually pull the reports it needs. On load, it silently probes the Roster report; if that fails (logged out, or the account's TroopWebhost role doesn't have report-pulling permission), everything stays hidden behind a **"This page is restricted to Adult Leaders"** message instead of showing controls that wouldn't work anyway. If the probe succeeds, that same roster pull is reused when you click the button, so nothing gets fetched twice.
@@ -74,6 +88,7 @@ If your Custom Page editor sanitizes/strips `<script>` tags, this won't work —
 - **Patrol Attendance by Campout uses each event's own Patrol value**, not the roster's current patrol assignment, since scouts change patrols periodically and attributing an old campout to a scout's *current* patrol would misattribute it. Column names are whatever patrol values actually appear in that report, which can differ in naming/casing from the roster's patrol names.
 - **Year-over-year deltas are a simplified recomputation**, not a full replay of the current year's logic — they don't apply the individual join/departure-cutoff refinement to prior-year Active %, for instance. Good for a directional comparison, not a perfectly apples-to-apples one.
 - **Name matching is normalization-based, not exact.** Names are matched across reports by lowercasing, stripping punctuation, and comparing sorted word sets — so "Smith, John" matches "John Smith," but "Johnny" won't match "Jonathan." Mismatches show up in the unmatched-names panel for manual review.
+- **Theme matching is best-effort.** It relies on TroopWebhost's own theme stylesheet being linked into some document in the page's frame ancestry that this script can reach. A heavily customized site theme that doesn't use TroopWebhost's usual CSS classes, or a frame structure deep enough that the real theme sits behind a cross-origin boundary, may not be detected, in which case the dashboard just uses its default palette. It never looks broken, just untailored. A `[APM Theme]` debug log in the browser console (on by default; flip `THEME_DEBUG` to `false` in the script once you've confirmed it's working on your site) shows exactly what was checked and where the colors came from.
 - **Requires TroopWebhost's report URLs to stay stable.** If TroopWebhost ever changes its `Menu_Item_ID` values or report formats, the live pull will start failing and the IDs in the table above will need updating. The Event Types list is more resilient to this than the four CSV reports, since it's found by locating the "Event Type" column header rather than any fixed page structure.
 - **The access gate (see [Access restriction](#access-restriction)) is a UX convenience, not enforcement.** It infers "Adult Leader" from "can pull the Roster report," which is an approximation, and it can't be relied on to keep anyone out — TroopWebhost's own server-side permissions are what actually protect the data.
 

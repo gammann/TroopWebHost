@@ -119,7 +119,7 @@
     font-family:'IBM Plex Mono',monospace; font-size:12px;font-weight:600;
     color:var(--forest); flex-shrink:0;
   }
-  .apm-dashboard .trail .marker.done{ background:var(--amber); border-color:var(--amber); color:#fff; }
+  .apm-dashboard .trail .marker.done{ background:var(--amber); border-color:var(--amber); color:var(--amber-ink); }
   .apm-dashboard .trail .seg{ width:34px; height:2px; background:var(--line); flex-shrink:0; }
   .apm-dashboard .trail .lbl{ font-size:12px; color:var(--forest); font-weight:500; white-space:nowrap; }
 
@@ -178,12 +178,12 @@
   .apm-dashboard .evtypes-header .ph{ font-size:13px; color:var(--sage); max-width:640px; }
 
   .apm-dashboard .btn{
-    background:var(--amber); color:#fff; border:none;
+    background:var(--amber); color:var(--amber-ink); border:none;
     padding:14px 28px; border-radius:6px;
     font-family:'Bitter',serif; font-weight:700; font-size:16px;
     cursor:pointer; letter-spacing:.01em;
   }
-  .apm-dashboard .btn:hover{ background:#a8670f; }
+  .apm-dashboard .btn:hover{ background:var(--amber-hover); }
   .apm-dashboard .btn.secondary{
     background:transparent; color:var(--forest); border:1.5px solid var(--forest);
     font-size:13px; padding:9px 16px;
@@ -256,6 +256,336 @@
 <body>
 
 <div class="apm-dashboard">
+<script>
+/* Dynamic theme detection -------------------------------------------------
+   TroopWebhost's site administrator can change the site's color scheme at
+   any time from the TWH admin panel. This block probes the *host page*
+   (the TWH master page this Custom Page is embedded in, not this widget)
+   for its actual brand colors and re-derives this dashboard's ten CSS
+   custom properties (--forest, --amber, --sage, etc.) from them, so the
+   dashboard always matches whatever theme is currently live. If nothing
+   usable can be detected, it silently keeps the built-in warm palette
+   defined in the stylesheet above. This never throws past its own IIFE. */
+(function(){
+  var FALLBACK = {
+    forest:'#1f3d31', forestDark:'#152a22', parchment:'#efe8d8', parchmentLight:'#f8f5ec',
+    ink:'#2a2620', amber:'#c17817', amberLight:'#e0a852', sage:'#7c9885', line:'#d8cfb8', danger:'#b3452c'
+  };
+
+  function hexToRgb(hex){
+    hex = hex.replace('#','');
+    if(hex.length===3){ hex = hex.split('').map(function(c){ return c+c; }).join(''); }
+    var n = parseInt(hex,16);
+    return { r:(n>>16)&255, g:(n>>8)&255, b:n&255 };
+  }
+  function rgbToHex(r,g,b){
+    function c(x){ x=Math.max(0,Math.min(255,Math.round(x))); var s=x.toString(16); return s.length===1?'0'+s:s; }
+    return '#'+c(r)+c(g)+c(b);
+  }
+  function rgbToHsl(r,g,b){
+    r/=255; g/=255; b/=255;
+    var max=Math.max(r,g,b), min=Math.min(r,g,b), h,s,l=(max+min)/2;
+    if(max===min){ h=0; s=0; }
+    else{
+      var d=max-min;
+      s = l>0.5 ? d/(2-max-min) : d/(max+min);
+      if(max===r) h=(g-b)/d+(g<b?6:0);
+      else if(max===g) h=(b-r)/d+2;
+      else h=(r-g)/d+4;
+      h/=6;
+    }
+    return { h:h*360, s:s*100, l:l*100 };
+  }
+  function hslToRgb(h,s,l){
+    h=((h%360)+360)%360; h/=360; s/=100; l/=100;
+    var r,g,b;
+    if(s===0){ r=g=b=l; }
+    else{
+      var hue2rgb=function(p,q,t){
+        if(t<0)t+=1; if(t>1)t-=1;
+        if(t<1/6) return p+(q-p)*6*t;
+        if(t<1/2) return q;
+        if(t<2/3) return p+(q-p)*(2/3-t)*6;
+        return p;
+      };
+      var q = l<0.5 ? l*(1+s) : l+s-l*s;
+      var p = 2*l-q;
+      r=hue2rgb(p,q,h+1/3); g=hue2rgb(p,q,h); b=hue2rgb(p,q,h-1/3);
+    }
+    return { r:Math.round(r*255), g:Math.round(g*255), b:Math.round(b*255) };
+  }
+  function hslToHex(h,s,l){ var c=hslToRgb(h,s,l); return rgbToHex(c.r,c.g,c.b); }
+  function relLum(r,g,b){
+    function lin(v){ v/=255; return v<=0.03928 ? v/12.92 : Math.pow((v+0.055)/1.055,2.4); }
+    return 0.2126*lin(r)+0.7152*lin(g)+0.0722*lin(b);
+  }
+  function contrastOf(rgb1,rgb2){
+    var L1=relLum(rgb1.r,rgb1.g,rgb1.b)+0.05, L2=relLum(rgb2.r,rgb2.g,rgb2.b)+0.05;
+    return L1>L2 ? L1/L2 : L2/L1;
+  }
+  function clamp(n,lo,hi){ return Math.max(lo,Math.min(hi,n)); }
+
+  var WHITE={r:255,g:255,b:255};
+  var BLACK={r:0,g:0,b:0};
+
+  function ensureContrast(hex, against, minRatio, direction){
+    var rgb = hexToRgb(hex), hsl = rgbToHsl(rgb.r,rgb.g,rgb.b), tries=0;
+    while(tries<25){
+      var cur = hexToRgb(hslToHex(hsl.h,hsl.s,hsl.l));
+      if(contrastOf(cur, against) >= minRatio) break;
+      hsl.l = direction==='darken' ? clamp(hsl.l-4,0,100) : clamp(hsl.l+4,0,100);
+      tries++;
+    }
+    return hslToHex(hsl.h,hsl.s,hsl.l);
+  }
+
+  function parseColor(val){
+    if(!val) return null;
+    val = val.trim();
+    if(!val || val==='transparent' || val==='inherit' || val==='initial' || val==='none') return null;
+    if(/^rgba?\(0,\s*0,\s*0,\s*0\)$/i.test(val)) return null;
+    if(val[0]==='#'){ try{ return hexToRgb(val); }catch(e){ return null; } }
+    var m = val.match(/rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)/i);
+    if(m) return { r:parseFloat(m[1]), g:parseFloat(m[2]), b:parseFloat(m[3]) };
+    try{
+      var probe = document.createElement('span');
+      probe.style.color = val; probe.style.display = 'none';
+      document.body.appendChild(probe);
+      var resolved = getComputedStyle(probe).color;
+      document.body.removeChild(probe);
+      if(resolved === val) return null;
+      return parseColor(resolved);
+    }catch(e){ return null; }
+  }
+
+  // --- Same-document theme probing (primary method) --------------------
+  // Rather than guessing generic Bootstrap class names or reaching into
+  // other frames, create invisible throwaway elements using TroopWebhost's
+  // OWN proprietary CSS classes (.navtable, .navlink, .banner-div, etc. -
+  // confirmed against a real TWH theme stylesheet) directly in a given
+  // document and read their computed styles. This works as long as
+  // TroopWebhost's site stylesheet is linked into that document, regardless
+  // of iframe/frameset structure, because the stylesheet's rules for these
+  // classes apply to any element carrying them - even a throwaway one with
+  // no real nav bar on the page.
+  function probeThemeIn(doc){
+    try{
+      if(!doc || !doc.body || !doc.createElement) return null;
+      var SENTINEL = 'rgb(1, 2, 3)';
+      var wrap = doc.createElement('div');
+      wrap.style.cssText = 'position:absolute;left:-9999px;top:-9999px;visibility:hidden;pointer-events:none;color:'+SENTINEL+';border-color:'+SENTINEL+';';
+      wrap.innerHTML =
+        '<div class="navtable" id="__apm_probe_navtable">' +
+          '<span class="navicon" id="__apm_probe_navicon"></span>' +
+          '<span class="navlink" id="__apm_probe_navlink"><a href="#" id="__apm_probe_navlink_a">x</a></span>' +
+        '</div>' +
+        '<div class="banner-div" id="__apm_probe_banner"></div>' +
+        '<ul class="nav-tabs"><li><a href="#" id="__apm_probe_tab">x</a></li></ul>' +
+        '<table class="table-striped"><thead><tr id="__apm_probe_gridhead"><th>x</th></tr></thead></table>' +
+        '<table class="table-curved"><tbody><tr><td id="__apm_probe_border">x</td></tr></tbody></table>' +
+        '<input class="form-control" id="__apm_probe_input">' +
+        '<span class="RequiredIndicator" id="__apm_probe_required">*</span>';
+      doc.body.appendChild(wrap);
+
+      var byId = function(id){ return doc.getElementById(id); };
+      var cs = function(el){ return el ? getComputedStyle(el) : null; };
+      var bgOf = function(el){ var c = cs(el); return c ? parseColor(c.backgroundColor) : null; };
+      var colorOf = function(el){ var c = cs(el); if(!c) return null; return (c.color && c.color!==SENTINEL) ? parseColor(c.color) : null; };
+      var borderOf = function(el){ var c = cs(el); if(!c) return null; return (c.borderLeftColor && c.borderLeftColor!==SENTINEL) ? parseColor(c.borderLeftColor) : null; };
+
+      var result = {
+        navy: bgOf(byId('__apm_probe_navtable')),
+        navyDark: bgOf(byId('__apm_probe_banner')),
+        yellow: colorOf(byId('__apm_probe_navlink_a')),
+        gold: bgOf(byId('__apm_probe_tab')),
+        gridHead: bgOf(byId('__apm_probe_gridhead')),
+        line: borderOf(byId('__apm_probe_border')),
+        card: bgOf(byId('__apm_probe_input')),
+        red: colorOf(byId('__apm_probe_required')),
+        paper: parseColor(getComputedStyle(doc.body).backgroundColor),
+        ink: (function(){ var v = getComputedStyle(doc.body).color; return (v && v!==SENTINEL) ? parseColor(v) : null; })()
+      };
+      wrap.parentNode.removeChild(wrap);
+      return result;
+    }catch(e){ return null; }
+  }
+
+  function hasSignal(r){ return !!(r && (r.navy || r.paper || r.gold || r.ink)); }
+
+  function hasSubstantiveContent(doc){
+    try{
+      var anchors = doc.querySelectorAll('a').length;
+      var sheets = doc.styleSheets ? doc.styleSheets.length : 0;
+      return { ok: anchors > 3 || sheets > 0, anchors: anchors, sheets: sheets };
+    }catch(e){ return { ok:false, anchors:0, sheets:0 }; }
+  }
+
+  var THEME_DEBUG = true; // set false to silence console diagnostics once this is confirmed working
+  function themeLog(){
+    if(!THEME_DEBUG) return;
+    try{ console.log.apply(console, ['[APM Theme]'].concat(Array.prototype.slice.call(arguments))); }catch(e){}
+  }
+
+  // Try this document first - works whenever TWH's stylesheet is linked
+  // into wherever this script actually runs, no matter the frame layout.
+  // Only if that finds nothing do we climb the frame ancestry and retry
+  // the same probe there, preferring the outermost ancestor with real
+  // page content so a bare frameset shell (no stylesheet, no nav) gets
+  // skipped in favor of the real themed page just inside it.
+  function findThemeSignal(){
+    var local = probeThemeIn(document);
+    themeLog('local document probe:', local);
+    if(hasSignal(local)) return { raw: local, source: 'this document' };
+
+    try{
+      var chain = [], w = window, guard = 0;
+      while(w.parent && w.parent !== w && guard < 8){
+        w.parent.document.title; // throws synchronously if cross-origin
+        chain.push(w.parent);
+        w = w.parent;
+        guard++;
+      }
+      for(var i = chain.length - 1; i >= 0; i--){
+        var content = hasSubstantiveContent(chain[i].document);
+        var label = (i === chain.length-1 ? 'window.top' : 'ancestor '+(chain.length-1-i)+' levels up');
+        themeLog('ancestor', label, '- anchors:', content.anchors, 'sheets:', content.sheets);
+        if(content.ok){
+          var probed = probeThemeIn(chain[i].document);
+          themeLog('probe on', label, ':', probed);
+          if(hasSignal(probed)) return { raw: probed, source: label };
+        }
+      }
+    }catch(e){ themeLog('ancestor climb threw:', e && e.message); }
+
+    return { raw: null, source: 'none' };
+  }
+
+  function darkenHex(hex, amt){ var c = hexToRgb(hex); return rgbToHex(c.r*(1-amt), c.g*(1-amt), c.b*(1-amt)); }
+  function lightenHex(hex, amt){ var c = hexToRgb(hex); return rgbToHex(c.r+(255-c.r)*amt, c.g+(255-c.g)*amt, c.b+(255-c.b)*amt); }
+  function toHex(rgb){ return rgbToHex(rgb.r, rgb.g, rgb.b); }
+
+  // The primary button always uses `amber` as a solid fill with text on top,
+  // so unlike the other roles, amber can't just be "whatever was probed" -
+  // it specifically needs to support readable text. Some real TWH themes
+  // use a pale gold/tan accent (TWH's own bundled defaults include one),
+  // and white text on a pale background is nearly invisible. Pick whichever
+  // of white or near-black text actually reads on this amber; if neither
+  // does (a genuinely mid-toned accent), darken the amber itself just
+  // enough for white text to work, rather than leaving unreadable button
+  // text. Also derive a hover shade from the final amber, replacing the
+  // previous hardcoded hover color which had no relationship to the theme.
+  function finalizeButtonContrast(p){
+    var whiteContrast = contrastOf(hexToRgb(p.amber), WHITE);
+    var blackContrast = contrastOf(hexToRgb(p.amber), BLACK);
+    if(!(whiteContrast >= 4.5 || blackContrast >= 4.5)){
+      // Neither works as button text - the accent is too mid-toned to host
+      // readable text at all. Darken it (only direction that can fix this).
+      p.amber = ensureContrast(p.amber, WHITE, 4.6, 'darken');
+    }
+    // Amber also appears as standalone text on light card backgrounds
+    // elsewhere in the UI (notes, sort arrows), so it needs to hold its
+    // own contrast there too. Darkening here only ever helps the
+    // button-text case above, so this can't undo that fix.
+    var lightBg = hexToRgb(p.parchmentLight || p.parchment);
+    p.amber = ensureContrast(p.amber, lightBg, 4.5, 'darken');
+    p.amberInk = (contrastOf(hexToRgb(p.amber), WHITE) >= 4.5) ? '#ffffff' : '#20180a';
+    p.amberHover = darkenHex(p.amber, 0.14);
+    return p;
+  }
+
+  function buildPalette(){
+    var found = findThemeSignal();
+    var raw = found.raw;
+    if(!hasSignal(raw)){
+      themeLog('no usable theme signal found anywhere - using built-in fallback palette');
+      return finalizeButtonContrast({
+        forest:FALLBACK.forest, forestDark:FALLBACK.forestDark, parchment:FALLBACK.parchment,
+        parchmentLight:FALLBACK.parchmentLight, ink:FALLBACK.ink, amber:FALLBACK.amber,
+        amberLight:FALLBACK.amberLight, sage:FALLBACK.sage, line:FALLBACK.line, danger:FALLBACK.danger
+      });
+    }
+    themeLog('using theme signal from', found.source, raw);
+
+    // FOREST: the site's own nav/header background, used as-is since it
+    // already displays real (usually light) nav text on it successfully;
+    // still contrast-checked as a safety net.
+    var forestHex = raw.navy ? toHex(raw.navy) : FALLBACK.forest;
+    forestHex = ensureContrast(forestHex, WHITE, 4.0, 'darken');
+    var forestDarkHex = raw.navyDark ? toHex(raw.navyDark) : darkenHex(forestHex, 0.32);
+
+    // AMBER: the site's own active-tab/accent color, or its nav-link text
+    // color as a secondary signal, or the built-in gold if neither exists.
+    // (Readability as button text is enforced afterward by finalizeButtonContrast.)
+    var amberHex = raw.gold ? toHex(raw.gold) : (raw.yellow ? toHex(raw.yellow) : FALLBACK.amber);
+    var amberLightHex = raw.yellow ? toHex(raw.yellow) : lightenHex(amberHex, 0.25);
+    amberLightHex = ensureContrast(amberLightHex, hexToRgb(forestHex), 4.5, 'lighten');
+
+    // SAGE: a muted secondary tone - the site's own table-header color when
+    // it reads as distinct from the page background, else derived from ink.
+    var paperHex = raw.paper ? toHex(raw.paper) : FALLBACK.parchment;
+    var sageHex = raw.gridHead ? toHex(raw.gridHead) : null;
+    if(!sageHex || contrastOf(hexToRgb(sageHex), hexToRgb(paperHex)) < 1.3){
+      sageHex = lightenHex(raw.ink ? toHex(raw.ink) : FALLBACK.ink, 0.45);
+    }
+
+    // PARCHMENT / INK: the site's own page background and body text color.
+    var parchmentHex = paperHex;
+    var parchmentLightHex = raw.card ? toHex(raw.card) : lightenHex(parchmentHex, 0.5);
+    parchmentLightHex = ensureContrast(parchmentLightHex, hexToRgb(forestHex), 6.0, 'lighten');
+    var inkHex = raw.ink ? toHex(raw.ink) : FALLBACK.ink;
+
+    // LINE: the site's own table/border color.
+    var lineHex = raw.line ? toHex(raw.line) : FALLBACK.line;
+
+    // DANGER: the site's own "required/error" text color, only trusted if
+    // it actually reads as red/orange-red - a mis-probed neutral gray here
+    // would be actively misleading as an error color, so fall back instead.
+    var dangerHex = FALLBACK.danger;
+    if(raw.red){
+      var dHsl = rgbToHsl(raw.red.r, raw.red.g, raw.red.b);
+      var distFromRed = Math.min(dHsl.h, 360-dHsl.h);
+      if(distFromRed < 35 && dHsl.s > 25){ dangerHex = toHex(raw.red); }
+    }
+
+    return finalizeButtonContrast({
+      forest:forestHex, forestDark:forestDarkHex, parchment:parchmentHex, parchmentLight:parchmentLightHex,
+      ink:inkHex, amber:amberHex, amberLight:amberLightHex, sage:sageHex, line:lineHex, danger:dangerHex
+    });
+  }
+
+  function applyTheme(){
+    var root = document.querySelector('.apm-dashboard');
+    if(!root) return;
+    var p, usedFallback = false;
+    try{ p = buildPalette() || FALLBACK; }catch(e){ p = finalizeButtonContrast({
+      forest:FALLBACK.forest, forestDark:FALLBACK.forestDark, parchment:FALLBACK.parchment,
+      parchmentLight:FALLBACK.parchmentLight, ink:FALLBACK.ink, amber:FALLBACK.amber,
+      amberLight:FALLBACK.amberLight, sage:FALLBACK.sage, line:FALLBACK.line, danger:FALLBACK.danger
+    }); usedFallback = true; themeLog('buildPalette threw:', e && e.message); }
+    try{
+      root.style.setProperty('--forest', p.forest);
+      root.style.setProperty('--forest-dark', p.forestDark);
+      root.style.setProperty('--parchment', p.parchment);
+      root.style.setProperty('--parchment-light', p.parchmentLight);
+      root.style.setProperty('--ink', p.ink);
+      root.style.setProperty('--amber', p.amber);
+      root.style.setProperty('--amber-light', p.amberLight);
+      root.style.setProperty('--amber-ink', p.amberInk);
+      root.style.setProperty('--amber-hover', p.amberHover);
+      root.style.setProperty('--sage', p.sage);
+      root.style.setProperty('--line', p.line);
+      root.style.setProperty('--danger', p.danger);
+      themeLog(usedFallback ? 'applied built-in fallback palette' : 'applied palette derived from live site theme', p);
+    }catch(e){ themeLog('applying palette threw:', e && e.message); }
+  }
+
+  applyTheme();
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', applyTheme);
+  }
+  window.addEventListener('load', applyTheme);
+})();
+</script>
 <header>
   <div class="eyebrow">Troop Planning Tool</div>
   <h1>Annual Planning Meeting Dashboard</h1>
