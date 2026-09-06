@@ -5,7 +5,7 @@ A single-file, no-build dashboard for BSA troops on [TroopWebhost](https://www.t
 Everything runs client-side in the browser. No backend, no build step, no file uploads — one button pulls everything.
 
 <p align="center">
-<img width="544" height="625" alt="image" src="https://github.com/user-attachments/assets/b98e674a-e2a6-4129-8fa5-689c7f4e0ed4" />
+<img width="538" height="574" alt="image" src="https://github.com/user-attachments/assets/14be5c03-b7ee-4276-a9fa-8d988769b763" />
 </p>
 
 
