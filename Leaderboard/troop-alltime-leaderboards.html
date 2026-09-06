@@ -55,6 +55,7 @@
   <style>
     #twl-root {
       --forest: #1f3a2e;
+      --forest-dark: #16281f;
       --canvas: #f1ead9;
       --ember: #c1652f;
       --ink: #2b2620;
@@ -64,11 +65,29 @@
       color: var(--ink);
       background: var(--canvas);
       border-radius: 4px;
-      padding: 32px clamp(16px, 4vw, 48px) 40px;
+      overflow: hidden;
+      padding: 0 0 40px;
       max-width: 820px;
       margin: 0 auto;
     }
     #twl-root * { box-sizing: border-box; }
+    #twl-root .twl-content {
+      padding: 24px clamp(16px, 4vw, 48px) 0;
+    }
+    #twl-root .twl-masthead {
+      background-image: linear-gradient(160deg, var(--forest) 0%, var(--forest-dark) 100%);
+      border-bottom: 6px solid var(--ember);
+      padding: 28px clamp(16px, 4vw, 48px) 22px;
+    }
+    #twl-root .twl-masthead .twl-eyebrow {
+      color: rgba(255, 255, 255, 0.85);
+    }
+    #twl-root .twl-masthead h1 {
+      color: #fff;
+    }
+    #twl-root .twl-masthead .twl-sub {
+      color: rgba(255, 255, 255, 0.75);
+    }
     #twl-root .twl-eyebrow {
       font-size: 12px;
       letter-spacing: 0.14em;
@@ -285,16 +304,20 @@
     }
   </style>
 
-  <p class="twl-eyebrow">Troop Report · All-Time</p>
-  <h1>Troop All-Time Leaderboards</h1>
-  <p class="twl-sub" id="twl-subtitle">Loading lifetime totals…</p>
+  <div class="twl-masthead">
+    <p class="twl-eyebrow">Troop Report · All-Time</p>
+    <h1>Troop All-Time Leaderboards</h1>
+    <p class="twl-sub" id="twl-subtitle">Loading lifetime totals…</p>
+  </div>
 
-  <div id="twl-status-tabs" class="twl-tabs twl-status-tabs" style="display:none;"></div>
-  <div id="twl-group-tabs" class="twl-tabs twl-group-tabs" style="display:none;"></div>
-  <div id="twl-tabs" class="twl-tabs" style="display:none;"></div>
-  <div id="twl-body"><div class="twl-state" id="twl-state">Requesting the full-history summary report…</div></div>
-  <div class="twl-footer" id="twl-footer"></div>
-  <div id="twl-admin-slot"></div>
+  <div class="twl-content">
+    <div id="twl-status-tabs" class="twl-tabs twl-status-tabs" style="display:none;"></div>
+    <div id="twl-group-tabs" class="twl-tabs twl-group-tabs" style="display:none;"></div>
+    <div id="twl-tabs" class="twl-tabs" style="display:none;"></div>
+    <div id="twl-body"><div class="twl-state" id="twl-state">Requesting the full-history summary report…</div></div>
+    <div class="twl-footer" id="twl-footer"></div>
+    <div id="twl-admin-slot"></div>
+  </div>
 </div>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -359,6 +382,13 @@
       var b = Math.round(+m[2] + (tb - +m[2]) * factor);
       return 'rgb(' + r + ', ' + g + ', ' + b + ')';
     }
+    // Darkens toward black -- same blend helper, opposite target.
+    // Used to build the masthead gradient's dark stop from --forest,
+    // matching the navy/navy-dark header-gradient pattern used on the
+    // other TWH custom pages.
+    function darken(rgbStr, factor) {
+      return lighten(rgbStr, factor, 0, 0, 0);
+    }
 
     // Candidates, each falling back through a couple of TWH class
     // possibilities before giving up and leaving the CSS default alone.
@@ -377,6 +407,7 @@
     // whatever forest color was actually found. Only fall back to
     // probing the link color directly if forest itself wasn't found.
     var mossC = forestC ? lighten(forestC, 0.45) : colorOf('.twl-probe-link', 'color');
+    var forestDarkC = forestC ? darken(forestC, 0.35) : null;
 
     document.body.removeChild(probe);
 
@@ -387,6 +418,7 @@
     // two visually-distinct roles collapse into one color.
     var applied = {};
     if (forestC) { root.style.setProperty('--forest', forestC); applied.forest = forestC; }
+    if (forestDarkC) { root.style.setProperty('--forest-dark', forestDarkC); applied['forest-dark'] = forestDarkC; }
     if (inkC) { root.style.setProperty('--ink', inkC); applied.ink = inkC; }
     if (emberC && emberC !== forestC) { root.style.setProperty('--ember', emberC); applied.ember = emberC; }
     if (mossC && mossC !== inkC && mossC !== emberC) { root.style.setProperty('--moss', mossC); applied.moss = mossC; }
