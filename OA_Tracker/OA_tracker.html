@@ -71,9 +71,10 @@
     --moss-light:#a9c397; --brick-light:#d98266; --brick-light-bg:rgba(217,130,102,0.25);
     --hair:rgba(239,232,212,0.14); --hair-strong:rgba(239,232,212,0.28);
     --accent-ink:#241a08;
+    --navy:#1e3626; --navy-dark:#101f17;
     --surface-1:rgba(255,255,255,0.025); --surface-2:rgba(0,0,0,0.25);
     --surface-3:rgba(0,0,0,0.3); --surface-4:rgba(255,255,255,0.08);
-    --field-bg:rgba(0,0,0,0.22); --masthead-glow:rgba(255,255,255,0.03);
+    --field-bg:rgba(0,0,0,0.22);
     --date-icon-filter:invert(0.85);
     background:linear-gradient(180deg, var(--pine-950), var(--pine-900) 40%, var(--pine-950));
     color:var(--parchment);
@@ -82,7 +83,14 @@
     border-radius:6px;
     max-width:1040px;
     margin:20px auto;
+    /* Hidden until oatrkApplyLiveSiteTheme() has decided light vs. dark and
+       set the right CSS variables, so the page never flashes its dark
+       default before switching to a light site's real colors. Visibility
+       (not display) is used so layout/scroll position aren't affected,
+       and the JS reveal always runs even if probing itself fails. */
+    visibility:hidden;
   }
+  #oatrk-root.oatrk-ready{ visibility:visible; }
   /* Light-mode overrides — applied via JS when the live site's own
      background reads as light. Everything not listed here (the probed
      --brass/--brick-light family, plus --accent-ink) is mode-independent
@@ -94,33 +102,37 @@
     --hair:rgba(32,48,31,0.12); --hair-strong:rgba(32,48,31,0.24);
     --surface-1:rgba(0,0,0,0.025); --surface-2:rgba(0,0,0,0.06);
     --surface-3:rgba(0,0,0,0.08); --surface-4:rgba(0,0,0,0.06);
-    --field-bg:rgba(0,0,0,0.05); --masthead-glow:rgba(0,0,0,0.02);
+    --field-bg:rgba(0,0,0,0.05);
     --date-icon-filter:none;
   }
   #oatrk-root a{ color:var(--brass-text); }
   #oatrk-root header.oatrk-masthead{
-    border:1px solid var(--hair-strong); border-radius:4px;
+    border:1px solid var(--hair-strong);
+    border-bottom:6px solid var(--brass);
+    border-radius:4px;
     padding:24px 26px 20px; margin-bottom:24px;
-    background:linear-gradient(180deg, var(--masthead-glow), transparent);
+    background-image:linear-gradient(160deg, var(--navy) 0%, var(--navy-dark) 100%);
+    color:#fff;
     position:relative;
   }
   #oatrk-root .oatrk-eyebrow{
     font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.16em;
-    text-transform:uppercase; color:var(--brass-text); margin:0 0 10px;
+    text-transform:uppercase; color:rgba(255,255,255,0.82); margin:0 0 10px;
   }
   #oatrk-root h1{
     font-family:'Roboto Slab', Georgia, serif; font-weight:700;
     font-size:clamp(24px,3.4vw,32px); margin:0 0 8px; line-height:1.1;
   }
   #oatrk-root header.oatrk-masthead p.oatrk-sub{
-    margin:0; max-width:64ch; color:var(--parchment-dim); font-size:14px; line-height:1.55;
+    margin:0; max-width:64ch; color:rgba(255,255,255,0.82); font-size:14px; line-height:1.55;
   }
+  #oatrk-root header.oatrk-masthead a{ color:#fff; text-decoration:underline; }
   #oatrk-root .oatrk-callout{
     margin-top:16px; padding:11px 14px; border-left:3px solid var(--brass);
-    background:var(--brass-glow); font-size:12.5px; line-height:1.55;
-    color:var(--parchment-dim); border-radius:0 3px 3px 0;
+    background:rgba(255,255,255,0.12); font-size:12.5px; line-height:1.55;
+    color:rgba(255,255,255,0.9); border-radius:0 3px 3px 0;
   }
-  #oatrk-root .oatrk-callout b{ color:var(--parchment); }
+  #oatrk-root .oatrk-callout b{ color:#fff; }
 
   #oatrk-root .oatrk-sheet{
     border:1px solid var(--hair-strong); border-radius:4px;
@@ -380,13 +392,14 @@ var ADULT_OA_EXPECTED_COLS = ['OA Eligibility','Name']; // confirmed — matches
    "isn't transparent" check, which is why the colors weren't actually
    following the site theme — this replaces that with the real thing.
 
-   Only --brass/--brass-light (from TWH's "gold"/"yellow" nav accents) and
-   --brick-light/--brick-light-bg (from TWH's own .RequiredIndicator red)
-   have a visual role on this page's dark-badge design, so those are the
-   only two wired up. navy/navyDark/gridHead/card/line are probed and kept
-   on oatrkSiteTheme for anyone extending this page later, but aren't
-   applied to anything currently — this design has no navy header bar,
-   grid-style table headers, or light card faces to skin with them.
+   --brass/--brass-light (from TWH's "gold"/"yellow" nav accents),
+   --brick-light/--brick-light-bg (from TWH's own .RequiredIndicator red),
+   and --navy/--navy-dark (from TWH's own .navtable — the masthead header's
+   gradient, matching the site's real toolbar color) are wired to visible
+   elements. gridHead/card/line are still probed and kept on oatrkSiteTheme
+   for anyone extending this page later, but aren't applied to anything
+   currently — this design has no grid-style table headers or light card
+   faces to skin with them.
    --pine-950/900/800 (canvas) and --parchment/--parchment-dim (body text)
    are intentionally left out — see the big comment on the #oatrk-root CSS
    variables above for why (this is a deliberate difference from the Eagle
@@ -507,60 +520,80 @@ function oatrkEnsureContrast(rgbStr, wantLight){
 }
 
 function oatrkApplyLiveSiteTheme(){
-  var detected;
+  var root = document.getElementById('oatrk-root');
   try{
-    detected = oatrkProbeSiteTheme();
+    var detected = oatrkProbeSiteTheme();
+    oatrkSiteTheme = detected;
+    if(!root) return;
+    var count = 0;
+
+    // Decide light vs. dark mode from the live site's actual body background.
+    // No usable reading (transparent/unset) -> keep this page's original
+    // dark-badge default rather than guessing.
+    var paperLum = detected.paper ? oatrkLuminance(detected.paper) : null;
+    var isLight = paperLum != null && paperLum > 0.5;
+    root.classList.toggle('oatrk-light', isLight);
+    // wantLight here means "accent text needs to read light-on-dark" — i.e.
+    // the OPPOSITE of the canvas being light.
+    var wantLightText = !isLight;
+
+    // navy -> the masthead header gradient, matching this site's real
+    // toolbar color (.navtable). Applied directly, unconditionally, same
+    // as Eagle Scout — no contrast math needed here, since every stock
+    // TWH scheme already pairs this exact background with white text in
+    // its own CSS (".navtable{background-color:#999; color:#FFF;}" etc.),
+    // so the header's hardcoded white text is safe by construction.
+    if(detected.navy){
+      root.style.setProperty('--navy', detected.navy);
+      root.style.setProperty('--navy-dark', detected.navyDark || oatrkDarkenColor(detected.navy, 0.35) || detected.navy);
+      count++;
+    }
+
+    // gold -> brass (primary accent), used as a FILL (buttons, field-letter
+    // circle, borders/hover). Always the nav-tabs background specifically —
+    // TWH's navlink text color ("yellow" in Eagle's naming) is tuned to sit
+    // as small text on a dark navy bar and is often a raw, saturated hue
+    // (literal #FF0 on several stock TWH schemes); used as a large solid
+    // button fill it looks garish rather than like a real accent color. The
+    // nav-tabs background is a much better fill source since TWH itself
+    // already uses it as a filled surface, not just text. yellow is kept
+    // only as a last-resort fallback if nav-tabs turns out unstyled.
+    // Not contrast-adjusted: always paired with the fixed --accent-ink text
+    // color, never used bare as text.
+    var gold = detected.gold || detected.yellow;
+    if(gold){
+      root.style.setProperty('--brass', gold);
+      root.style.setProperty('--brass-light', gold);
+      // brass-text: the same accent, but nudged for contrast since this one
+      // IS used bare as text/links/borders straight on the canvas.
+      root.style.setProperty('--brass-text', oatrkEnsureContrast(gold, wantLightText));
+      root.style.setProperty('--brass-glow', oatrkToRgba(gold, 0.1) || 'rgba(192,138,46,0.08)');
+      count++;
+    }
+    if(detected.red){
+      var brickText = oatrkEnsureContrast(detected.red, wantLightText);
+      root.style.setProperty('--brick-light', brickText);
+      root.style.setProperty('--brick-light-bg', oatrkToRgba(brickText, 0.25) || 'rgba(217,130,102,0.25)');
+      count++;
+    }
+    if(count) console.info('OA Tracker: matched '+count+' color(s) from this site\'s current CSS ('+(isLight?'light':'dark')+' mode).');
+    else console.info('OA Tracker: no live site colors detected, using built-in defaults.');
   }catch(e){
     console.warn('OA Tracker: theme detection failed, using built-in defaults:', e);
-    return;
+  }finally{
+    // Always reveal the page exactly once, whether probing succeeded,
+    // found nothing, or threw — otherwise a probing bug would leave the
+    // page permanently hidden instead of just unthemed.
+    if(root) root.classList.add('oatrk-ready');
   }
-  oatrkSiteTheme = detected;
-  var root = document.getElementById('oatrk-root');
-  if(!root) return;
-  var count = 0;
-
-  // Decide light vs. dark mode from the live site's actual body background.
-  // No usable reading (transparent/unset) -> keep this page's original
-  // dark-badge default rather than guessing.
-  var paperLum = detected.paper ? oatrkLuminance(detected.paper) : null;
-  var isLight = paperLum != null && paperLum > 0.5;
-  root.classList.toggle('oatrk-light', isLight);
-  // wantLight here means "accent text needs to read light-on-dark" — i.e.
-  // the OPPOSITE of the canvas being light.
-  var wantLightText = !isLight;
-
-  // gold -> brass (primary accent), used as a FILL (buttons, field-letter
-  // circle, borders/hover). Always the nav-tabs background specifically —
-  // TWH's navlink text color ("yellow" in Eagle's naming) is tuned to sit
-  // as small text on a dark navy bar and is often a raw, saturated hue
-  // (literal #FF0 on several stock TWH schemes); used as a large solid
-  // button fill it looks garish rather than like a real accent color. The
-  // nav-tabs background is a much better fill source since TWH itself
-  // already uses it as a filled surface, not just text. yellow is kept
-  // only as a last-resort fallback if nav-tabs turns out unstyled.
-  // Not contrast-adjusted: always paired with the fixed --accent-ink text
-  // color, never used bare as text.
-  var gold = detected.gold || detected.yellow;
-  if(gold){
-    root.style.setProperty('--brass', gold);
-    root.style.setProperty('--brass-light', gold);
-    // brass-text: the same accent, but nudged for contrast since this one
-    // IS used bare as text/links/borders straight on the canvas.
-    root.style.setProperty('--brass-text', oatrkEnsureContrast(gold, wantLightText));
-    root.style.setProperty('--brass-glow', oatrkToRgba(gold, 0.1) || 'rgba(192,138,46,0.08)');
-    count++;
-  }
-  if(detected.red){
-    var brickText = oatrkEnsureContrast(detected.red, wantLightText);
-    root.style.setProperty('--brick-light', brickText);
-    root.style.setProperty('--brick-light-bg', oatrkToRgba(brickText, 0.25) || 'rgba(217,130,102,0.25)');
-    count++;
-  }
-  if(count) console.info('OA Tracker: matched '+count+' color(s) from this site\'s current CSS ('+(isLight?'light':'dark')+' mode).');
-  else console.info('OA Tracker: no live site colors detected, using built-in defaults.');
 }
 
-document.addEventListener('DOMContentLoaded', oatrkApplyLiveSiteTheme);
+// Runs immediately rather than waiting for DOMContentLoaded: this script
+// tag sits after all of #oatrk-root's markup, so the element already
+// exists by the time the parser reaches this point. Waiting for
+// DOMContentLoaded only delays the reveal above and risks a longer flash
+// of the hidden/dark state on slow-loading pages.
+oatrkApplyLiveSiteTheme();
 
 var RANK_ORDER = ['Scout','Tenderfoot','Second Class','First Class','Star','Life','Eagle'];
 function rankIndex(r){ return RANK_ORDER.indexOf((r||'').trim()); }
