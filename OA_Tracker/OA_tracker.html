@@ -32,6 +32,13 @@
      these XLS links may return a PDF instead, which SheetJS can't read.
 -->
 <div id="oatrk-root">
+<!-- OATRK_SHARED_DATE: the last "Compute Eligibility As Of This Date" a
+     leader successfully set via this page, written back here so the
+     Scout/Parent view uses the SAME date instead of its own Feb-1 guess.
+     Read by oatrkNextTargetDate() below. Written automatically by
+     oatrkPersistSharedDate() after each successful leader-mode report pull —
+     see that function for how, and why a failed write here is harmless. -->
+<span id="oatrk-sharedDate" style="display:none"></span>
 <style>
   #oatrk-root, #oatrk-root *{ box-sizing:border-box; }
   #oatrk-root{
@@ -141,6 +148,9 @@
   #oatrk-root .oatrk-sheet h2{ font-family:'Roboto Slab',Georgia,serif; font-size:17px; margin:0 0 4px; }
   #oatrk-root .oatrk-sheet-sub{ font-size:12.5px; color:var(--parchment-dim); margin:0 0 18px; }
 
+  #oatrk-root .oatrk-self-campouts{ font-size:13px; margin-top:6px; }
+  #oatrk-root .oatrk-self-campouts li{ margin-bottom:4px; }
+
   #oatrk-root .oatrk-field-line{
     display:grid; grid-template-columns:24px 1fr; gap:14px;
     padding:13px 0; border-top:1px solid var(--hair); align-items:start;
@@ -245,12 +255,14 @@
   <h1>OA Tracker</h1>
   <p class="oatrk-sub">Pulls the Order of the Arrow Eligibility, Events, and Uncompleted Requirements reports straight from this site and sorts scouts into who's eligible now, who's within reach on the current calendar, and who just needs rank.</p>
   <p class="oatrk-sub" style="margin-top:10px;">Official eligibility requirements: <a href="https://oa-scouting.org/about/membership" target="_blank" rel="noopener">oa-scouting.org/about/membership</a></p>
-  <div class="oatrk-callout">
+  <div class="oatrk-callout" id="oatrk-leaderCallout" style="display:none;">
     <b>Heads up:</b> pulling the OA Eligibility report re-saves the "Compute Eligibility As Of This Date" field on that screen — the same as typing it in by hand. It is not a read-only lookup.
   </div>
 </header>
 
-<div class="oatrk-sheet">
+<div class="oatrk-status" id="oatrk-modeCheck">Checking your TroopWebHost access level…</div>
+
+<div class="oatrk-sheet" id="oatrk-leaderSheet" style="display:none;">
   <h2>Compute eligibility</h2>
   <p class="oatrk-sheet-sub">Runs entirely in your browser, using your current TroopWebHost login. Nothing is sent anywhere else.</p>
   <div class="oatrk-field-line">
@@ -266,6 +278,15 @@
     <button class="oatrk-btn" id="oatrk-runAuto" type="button" disabled>Pull Reports Automatically</button>
     <span class="oatrk-status" id="oatrk-statusAuto">Pick a date to continue.</span>
   </div>
+</div>
+
+<div class="oatrk-sheet" id="oatrk-selfSheet" style="display:none;">
+  <h2>Your Scout's Order of the Arrow status</h2>
+  <p class="oatrk-sheet-sub">You're signed in as a parent or Scout, not a troop leader, so this shows only your own Scout(s) — pulled from TroopWebHost the same way the leader view is, just from the pages your login has access to.</p>
+  <p class="oatrk-sheet-sub" id="oatrk-selfTargetDate" style="margin-top:8px;"></p>
+  <div class="oatrk-status" id="oatrk-selfStatus">Looking up your Scout(s)…</div>
+  <div id="oatrk-selfScouts"></div>
+  <div id="oatrk-selfCalendar"></div>
 </div>
 
 <div class="oatrk-results" id="oatrk-results">
@@ -359,6 +380,16 @@
 <script>
 (function(){
 
+/* ============ ADMINISTRATOR CONFIGURABLE ============
+   Self-service (Scout/parent login) camping-night eligibility is computed
+   as of this troop's next OA election window rather than "right now" — by
+   default, the next upcoming February 1st. Change these two if your troop
+   runs elections at a different time of year. Everything downstream
+   (the camping-night window, and which upcoming campouts count toward
+   "scheduled" nights) is derived from this automatically. */
+var OATRK_SELF_TARGET_MONTH = 2; // 1-12
+var OATRK_SELF_TARGET_DAY = 1;
+
 /* ============ CONFIG — verify these against your own site ============
    Order of the Arrow Eligibility screen:
      Menu_Item_ID = 53654, Form_ID = 8400 (the on-screen form),
@@ -382,6 +413,128 @@ var OATRK_EVENTS_URL = 'FormReport.aspx?Menu_Item_ID=53104&Stack=1&ReportFormat=
 var OATRK_REQS_URL   = 'FormReport.aspx?Menu_Item_ID=46046&Stack=1&ReportFormat=XLS';
 var OATRK_ROSTER_URL = 'FormReport.aspx?Menu_Item_ID=53747&Stack=1&ReportFormat=XLS'; // Export Active Roster To Excel — confirmed
 var ADULT_OA_EXPECTED_COLS = ['OA Eligibility','Name']; // confirmed — matches Scout report's columns except Rank→Leadership
+
+/* ================= SELF-SERVICE (Scout / parent login) CONFIG =================
+   Leaders can pull the full OA Eligibility report; Scouts and parents can't —
+   TroopWebHost redirects that request elsewhere for them. When that happens
+   (detected in loadLiveOADate() below), this switches into a scoped "your
+   own Scout(s)" view instead, built from the same self-service pages the
+   Eagle Scout tool already uses in production (its TWH_CONFIG.selfProfileUrl
+   / selfRankPositionUrl), confirmed here against a real HAR capture, plus
+   this tool's own uncompleted-rank-requirement tabs and the self-service
+   upcoming-events export.
+
+   CAVEAT #1: TroopWebHost computes the "eligible now" camping-night window
+   itself for the leader-mode report, using logic this tool has never had
+   visibility into (see README). Self-service mode has no equivalent report
+   to read that number from, so it approximates with a rolling lookback from
+   today (OATRK_SELF_CAMPING_WINDOW_MONTHS) — the same window length already
+   assumed elsewhere in this file for the informational adult camping list.
+   Labeled as an approximation in the UI; the raw logged nights are shown
+   alongside it so it's never a pure black box.
+
+   CAVEAT #2: the self-service "Upcoming Event Summary/Details" exports have
+   no nights/duration column — just one date per event, even for multi-night
+   campouts. So upcoming campouts are shown as a plain reference list, not
+   folded into the eligibility math the way logged past nights are — there's
+   no reliable way to know how many nights a future campout will be from
+   this export alone. */
+var OATRK_SELF_MENU_ITEM_ID = '45899';
+var OATRK_SELF_MY_SCOUTS_URL = 'FormList.aspx?Menu_Item_ID='+OATRK_SELF_MENU_ITEM_ID+'&Stack=1';
+function oatrkSelfProfileUrl(id){ return 'FormDetail.aspx?Menu_Item_ID='+OATRK_SELF_MENU_ITEM_ID+'&Form_ID=209&FK=0&ID='+id+'&Stack=2'; }
+function oatrkSelfRankPositionUrl(id){ return 'FormDetail.aspx?Menu_Item_ID='+OATRK_SELF_MENU_ITEM_ID+'&Form_ID=432&FK=0&ID='+id+'&Stack=2'; }
+function oatrkSelfRankReqUrl(id, formId){ return 'FormDetail.aspx?Menu_Item_ID='+OATRK_SELF_MENU_ITEM_ID+'&Form_ID='+formId+'&FK=0&ID='+id+'&Stack=2'; }
+var OATRK_SELF_RANK_REQ_FORM_IDS = { 'Tenderfoot':'433', 'Second Class':'430', 'First Class':'428' };
+
+/* A Scout logged in DIRECTLY (not through a parent's account) can't reach
+   Menu_Item_ID=45899 at all — it redirects to the site's home page, since
+   that menu item is the Parent-only "My Scout(s)" list. Confirmed via a HAR
+   of a real Scout-direct session: their own data lives under two different
+   Menu_Item_IDs instead (45902 for the OA-fields profile, 45911 for current
+   rank + Rank/Activity History + the Tenderfoot/Second/First Class
+   requirement tabs), and neither needs an ID query param on its base page —
+   TWH already knows "myself" from the session. The Scout's own numeric ID
+   (needed only for the requirement-tab sub-pages) is read out of a hidden
+   <input name="ID"> already present on either base page. */
+var OATRK_SELF_DIRECT_PROFILE_MENU_ITEM_ID = '45902';
+var OATRK_SELF_DIRECT_RANK_MENU_ITEM_ID = '45911';
+var OATRK_SELF_DIRECT_RANK_REQ_FORM_IDS = { 'Tenderfoot':'222', 'Second Class':'223', 'First Class':'224' };
+function oatrkSelfDirectProfileUrl(){ return 'FormDetail.aspx?Menu_Item_ID='+OATRK_SELF_DIRECT_PROFILE_MENU_ITEM_ID+'&Stack=1'; }
+function oatrkSelfDirectRankUrl(){ return 'FormDetail.aspx?Menu_Item_ID='+OATRK_SELF_DIRECT_RANK_MENU_ITEM_ID+'&Stack=1'; }
+function oatrkSelfDirectRankReqUrl(id, formId){ return 'FormDetail.aspx?Menu_Item_ID='+OATRK_SELF_DIRECT_RANK_MENU_ITEM_ID+'&Form_ID='+formId+'&Stack=1&ID='+id+'&FK=0'; }
+
+/* The "Name" field on the direct-login profile page is split across several
+   <span class="bodyheading"> cells (First/Middle/Last/Suffix) rather than
+   the single span.text-left that oatrkLabelValue expects, so it needs its
+   own reader. Joining every non-empty piece is good enough for display. */
+function oatrkParseSelfDirectName(doc){
+  var labels = Array.prototype.slice.call(doc.querySelectorAll('label'));
+  for(var i=0;i<labels.length;i++){
+    var text = labels[i].textContent.replace(/\s+/g,' ').trim().replace(/^\*\s*/, '');
+    if(text.toLowerCase() !== 'name') continue;
+    var row = labels[i].closest('tr');
+    if(!row) continue;
+    var parts = Array.prototype.slice.call(row.querySelectorAll('span.bodyheading'))
+      .map(function(s){ return s.textContent.replace(/\s+/g,' ').trim(); })
+      .filter(Boolean);
+    if(parts.length) return parts.join(' ');
+  }
+  return 'My Scout';
+}
+
+function oatrkFetchScoutDirectUncompletedTotal(id, currentRank){
+  if(rankAtLeastFirstClass(currentRank)) return Promise.resolve(null);
+  var ranks = ['Tenderfoot','Second Class','First Class'];
+  return Promise.all(ranks.map(function(r){
+    var formId = OATRK_SELF_DIRECT_RANK_REQ_FORM_IDS[r];
+    return oatrkFetchDoc(oatrkSelfDirectRankReqUrl(id, formId)).then(oatrkParseSelfUncompletedCount);
+  })).then(function(results){
+    return results.reduce(function(sum, r){ return sum + r.uncompleted; }, 0);
+  }).catch(function(){ return null; });
+}
+
+/* Full self-fetch for a Scout logged in directly — mirrors the shape
+   oatrkFetchSelfServiceScout() returns for a Parent login, so both plug into
+   the same oatrkComputeSelfEligibility()/render pipeline unchanged. */
+function oatrkFetchScoutDirectSelf(){
+  return oatrkFetchDoc(oatrkSelfDirectProfileUrl()).then(function(profileDoc){
+    var idInput = profileDoc.querySelector('input[name="ID"]');
+    var id = idInput ? idInput.value : null;
+    var name = oatrkParseSelfDirectName(profileDoc);
+    var oa = oatrkParseSelfOA(profileDoc);
+    return oatrkFetchDoc(oatrkSelfDirectRankUrl()).then(function(rankDoc){
+      var currentRank = oatrkLabelValue(rankDoc, 'Current Rank') || null;
+      var activity = oatrkParseSelfActivityHistory(rankDoc);
+      return oatrkFetchScoutDirectUncompletedTotal(id, currentRank).then(function(uncompleted){
+        return { name:name, id:id, rank:currentRank, oa:oa, activity:activity, uncompletedReqs:uncompleted };
+      });
+    });
+  });
+}
+var OATRK_SELF_CAMPING_WINDOW_MONTHS = 24;
+var OATRK_SELF_UPCOMING_URL = 'FormReport.aspx?Menu_Item_ID=51898&Stack=1&ReportFormat=XLS'; // Upcoming Event Summary — confirmed, used as a fallback if the calendar itself fails
+
+/* Real per-event nights, confirmed from a captured HAR of the self-service
+   calendar (Menu_Item_ID=45922). The month grid repeats the SAME event ID
+   link on every day it spans — confirmed against that event's own detail
+   page ("Scheduled Start"/"Scheduled End"), which matched exactly — so
+   nights can be computed directly from grid positions (first day seen to
+   last day seen) without fetching each event's own detail page at all.
+   Campout-type events render wrapped in <font color="#0066ff">; other
+   types use different colors (e.g. #996633 for "Non-Troop Event",
+   confirmed against the same capture) — days without that color are
+   skipped. Padding days from the adjacent month render as <i>N</i> instead
+   of <b>N</b>, and are naturally excluded since only <b> is matched.
+   Advancing to a given month is a plain form POST with a fixed set of
+   fields (confirmed identical across 5 real captured month-changes except
+   the two Calendar* fields) — no ASP.NET __VIEWSTATE involved, so any
+   target month can be requested directly without stepping through
+   intermediate months. */
+var OATRK_SELF_CALENDAR_MENU_ITEM_ID = '45922';
+var OATRK_SELF_CALENDAR_FORM_ID = '271';
+var OATRK_SELF_CAMPOUT_COLOR = '#0066ff';
+var OATRK_SELF_CALENDAR_MONTHS_AHEAD = 3; // current month + this many = total months covered, matching the captured range
+var OATRK_FETCH_TIMEOUT_MS = 15000;
 
 /* ================= LIVE SITE THEME =================
    Ported directly from the Eagle Scout tool's proven probeSiteTheme() /
@@ -748,12 +901,133 @@ function assertColumns(rows, expectedAnyOf, label){
   }
 }
 
+/* ================= SELF-EDITING INFRASTRUCTURE (admin-only) =================
+   This page can discover its own Custom Page "Section_ID" — the identifier
+   TroopWebHost's Custom Page editor uses to address THIS specific block of
+   pasted HTML — entirely read-only, with no save involved.
+
+   Confirmed via a captured HAR of opening (not saving) the page editor:
+     GET formCustomEdit.aspx?Menu_Item_ID=<own>&Form_ID=7323&Custom_Form_ID=<own>
+   returns the editor screen, which already embeds
+     onclick="easyEditSectionContent('163')"
+   right next to this page's own content — no save required to see it.
+   Form_ID=7323 is the same fixed constant already used elsewhere in this
+   file (SELF_FORM_ID); Menu_Item_ID and Custom_Form_ID for THIS page are
+   read straight off the currently-loaded page below.
+
+   This only succeeds for a login with Custom Page *editing* rights, which is
+   a narrower permission than "troop leader" — an ordinary leader who can
+   pull the OA Eligibility report may still get redirected here. That's fine:
+   every caller of this treats failure as "skip this feature", never as a
+   fatal error, the same way self-service mode treats a leader-only redirect
+   as a signal rather than a crash.
+
+   NOTE: this only covers the READ side. Actually persisting a new value
+   requires SAVING new section source — confirmed straightforward from a
+   captured real save (see oatrkPersistSharedDate below): a two-step POST,
+   ~20 plain fields each time, no ViewState blob to fake. Step 1 asks TWH for
+   the section's current raw source (as a filled-in <textarea>); step 2 posts
+   that same source back with one small edit. */
+function oatrkFetchSectionSource(ctx, sectionId){
+  return oatrkPostDoc('formCustomEdit.aspx', {
+    menuopenflag:'N', Selected_Action:'EditSectionSource', Hover_Action:'', Selected_Button_ID:'',
+    Menu_Item_ID: ctx.menuItemId, Form_ID:'7323', Link_To_Menu_Item_ID:'', Pass:'1', Stack:'1',
+    NextSectionPageNumber:'', NewRowsPerPage:'', ChildRowID:'0', Report_Format:'',
+    Current_URL:'https://www.troopwebhost.org/formCustomEdit.aspx?Menu_Item_ID='+ctx.menuItemId+'&Form_ID=7323',
+    Page_Layout:'1', Report_option:'2', SelectedSectionID: sectionId,
+    WidgetType:'131', WidgetMaximumRows:'10', MaximumWidth:'160', MaximumHeight:'200',
+    BackgroundColorSelect:'none', BackgroundColorText:'#ffffff',
+    Custom_Form_ID: ctx.customFormId, FirstControl:''
+  }).then(function(doc){
+    var ta = doc.getElementById('SectionTextContent');
+    if(!ta) throw new Error('editor response had no SectionTextContent textarea — TroopWebHost may have changed its editor layout');
+    return ta.value;
+  });
+}
+
+function oatrkSaveSectionSource(ctx, sectionId, newSource){
+  return oatrkPostDoc('formCustomEdit.aspx', {
+    menuopenflag:'N', Selected_Action:'SaveContentEdit', Hover_Action:'', Selected_Button_ID:'',
+    Menu_Item_ID: ctx.menuItemId, Form_ID:'7323', Link_To_Menu_Item_ID:'', Pass:'1', Stack:'1',
+    NextSectionPageNumber:'', NewRowsPerPage:'', ChildRowID:'0', Report_Format:'',
+    Current_URL:'https://www.troopwebhost.org/formCustomEdit.aspx',
+    Page_Layout:'1', Report_option:'2', Custom_Form_ID: ctx.customFormId, SelectedSectionID: sectionId,
+    SectionTextContent: newSource, FirstControl:''
+  });
+}
+
+/* Best-effort: rewrites just the #oatrk-sharedDate marker's value inside
+   this page's OWN saved source, so every future visitor — leader or
+   Scout/Parent — sees the same date this leader just set. Nothing else in
+   the fetched source is touched; a byte-diff of a real round-trip capture
+   confirmed the untouched content survives unchanged.
+   Requires Custom-Page-*editing* rights, which is narrower than "troop
+   leader" — an ordinary leader who can pull the OA Eligibility report may
+   not have this. That's expected, not a bug: failure here is silent and
+   never blocks the eligibility report that triggered it, since that report
+   has already succeeded by the time this runs. */
+function oatrkPersistSharedDate(mdy){
+  var ctx = oatrkDiscoverPageContext();
+  if(!ctx.menuItemId || !ctx.customFormId) return Promise.resolve(false);
+  return oatrkDiscoverSectionId().then(function(sectionId){
+    return oatrkFetchSectionSource(ctx, sectionId).then(function(source){
+      var re = /(<span id="oatrk-sharedDate"[^>]*>)([^<]*)(<\/span>)/;
+      if(!re.test(source)) throw new Error('marker span not found in the fetched source — this page may be running an older version');
+      var updated = source.replace(re, '$1'+mdy+'$3');
+      if(updated === source) return true; // already correct, nothing to save
+      return oatrkSaveSectionSource(ctx, sectionId, updated).then(function(){ return true; });
+    });
+  }).catch(function(err){
+    console.warn('OA Tracker: could not save the shared eligibility date back into the page (this is fine — the eligibility report above already succeeded):', err);
+    return false;
+  });
+}
+
+function oatrkDiscoverPageContext(){
+  var customFormIdInput = document.querySelector('input[name="Custom_Form_ID"]');
+  var customFormId = customFormIdInput ? customFormIdInput.value : null;
+  var menuItemId = null;
+  var params = new URLSearchParams(window.location.search);
+  if(params.get('Menu_Item_ID')) menuItemId = params.get('Menu_Item_ID');
+  return { menuItemId: menuItemId, customFormId: customFormId };
+}
+
+function oatrkDiscoverSectionId(){
+  var ctx = oatrkDiscoverPageContext();
+  if(!ctx.menuItemId || !ctx.customFormId){
+    return Promise.reject(new Error('could not determine this page\'s own Menu_Item_ID/Custom_Form_ID from the currently-loaded page'));
+  }
+  var url = 'formCustomEdit.aspx?Menu_Item_ID='+ctx.menuItemId+'&Form_ID=7323&Custom_Form_ID='+ctx.customFormId;
+  return fetch(url, { credentials:'same-origin' }).then(function(res){
+    if(!res.ok) throw new Error('HTTP '+res.status);
+    if(res.redirected) throw new Error('redirected to '+res.url+' (this login likely can\'t edit Custom Pages)');
+    return res.text();
+  }).then(function(html){
+    // If this page ever has more than one section, prefer whichever
+    // easyEditSectionContent('N') sits closest to this script's own root div
+    // rather than just taking the first match on the page.
+    var marker = html.indexOf('id="oatrk-root"');
+    var re = /easyEditSectionContent\('(\d+)'\)/g;
+    var best = null, bestDist = Infinity, m;
+    while((m = re.exec(html))){
+      var dist = marker === -1 ? m.index : Math.abs(m.index - marker);
+      if(dist < bestDist){ bestDist = dist; best = m[1]; }
+    }
+    if(!best) throw new Error('editor page loaded, but no section markers were found on it');
+    return best;
+  });
+}
+
 /* Read-only: loads the OA Eligibility screen and reads the date already
-   saved there. Does not submit or change anything. */
+   saved there. Does not submit or change anything.
+   Doubles as this page's permission check: leaders load this page
+   directly, but TroopWebHost redirects Scouts/parents elsewhere for it —
+   that redirect (not an HTTP error) is what triggers self-service mode. */
 function fetchLiveOADate(){
   var url = 'FormDetail.aspx?Menu_Item_ID='+OATRK_OA_MENU_ITEM_ID+'&Stack=0';
   return fetch(url, { credentials:'same-origin' }).then(function(res){
     if(!res.ok) throw new Error('HTTP '+res.status);
+    if(res.redirected) throw new Error('redirected to '+res.url+' (likely no leader access)');
     return res.text();
   }).then(function(html){
     var tagMatch = html.match(/<input[^>]*id="ENTRY15966316"[^>]*>/i);
@@ -764,9 +1038,684 @@ function fetchLiveOADate(){
   });
 }
 
+/* ================= SELF-SERVICE (Scout / parent login) fetch + parse ================= */
+
+function oatrkFetchRaw(url, opts){
+  var controller = new AbortController();
+  var timer = setTimeout(function(){ controller.abort(); }, OATRK_FETCH_TIMEOUT_MS);
+  var fetchOpts = { credentials:'same-origin', signal: controller.signal };
+  if(opts) for(var k in opts) fetchOpts[k] = opts[k];
+  return fetch(url, fetchOpts)
+    .catch(function(e){
+      if(e.name === 'AbortError') throw new Error(url+' timed out after '+(OATRK_FETCH_TIMEOUT_MS/1000)+'s.');
+      throw e;
+    })
+    .then(function(res){
+      if(!res.ok) throw new Error(url+' responded HTTP '+res.status+'.');
+      if(res.redirected) throw new Error(url+' redirected to '+res.url+' (likely no access).');
+      return res.text();
+    })
+    .then(function(text){ return new DOMParser().parseFromString(text, 'text/html'); })
+    .finally(function(){ clearTimeout(timer); });
+}
+function oatrkFetchDoc(url){ return oatrkFetchRaw(url); }
+function oatrkPostDoc(url, fields){
+  var body = Object.keys(fields).map(function(k){
+    return encodeURIComponent(k)+'='+encodeURIComponent(fields[k]);
+  }).join('&');
+  return oatrkFetchRaw(url, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/x-www-form-urlencoded' },
+    body: body
+  });
+}
+
+/* ---- generic table-parsing helpers (ported from the Eagle Scout tool) ---- */
+function oatrkHeaderCells(table){
+  var headRow = table.querySelector('tr');
+  if(!headRow) return [];
+  var cells = Array.prototype.slice.call(headRow.querySelectorAll('th,td'));
+  return cells.map(function(c){ return c.textContent.replace(/\s+/g,' ').trim(); });
+}
+function oatrkTableHasHeaders(table, headerWords){
+  var cells = oatrkHeaderCells(table);
+  var txt = cells.join(' | ').toLowerCase();
+  return headerWords.every(function(w){ return txt.indexOf(w.toLowerCase()) !== -1; });
+}
+function oatrkExtractTableByLabels(table, labelDefs){
+  var hCells = oatrkHeaderCells(table);
+  var colIndex = {};
+  labelDefs.forEach(function(def){
+    var idx = -1;
+    for(var i=0;i<hCells.length;i++){ if(hCells[i].toLowerCase().indexOf(def.match.toLowerCase()) !== -1){ idx = i; break; } }
+    if(idx !== -1) colIndex[def.key] = idx;
+  });
+  var rows = Array.prototype.slice.call(table.querySelectorAll('tr')).slice(1);
+  var out = [];
+  rows.forEach(function(r){
+    var cells = Array.prototype.slice.call(r.querySelectorAll('td')).map(function(td){ return td.textContent.replace(/\s+/g,' ').trim(); });
+    if(!cells.length) return;
+    var obj = {};
+    labelDefs.forEach(function(def){
+      var idx = colIndex[def.key];
+      obj[def.key] = (idx != null && idx < cells.length) ? cells[idx] : '';
+    });
+    out.push(obj);
+  });
+  return { colIndex: colIndex, rows: out };
+}
+function oatrkFindTable(doc, headerWords){
+  var tables = Array.prototype.slice.call(doc.querySelectorAll('table'));
+  for(var i=0;i<tables.length;i++){ if(oatrkTableHasHeaders(tables[i], headerWords)) return tables[i]; }
+  return null;
+}
+
+/* Self-service field values are rendered as label + adjacent read-only span,
+   e.g. "Order of the Arrow Ordeal Date" -> <span class="text-left">03/14/2026</span>,
+   confirmed against a real captured self-service profile page. */
+function oatrkLabelValue(doc, labelSubstr){
+  var labels = Array.prototype.slice.call(doc.querySelectorAll('label'));
+  for(var i=0;i<labels.length;i++){
+    var text = labels[i].textContent.replace(/\s+/g,' ').trim();
+    if(text.toLowerCase().indexOf(labelSubstr.toLowerCase()) === -1) continue;
+    var row = labels[i].closest('tr');
+    if(!row) continue;
+    var span = row.querySelector('span.text-left') || row.querySelector('td span');
+    if(span) return span.textContent.replace(/\s+/g,' ').trim();
+  }
+  return '';
+}
+
+function oatrkParseSelfOA(doc){
+  return {
+    election:    oatrkLabelValue(doc, 'Order of the Arrow Election Date'),
+    calloutDate: oatrkLabelValue(doc, 'Order of the Arrow Call Out Date'),
+    ordeal:      oatrkLabelValue(doc, 'Order of the Arrow Ordeal Date'),
+    brotherhood: oatrkLabelValue(doc, 'Order of the Arrow Brotherhood Date'),
+    vigil:       oatrkLabelValue(doc, 'Order of the Arrow Vigil Date'),
+    vigilName:   oatrkLabelValue(doc, 'Order of the Arrow Vigil Name'),
+    notes:       oatrkLabelValue(doc, 'Order of the Arrow Notes')
+  };
+}
+
+/* Current rank isn't a labeled field in self-service — it's derived as the
+   most recently awarded row in the "Rank Advancement History" table. */
+function oatrkParseSelfRankHistory(doc){
+  var table = oatrkFindTable(doc, ['Rank','Date Earned','Date Awarded']);
+  if(!table) return { history: [], currentRank: null };
+  var extracted = oatrkExtractTableByLabels(table, [
+    { key:'rank', match:'Rank' },
+    { key:'dateEarned', match:'Date Earned' },
+    { key:'dateAwarded', match:'Date Awarded' }
+  ]);
+  var rows = extracted.rows.filter(function(r){ return r.rank; });
+  var current = null;
+  rows.forEach(function(r){
+    var d = parseEventDate(r.dateAwarded) || parseEventDate(r.dateEarned);
+    if(!current || (d && (!current.d || d > current.d))) current = { rank:r.rank, d:d };
+  });
+  return { history: rows, currentRank: current ? current.rank : (rows.length ? rows[rows.length-1].rank : null) };
+}
+
+/* Same page as rank history — the "Activity History" table underneath it. */
+function oatrkParseSelfActivityHistory(doc){
+  var table = oatrkFindTable(doc, ['Event','Date','Camping Nights']);
+  if(!table) return [];
+  var extracted = oatrkExtractTableByLabels(table, [
+    { key:'event', match:'Event' },
+    { key:'date', match:'Date' },
+    { key:'nights', match:'Camping Nights' }
+  ]);
+  return extracted.rows.filter(function(r){ return r.event; }).map(function(r){
+    return { event:r.event, date:r.date, nights: parseInt(r.nights,10) || 0 };
+  });
+}
+
+/* Tenderfoot/Second Class/First Class tabs — each requirement row has an
+   "Earned" cell that's blank until completed. */
+function oatrkParseSelfUncompletedCount(doc){
+  var table = oatrkFindTable(doc, ['Award','Code','Requirement','Earned']);
+  if(!table) return { total:0, uncompleted:0 };
+  var extracted = oatrkExtractTableByLabels(table, [{ key:'earned', match:'Earned' }]);
+  var total = extracted.rows.length, uncompleted = 0;
+  extracted.rows.forEach(function(r){ if(!r.earned) uncompleted++; });
+  return { total:total, uncompleted:uncompleted };
+}
+
+function oatrkFetchMyScoutsRoster(){
+  return oatrkFetchDoc(OATRK_SELF_MY_SCOUTS_URL).then(function(doc){
+    var table = oatrkFindTable(doc, ['Name','Rank']);
+    if(!table) return [];
+    var rowEls = Array.prototype.slice.call(table.querySelectorAll('tr')).slice(1);
+    var extracted = oatrkExtractTableByLabels(table, [
+      { key:'name', match:'Name' }, { key:'rank', match:'Rank' }
+    ]);
+    var roster = [];
+    rowEls.forEach(function(rowEl, idx){
+      var row = extracted.rows[idx];
+      if(!row || !row.name) return;
+      var id = null;
+      Array.prototype.slice.call(rowEl.querySelectorAll('[onclick]')).forEach(function(el){
+        var m = (el.getAttribute('onclick')||'').match(/[?&]ID=(\d+)/);
+        if(m && !id) id = m[1];
+      });
+      if(id) roster.push({ name:row.name, rank:row.rank, id:id });
+    });
+    return roster;
+  });
+}
+
+/* Uncompleted-requirement tabs only matter (and are only fetched) if the
+   Scout isn't First Class yet — no point pulling three extra pages for a
+   Scout who's already cleared the rank side of eligibility. Checks all
+   three ranks unconditionally once triggered, same as leader-mode's own
+   Uncompleted Requirements report — Scouts sometimes complete requirements
+   out of order, so filtering by current rank could under-count. */
+function oatrkFetchSelfUncompletedTotal(id, currentRank){
+  if(rankAtLeastFirstClass(currentRank)) return Promise.resolve(null);
+  var ranks = ['Tenderfoot','Second Class','First Class'];
+  return Promise.all(ranks.map(function(r){
+    var formId = OATRK_SELF_RANK_REQ_FORM_IDS[r];
+    return oatrkFetchDoc(oatrkSelfRankReqUrl(id, formId)).then(oatrkParseSelfUncompletedCount);
+  })).then(function(results){
+    return results.reduce(function(sum, r){ return sum + r.uncompleted; }, 0);
+  }).catch(function(){ return null; }); // don't fail the whole scout over this piece
+}
+
+function oatrkFetchSelfServiceScout(basic){
+  return Promise.all([
+    oatrkFetchDoc(oatrkSelfProfileUrl(basic.id)).then(oatrkParseSelfOA),
+    oatrkFetchDoc(oatrkSelfRankPositionUrl(basic.id)).then(function(doc){
+      return { rankInfo: oatrkParseSelfRankHistory(doc), activity: oatrkParseSelfActivityHistory(doc) };
+    })
+  ]).then(function(results){
+    var oa = results[0];
+    var rankInfo = results[1].rankInfo;
+    var activity = results[1].activity;
+    var currentRank = rankInfo.currentRank || basic.rank || null;
+    return oatrkFetchSelfUncompletedTotal(basic.id, currentRank).then(function(uncompleted){
+      return {
+        name: basic.name, id: basic.id, rank: currentRank,
+        oa: oa, activity: activity, uncompletedReqs: uncompleted
+      };
+    });
+  });
+}
+
+/* If a leader has previously saved a shared date into #oatrk-sharedDate
+   (see the CONFIG comment above the root div), the self-service page uses
+   THAT exact date instead of guessing its own Feb-1 anchor — this is how
+   "leader sets the date, Scout/Parent page follows it" stays in sync.
+   Falls back to the OATRK_SELF_TARGET_MONTH/DAY anchor whenever the marker
+   is empty, unparseable, or already in the past. */
+function oatrkNextTargetDate(){
+  var today = new Date(); today.setHours(0,0,0,0);
+  var sharedEl = document.getElementById('oatrk-sharedDate');
+  if(sharedEl){
+    var shared = parseEventDate((sharedEl.textContent||'').trim());
+    if(shared && shared >= today) return shared;
+  }
+  var candidate = new Date(today.getFullYear(), OATRK_SELF_TARGET_MONTH-1, OATRK_SELF_TARGET_DAY);
+  if(candidate < today) candidate = new Date(today.getFullYear()+1, OATRK_SELF_TARGET_MONTH-1, OATRK_SELF_TARGET_DAY);
+  return candidate;
+}
+
+function oatrkComputeSelfEligibility(scout, campouts){
+  campouts = campouts || [];
+  var today = new Date(); today.setHours(0,0,0,0);
+  var targetDate = oatrkNextTargetDate();
+  var windowStart = new Date(targetDate.getTime());
+  windowStart.setMonth(windowStart.getMonth() - OATRK_SELF_CAMPING_WINDOW_MONTHS);
+
+  var loggedInWindow = scout.activity.filter(function(ev){
+    var d = parseEventDate(ev.date);
+    return d && d >= windowStart && d <= targetDate;
+  });
+  var loggedLt = loggedInWindow.filter(function(e){ return e.nights >= 5; }).reduce(function(a,e){ return a+e.nights; }, 0);
+  var loggedSt = loggedInWindow.filter(function(e){ return e.nights > 0 && e.nights < 5; }).reduce(function(a,e){ return a+e.nights; }, 0);
+
+  /* Scheduled (troop-wide calendar) campouts between today and the target
+     date — not yet attended, so not yet in the Scout's own activity
+     history. Counting these assumes the Scout attends, same assumption
+     leader-mode's "Within Reach" already makes for a leader-chosen target
+     date. Only real calendar-derived items have .start/.end Date objects;
+     the dates-only CSV fallback doesn't, so those are naturally excluded
+     here rather than mis-counted. */
+  var scheduled = campouts.filter(function(c){
+    return c.start instanceof Date && c.end instanceof Date &&
+      c.start >= today && c.start <= targetDate;
+  });
+  var scheduledLt = scheduled.filter(function(c){ return c.nights >= 5; }).reduce(function(a,c){ return a+c.nights; }, 0);
+  var scheduledSt = scheduled.filter(function(c){ return c.nights > 0 && c.nights < 5; }).reduce(function(a,c){ return a+c.nights; }, 0);
+
+  var lt = loggedLt + scheduledLt;
+  var st = loggedSt + scheduledSt;
+  var hasLongTrip = lt > 0;
+  var campingOk = hasLongTrip && st >= 10;
+  var rankOk = rankAtLeastFirstClass(scout.rank);
+
+  var honor = scout.oa.vigil ? 'Vigil' : (scout.oa.brotherhood ? 'Brotherhood' : (scout.oa.ordeal ? 'Ordeal' : null));
+  var honorDate = scout.oa.vigil || scout.oa.brotherhood || scout.oa.ordeal || null;
+  var awaitingOrdeal = !!(scout.oa.election && !scout.oa.ordeal);
+  var deadlineInfo = awaitingOrdeal ? ordealDeadlineInfo(scout.oa.election) : null;
+
+  var status;
+  if(honor) status = 'already';
+  else if(awaitingOrdeal) status = 'awaiting-ordeal';
+  else if(rankOk && campingOk) status = 'eligible';
+  else if(!rankOk && campingOk) status = 'rank-blocked';
+  else status = 'not-yet';
+
+  return {
+    status:status, honor:honor, honorDate:honorDate, deadlineInfo:deadlineInfo,
+    rankOk:rankOk, lt:lt, st:st, loggedLt:loggedLt, loggedSt:loggedSt,
+    scheduledLt:scheduledLt, scheduledSt:scheduledSt,
+    campingOk:campingOk, hasLongTrip:hasLongTrip,
+    stNeeded: Math.max(0, 10-st), uncompletedReqs: scout.uncompletedReqs,
+    targetDate: targetDate
+  };
+}
+
+/* Fallback only: dates-only, no nights/duration column available in this
+   export. Used if the calendar-based pipeline below fails for any reason
+   (e.g. this login can't reach Menu_Item_ID=45922 even though the export
+   works) — still better than showing nothing. */
+function oatrkFetchUpcomingCampoutsFallback(){
+  return fetchSimple(OATRK_SELF_UPCOMING_URL, 'Upcoming Event Summary').then(function(buf){
+    var rows = bufferToObjects(buf);
+    return rows.filter(function(r){ return /^campout$/i.test((r['Type']||'').trim()); })
+      .map(function(r){ return { date:r['Date'], name:r['Event Name'], location:r['Location'], nights:null }; });
+  });
+}
+
+function oatrkCalendarMonthFields(targetYYYYMM){
+  var target = parseInt(targetYYYYMM,10);
+  var y = Math.floor(target/100), m = target%100;
+  m -= 1; if(m === 0){ m = 12; y -= 1; }
+  var thru = y*100+m;
+  return {
+    menuopenflag:'N', Selected_Action:'show', Hover_Action:'', Selected_Button_ID:'',
+    Menu_Item_ID: OATRK_SELF_CALENDAR_MENU_ITEM_ID, Form_ID: OATRK_SELF_CALENDAR_FORM_ID,
+    Link_To_Menu_Item_ID:'', Pass:'1', Stack:'1', NextSectionPageNumber:'', NewRowsPerPage:'',
+    ChildRowID:'0', Report_Format:'',
+    Current_URL: 'https://www.troopwebhost.org/FormList.aspx?Menu_Item_ID='+OATRK_SELF_CALENDAR_MENU_ITEM_ID+'&Stack=1',
+    Page_Layout:'1', Report_option:'2', FK:'0', ID:'0',
+    CalendarDateControl0: String(targetYYYYMM), CalendarDateControlThru799: String(thru),
+    FirstControl:'BUTTON1'
+  };
+}
+function oatrkFetchCalendarMonth(targetYYYYMM){
+  var listUrl = 'FormList.aspx?Menu_Item_ID='+OATRK_SELF_CALENDAR_MENU_ITEM_ID+'&Stack=1';
+  if(!targetYYYYMM) return oatrkFetchDoc(listUrl);
+  return oatrkPostDoc('FormList.aspx', oatrkCalendarMonthFields(targetYYYYMM));
+}
+
+/* One month's day-cells -> raw (date, id, color, name) occurrences. Doesn't
+   filter by color here — that happens after merging across months, so an
+   event whose color reads differently on a mis-rendered cell in one month
+   doesn't get lost if it reads correctly elsewhere.
+   Uses real DOM traversal (not regex-on-innerHTML): serializing back to a
+   string re-encodes "&" in href attributes as "&amp;", which breaks a
+   regex written against the original response text. */
+function oatrkParseCalendarMonth(doc, year, month){
+  var out = [];
+  var dayCells = Array.prototype.slice.call(doc.querySelectorAll('td.calendar-cell'));
+  dayCells.forEach(function(cell){
+    var bEl = cell.querySelector('b'); // <i>N</i> = padding day from an adjacent month; only <b> is a real in-month day
+    if(!bEl) return;
+    var day = parseInt(bEl.textContent.trim(), 10);
+    if(!day) return;
+    var links = Array.prototype.slice.call(cell.querySelectorAll('a[href*="Stack=2"]'));
+    links.forEach(function(a){
+      var idMatch = (a.getAttribute('href')||'').match(/[?&]ID=(\d+)/);
+      if(!idMatch) return;
+      var fontEl = a.querySelector('font');
+      var color = fontEl ? (fontEl.getAttribute('color')||'').toLowerCase() : null;
+      var name = (fontEl ? fontEl.textContent : a.textContent).trim();
+      out.push({ date: new Date(year, month-1, day), id: idMatch[1], color: color, name: name });
+    });
+  });
+  return out;
+}
+
+/* Month fetches are strictly SEQUENTIAL, not Promise.all in parallel (see
+   below), AND every month — including the "current" one — is requested with
+   an explicit target, never a bare GET. Two independent HAR-confirmed bugs
+   drove this:
+   (1) Concurrent requests race TWH's shared session-side calendar-navigation
+       state, so a request asking for October can silently come back with a
+       DIFFERENT month's grid (e.g. September's) while still being parsed and
+       labeled as October — merging that mislabeled month's events into the
+       real month's inflated a real 2-night event into a bogus 32-night one.
+   (2) A bare GET for "the current month" doesn't actually request a month at
+       all — it just returns wherever this session's calendar happens to be
+       parked, which can be leftover state from earlier browsing in the same
+       tab/session, unrelated to today's real date. In a second captured HAR,
+       that leftover state was December while today was September; the code
+       still labeled that response's events as September, so a real December
+       event ("Racing Tracks") got recorded once correctly (from the explicit
+       December fetch) and once more under a phantom September date (from the
+       mislabeled bare GET) — two non-contiguous date sets for the same event
+       ID, so it displayed twice.
+   Fetching every month sequentially with an explicit target closes both:
+   there's no ambiguity about what's being requested, and no concurrent
+   requests to race each other. The contiguous-run split further down is a
+   third, independent guard in case TWH ever reuses an event ID for something
+   unrelated. */
+function oatrkFetchUpcomingCampouts(){
+  var today = new Date(); today.setHours(0,0,0,0);
+  var months = [];
+  for(var i=0; i<=OATRK_SELF_CALENDAR_MONTHS_AHEAD; i++){
+    var d = new Date(today.getFullYear(), today.getMonth()+i, 1);
+    months.push({ y:d.getFullYear(), m:d.getMonth()+1, target: d.getFullYear()*100+(d.getMonth()+1) });
+  }
+  var perMonth = [];
+  var chain = Promise.resolve();
+  months.forEach(function(mo){
+    chain = chain.then(function(){
+      return oatrkFetchCalendarMonth(mo.target).then(function(doc){
+        perMonth.push(oatrkParseCalendarMonth(doc, mo.y, mo.m));
+      });
+    });
+  });
+  return chain.then(function(){
+    var all = [].concat.apply([], perMonth);
+    var campouts = all.filter(function(e){ return e.color === OATRK_SELF_CAMPOUT_COLOR; });
+    var byId = {};
+    campouts.forEach(function(e){
+      if(!byId[e.id]) byId[e.id] = { id:e.id, name:e.name, dates:[] };
+      byId[e.id].dates.push(e.date);
+    });
+    var results = [];
+    Object.keys(byId).forEach(function(id){
+      var g = byId[id];
+      var sorted = g.dates.slice().sort(function(a,b){ return a-b; });
+      // Split into runs of consecutive calendar days. TWH repeats the same
+      // event ID on every day it spans, so a genuine multi-day event is one
+      // run — but an ID isn't guaranteed unique across every month this page
+      // fetches, so a gap of more than a day starts a new occurrence instead
+      // of being folded into one bogus multi-month span.
+      var runs = [[sorted[0]]];
+      for(var i=1;i<sorted.length;i++){
+        var gapDays = Math.round((sorted[i]-sorted[i-1])/86400000);
+        if(gapDays <= 1) runs[runs.length-1].push(sorted[i]);
+        else runs.push([sorted[i]]);
+      }
+      runs.forEach(function(run){
+        var start = run[0], end = run[run.length-1];
+        results.push({ start:start, end:end, date: mdyFromDate(start), name:g.name,
+          nights: Math.round((end-start)/86400000) });
+      });
+    });
+    return results.filter(function(ev){ return ev.end >= today; })
+      .sort(function(a,b){ return a.start - b.start; });
+  }).catch(function(err){
+    console.warn('OA Tracker: calendar-based upcoming campouts failed, falling back to the dates-only export:', err);
+    return oatrkFetchUpcomingCampoutsFallback();
+  });
+}
+function mdyFromDate(d){
+  return (d.getMonth()+1)+'/'+d.getDate()+'/'+d.getFullYear();
+}
+
+
+/* ================= SELF-SERVICE (Scout / parent login) orchestration + render ================= */
+
+function oatrkRenderUpcomingCampouts(list, err){
+  var el = document.getElementById('oatrk-selfCalendar');
+  var usedFallback = list.length && list[0].nights == null;
+  var caveat = usedFallback
+    ? '<b>Upcoming campouts</b> — dates only; the calendar-based night count wasn\'t available, so this fell back to the plain event export, which has no duration figure. Not counted toward eligibility below, just shown for reference.'
+    : '<b>Upcoming campouts</b> — nights are computed from the troop calendar\'s own start/end dates for each event. Not counted toward eligibility below (that only reflects nights already logged), just shown for reference.';
+  var html = '<div class="oatrk-sheet-sub" style="margin-top:18px;">' + caveat + '</div>';
+  if(err){
+    html += '<div class="oatrk-status oatrk-err">Could not load the upcoming campout calendar (' + esc(err.message) + ').</div>';
+  } else if(!list.length){
+    html += '<div class="oatrk-empty-row">No upcoming campouts on the calendar right now.</div>';
+  } else {
+    html += '<ul class="oatrk-self-campouts">' + list.map(function(e){
+      var nightsStr = e.nights == null ? '' : ' — ' + e.nights + ' night' + (e.nights===1?'':'s');
+      return '<li>' + esc(e.date) + nightsStr + ' — <b>' + esc(e.name) + '</b>' + (e.location ? ' (' + esc(e.location) + ')' : '') + '</li>';
+    }).join('') + '</ul>';
+  }
+  el.innerHTML = html;
+}
+
+/* Builds one .oatrk-section block in the exact leader-mode shape
+   (section-head with stamp/title/count, description paragraph, table)
+   so self-service results are visually identical to leader-mode results —
+   just grouped by household member instead of by the whole troop. */
+function oatrkBuildSection(stampClass, stampText, title, countText, desc, theadHtml, rowsHtml){
+  return '<div class="oatrk-section">' +
+    '<div class="oatrk-section-head">' +
+      '<span class="oatrk-stamp ' + stampClass + '">' + esc(stampText) + '</span>' +
+      '<span class="oatrk-section-title">' + esc(title) + '</span>' +
+      '<span class="oatrk-section-count">' + esc(countText) + '</span>' +
+    '</div>' +
+    '<p class="oatrk-section-desc">' + desc + '</p>' +
+    '<table><thead><tr>' + theadHtml + '</tr></thead><tbody>' + rowsHtml + '</tbody></table>' +
+  '</div>';
+}
+
+function oatrkRenderSelfServiceResults(items){
+  // items: [{ basic, scout, elig, err }] — one per Scout linked to this login.
+  var buckets = { already:[], 'awaiting-ordeal':[], eligible:[], 'rank-blocked':[], 'not-yet':[] };
+  var errored = [];
+  items.forEach(function(it){
+    if(it.err){ errored.push(it); return; }
+    buckets[it.elig.status].push(it);
+  });
+
+  var sections = [];
+
+  if(buckets.already.length){
+    var rows = buckets.already.map(function(it){
+      var scout = it.scout, elig = it.elig;
+      var note = '—';
+      if(elig.honor === 'Vigil' && scout.oa.vigilName){
+        note = 'Vigil name: ' + esc(scout.oa.vigilName);
+      } else if(elig.honor === 'Ordeal'){
+        note = oatrkBrotherhoodEligible(scout.oa.ordeal)
+          ? '<span class="oatrk-tag">eligible for Brotherhood</span>'
+          : 'not yet Brotherhood-eligible';
+      }
+      return '<tr><td class="oatrk-name">'+esc(scout.name)+'</td><td>'+esc(elig.honor)+'</td>'+
+        '<td>'+esc(elig.honorDate||'—')+'</td><td>'+note+'</td></tr>';
+    }).join('');
+    sections.push(oatrkBuildSection('go', 'Members', 'Already in the Order of the Arrow',
+      buckets.already.length + ' scout' + (buckets.already.length===1?'':'s'),
+      'Honor is the highest of Ordeal/Brotherhood/Vigil on this login\'s own OA status page, with the date of that honor. Anyone whose Ordeal was at least 6 months ago and hasn\'t advanced further is flagged eligible for Brotherhood.',
+      '<th>Scout</th><th>OA Honor</th><th>Honor date</th><th>Notes</th>', rows));
+  }
+
+  if(buckets['awaiting-ordeal'].length){
+    var rows = buckets['awaiting-ordeal'].map(function(it){
+      var scout = it.scout, elig = it.elig, di = elig.deadlineInfo;
+      var statusHtml = di
+        ? (di.overdue
+            ? '<span class="oatrk-tag oatrk-tag-overdue">overdue by '+Math.abs(di.daysLeft)+' day'+(Math.abs(di.daysLeft)===1?'':'s')+' — needs re-election</span>'
+            : '<span class="oatrk-tag">'+di.daysLeft+' day'+(di.daysLeft===1?'':'s')+' left (by '+di.deadlineStr+')</span>')
+        : '<span class="oatrk-tag">could not read election date</span>';
+      return '<tr><td class="oatrk-name">'+esc(scout.name)+'</td><td>'+esc(scout.oa.election)+'</td><td>'+statusHtml+'</td></tr>';
+    }).join('');
+    sections.push(oatrkBuildSection('block', 'Awaiting Ordeal', 'Elected, but no Ordeal date on file',
+      buckets['awaiting-ordeal'].length + ' scout' + (buckets['awaiting-ordeal'].length===1?'':'s'),
+      'Has an OA Election date but no OA Ordeal date on this login\'s OA status page. Elections expire 18 months after the election date if the Ordeal isn\'t done by then, so this is worth tracking closely.',
+      '<th>Scout</th><th>OA Election date</th><th>Ordeal deadline</th>', rows));
+  }
+
+  if(buckets.eligible.length){
+    var rows = buckets.eligible.map(function(it){
+      var scout = it.scout, elig = it.elig;
+      return '<tr><td class="oatrk-name">'+esc(scout.name)+'</td><td>'+esc(scout.rank||'—')+'</td>'+
+        '<td class="oatrk-num">'+elig.lt+'</td><td class="oatrk-num">'+elig.st+'</td></tr>';
+    }).join('');
+    sections.push(oatrkBuildSection('go', 'Eligible', 'Eligible now',
+      buckets.eligible.length + ' scout' + (buckets.eligible.length===1?'':'s'),
+      'Rank and both camping-night minimums are satisfied, counting nights already logged plus anything already scheduled on the calendar through the target date below.',
+      '<th>Scout</th><th>Rank</th><th class="oatrk-num-h">Long-term nights</th><th class="oatrk-num-h">Short-term nights</th>', rows));
+  }
+
+  if(buckets['rank-blocked'].length){
+    var rows = buckets['rank-blocked'].map(function(it){
+      var scout = it.scout, elig = it.elig;
+      return '<tr><td class="oatrk-name">'+esc(scout.name)+'</td><td>'+esc(scout.rank||'—')+'</td>'+
+        '<td class="oatrk-num">'+(elig.uncompletedReqs!=null ? elig.uncompletedReqs : '<span class="oatrk-tag">no data found</span>')+'</td></tr>';
+    }).join('');
+    sections.push(oatrkBuildSection('block', 'Rank-blocked', 'Camping nights met — needs First Class',
+      buckets['rank-blocked'].length + ' scout' + (buckets['rank-blocked'].length===1?'':'s'),
+      'Camping requirement is already satisfied (or reachable — see below) — rank is the only thing standing between them and eligibility.',
+      '<th>Scout</th><th>Current rank</th><th class="oatrk-num-h">Requirements left to First Class</th>', rows));
+  }
+
+  if(buckets['not-yet'].length){
+    var rows = buckets['not-yet'].map(function(it){
+      var scout = it.scout, elig = it.elig;
+      var needsParts = [];
+      if(!elig.hasLongTrip) needsParts.push('a long-term trip');
+      if(elig.stNeeded > 0) needsParts.push(elig.stNeeded+' more short-term night'+(elig.stNeeded===1?'':'s'));
+      if(!elig.rankOk) needsParts.push(elig.uncompletedReqs!=null
+        ? elig.uncompletedReqs+' requirement'+(elig.uncompletedReqs===1?'':'s')+' to First Class'
+        : 'First Class rank');
+      var needsLabel = needsParts.join(' + ') || 'nothing — recheck data';
+      var pct = Math.min(100, Math.round((elig.st/10)*100));
+      var barLabel = elig.st+'/10 short-term nights'+(elig.scheduledSt?' (incl. scheduled)':'')+' logged toward the target date';
+      return '<tr><td class="oatrk-name">'+esc(scout.name)+'</td><td>'+esc(scout.rank||'—')+'</td>'+
+        '<td><span class="oatrk-tag">'+esc(needsLabel)+'</span></td>'+
+        '<td class="oatrk-bar-cell"><div class="oatrk-bar-track"><div class="oatrk-bar-fill" style="width:'+pct+'%"></div></div>'+
+        '<div class="oatrk-bar-label">'+esc(barLabel)+'</div></td></tr>';
+    }).join('');
+    sections.push(oatrkBuildSection('reach', 'In progress', 'Working toward eligibility',
+      buckets['not-yet'].length + ' scout' + (buckets['not-yet'].length===1?'':'s'),
+      'Rank and/or camping nights aren\'t there yet — nights include anything already logged plus anything already scheduled on the calendar between now and the target date, the same assumption leader-mode\'s "Within Reach" makes for a leader-chosen date.',
+      '<th>Scout</th><th>Rank</th><th>Still needs</th><th class="oatrk-bar-cell">Nights needed vs. target</th>', rows));
+  }
+
+  if(errored.length){
+    var rows = errored.map(function(it){
+      return '<tr><td class="oatrk-name">'+esc(it.basic.name)+'</td><td>'+esc(it.err.message)+'</td></tr>';
+    }).join('');
+    sections.push(oatrkBuildSection('block', 'Error', 'Could not load full details',
+      errored.length + ' scout' + (errored.length===1?'':'s'),
+      'These Scouts are linked to this login, but this page couldn\'t pull their full OA status.',
+      '<th>Scout</th><th>Issue</th>', rows));
+  }
+
+  var html = sections.join('');
+  var okItem = items.filter(function(it){ return !it.err; })[0];
+  if(okItem){
+    html += '<p class="oatrk-footnote">The target date and lookback window above are both set at the top of ' +
+      'this page\'s code and adjustable there. Scheduled nights assume the Scout attends everything currently ' +
+      'on the calendar. This is this page\'s own approximation of the window TroopWebHost computes internally ' +
+      'for the leader-mode report — TroopWebHost\'s own determination is the authoritative one.</p>';
+  }
+  return html;
+}
+
+/* Standalone Brotherhood-eligible check for a raw ordeal-date string —
+   same 6-month rule as honorInfo(), used here since self-service data
+   doesn't come as a roster row. */
+function oatrkBrotherhoodEligible(ordealStr){
+  var d = parseEventDate(ordealStr);
+  if(!d) return false;
+  var today = new Date(); today.setHours(0,0,0,0);
+  var waitOver = new Date(d.getTime());
+  waitOver.setMonth(waitOver.getMonth() + OATRK_BROTHERHOOD_WAIT_MONTHS);
+  return waitOver <= today;
+}
+
+function oatrkRunSelfServiceMode(){
+  document.getElementById('oatrk-leaderSheet').style.display = 'none';
+  var leaderCallout = document.getElementById('oatrk-leaderCallout');
+  if(leaderCallout) leaderCallout.style.display = 'none';
+  var selfSheet = document.getElementById('oatrk-selfSheet');
+  selfSheet.style.display = '';
+  var statusEl = document.getElementById('oatrk-selfStatus');
+  var scoutsEl = document.getElementById('oatrk-selfScouts');
+
+  var targetDateEl = document.getElementById('oatrk-selfTargetDate');
+  if(targetDateEl){
+    var sharedEl = document.getElementById('oatrk-sharedDate');
+    var sharedRaw = sharedEl ? (sharedEl.textContent||'').trim() : '';
+    var usingShared = sharedRaw && parseEventDate(sharedRaw) && parseEventDate(sharedRaw) >= new Date(new Date().setHours(0,0,0,0));
+    targetDateEl.textContent = 'Eligibility below is computed as of ' + mdyFromDate(oatrkNextTargetDate()) +
+      (usingShared
+        ? ' — the same date a troop leader most recently set on this page'
+        : ' (this troop\'s next OA election window, this page\'s own default)') +
+      ', looking back ' + OATRK_SELF_CAMPING_WINDOW_MONTHS + ' months for camping nights.';
+  }
+
+  // Upcoming campouts (the calendar fetch) are only pulled and shown when at
+  // least one Scout still hasn't met the camping-nights requirement from
+  // what's already logged — that's the only case where a scheduled-but-not-
+  // yet-happened campout could change the outcome. A preliminary pass with
+  // no campout data (below) is enough to tell.
+  function finish(results){
+    var prelim = results.map(function(r){
+      if(r.err) return { basic:r.basic, scout:null, elig:null, err:r.err };
+      return { basic:r.basic, scout:r.scout, elig:oatrkComputeSelfEligibility(r.scout, []), err:null };
+    });
+    var needsCampouts = prelim.some(function(it){ return !it.err && it.elig.status === 'not-yet'; });
+
+    if(!needsCampouts){
+      scoutsEl.innerHTML = oatrkRenderSelfServiceResults(prelim);
+      return;
+    }
+
+    oatrkFetchUpcomingCampouts()
+      .then(function(list){ oatrkRenderUpcomingCampouts(list, null); return list; })
+      .catch(function(err){ oatrkRenderUpcomingCampouts([], err); return []; })
+      .then(function(campouts){
+        var items = results.map(function(r){
+          if(r.err) return { basic:r.basic, scout:null, elig:null, err:r.err };
+          return { basic:r.basic, scout:r.scout, elig:oatrkComputeSelfEligibility(r.scout, campouts), err:null };
+        });
+        scoutsEl.innerHTML = oatrkRenderSelfServiceResults(items);
+      });
+  }
+
+  // A Scout logged in directly (not through a parent's account) can't reach
+  // the roster page at all — Menu_Item_ID=45899 redirects to the site's home
+  // page for that login type. That redirect is exactly what oatrkFetchDoc()
+  // turns into a rejected promise, so it's the trigger for falling back to
+  // the direct-login endpoints instead of treating it as a hard failure.
+  function runDirectScoutFallback(rosterErr){
+    oatrkFetchScoutDirectSelf().then(function(scout){
+      var basic = { name:scout.name, id:scout.id };
+      statusEl.textContent = 'Signed in as ' + scout.name + '.';
+      finish([{ basic:basic, scout:scout, err:null }]);
+    }).catch(function(directErr){
+      statusEl.textContent = 'Could not look up your Scout info (' + rosterErr.message + '). Make sure you\'re logged into TroopWebHost in this tab.';
+      statusEl.classList.add('oatrk-err');
+    });
+  }
+
+  oatrkFetchMyScoutsRoster().then(function(roster){
+    if(!roster.length){
+      statusEl.textContent = 'Signed in, but couldn\'t find any Scouts linked to this login.';
+      statusEl.classList.add('oatrk-err');
+      return;
+    }
+    statusEl.textContent = 'Found ' + roster.length + ' Scout' + (roster.length===1?'':'s') + ' linked to this login.';
+
+    var settled = roster.map(function(basic){
+      return oatrkFetchSelfServiceScout(basic)
+        .then(function(scout){ return { basic:basic, scout:scout, err:null }; })
+        .catch(function(err){ return { basic:basic, scout:null, err:err }; });
+    });
+
+    Promise.all(settled).then(finish);
+  }).catch(runDirectScoutFallback);
+}
+
 function loadLiveOADate(){
   var statusEl = document.getElementById('oatrk-liveDateStatus');
+  var modeCheckEl = document.getElementById('oatrk-modeCheck');
   fetchLiveOADate().then(function(mdy){
+    if(modeCheckEl) modeCheckEl.style.display = 'none';
+    document.getElementById('oatrk-leaderSheet').style.display = '';
+    var leaderCallout = document.getElementById('oatrk-leaderCallout');
+    if(leaderCallout) leaderCallout.style.display = '';
     oatrkLastKnownOADate = mdy;
     statusEl.textContent = 'Currently set on TroopWebHost: ' + mdy;
     var iso = mdyToIso(mdy);
@@ -776,7 +1725,8 @@ function loadLiveOADate(){
       statusAuto.textContent = 'Loaded the current TroopWebHost date — change it above if you want a different one, then click Pull Reports Automatically.';
     }
   }).catch(function(err){
-    statusEl.textContent = 'Could not read the current TroopWebHost date (' + err.message + '). Make sure you\'re logged in, or enter a date manually.';
+    if(modeCheckEl) modeCheckEl.style.display = 'none';
+    oatrkRunSelfServiceMode();
   });
 }
 
@@ -837,6 +1787,7 @@ runAutoBtn.addEventListener('click', function(){
       var suffix = adultWarning ? ' (adults skipped: '+adultWarning+')' : ', '+adultRows.length+' adults';
       statusAuto.textContent = 'Done — pulled '+data.oa.length+' scouts'+suffix+', '+data.events.length+' events, '+data.reqs.length+' requirement rows, '+data.roster.length+' roster rows.';
       runReport(data.oa, adultRows||[], data.events, data.reqs, data.roster, includedTypes, autoDate.value);
+      oatrkPersistSharedDate(mdy); // best-effort — see its own comment for why a failure here is fine
     })
     .catch(function(err){
       statusAuto.textContent = 'Error: ' + err.message;
