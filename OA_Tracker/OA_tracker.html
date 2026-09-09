@@ -238,6 +238,7 @@
   #oatrk-root .oatrk-tag-overdue{
     background:var(--brick-light-bg); color:var(--brick-light);
   }
+  #oatrk-root .oatrk-lapsed-note{ display:block; font-size:10.5px; font-weight:400; color:var(--brick-light); margin-top:2px; }
   #oatrk-root .oatrk-empty-row{ padding:18px 10px; color:var(--parchment-dim); font-size:12.5px; font-style:italic; }
   #oatrk-root details.oatrk-audit{ border:1px solid var(--hair); border-radius:4px; padding:11px 15px; margin-top:6px; }
   #oatrk-root details.oatrk-audit summary{
@@ -1296,8 +1297,18 @@ function oatrkComputeSelfEligibility(scout, campouts){
 
   var honor = scout.oa.vigil ? 'Vigil' : (scout.oa.brotherhood ? 'Brotherhood' : (scout.oa.ordeal ? 'Ordeal' : null));
   var honorDate = scout.oa.vigil || scout.oa.brotherhood || scout.oa.ordeal || null;
-  var awaitingOrdeal = !!(scout.oa.election && !scout.oa.ordeal);
-  var deadlineInfo = awaitingOrdeal ? ordealDeadlineInfo(scout.oa.election) : null;
+  var electedNoOrdeal = !!(scout.oa.election && !scout.oa.ordeal);
+  var deadlineInfo = electedNoOrdeal ? ordealDeadlineInfo(scout.oa.election) : null;
+
+  /* Once the 18-month Ordeal window passes without the Ordeal being
+     completed, the election itself expires — the Scout needs to be
+     elected again, so they're no longer "awaiting Ordeal": they fall
+     back into the normal buckets below (same as leader mode), with a
+     lapsed-election note carried along so the history isn't lost. If
+     the election date couldn't be parsed, treat it the same as before
+     (still shown as awaiting Ordeal with "could not read election date"). */
+  var awaitingOrdeal = electedNoOrdeal && !(deadlineInfo && deadlineInfo.overdue);
+  var lapsedElection = (electedNoOrdeal && deadlineInfo && deadlineInfo.overdue) ? deadlineInfo : null;
 
   var status;
   if(honor) status = 'already';
@@ -1308,6 +1319,7 @@ function oatrkComputeSelfEligibility(scout, campouts){
 
   return {
     status:status, honor:honor, honorDate:honorDate, deadlineInfo:deadlineInfo,
+    lapsedElection:lapsedElection,
     rankOk:rankOk, lt:lt, st:st, loggedLt:loggedLt, loggedSt:loggedSt,
     scheduledLt:scheduledLt, scheduledSt:scheduledSt,
     campingOk:campingOk, hasLongTrip:hasLongTrip,
@@ -1547,7 +1559,7 @@ function oatrkRenderSelfServiceResults(items){
   if(buckets.eligible.length){
     var rows = buckets.eligible.map(function(it){
       var scout = it.scout, elig = it.elig;
-      return '<tr><td class="oatrk-name">'+esc(scout.name)+'</td><td>'+esc(scout.rank||'—')+'</td>'+
+      return '<tr><td class="oatrk-name">'+esc(scout.name)+oatrkLapsedNoteHtml(elig.lapsedElection)+'</td><td>'+esc(scout.rank||'—')+'</td>'+
         '<td class="oatrk-num">'+elig.lt+'</td><td class="oatrk-num">'+elig.st+'</td></tr>';
     }).join('');
     sections.push(oatrkBuildSection('go', 'Eligible', 'Eligible now',
@@ -1559,7 +1571,7 @@ function oatrkRenderSelfServiceResults(items){
   if(buckets['rank-blocked'].length){
     var rows = buckets['rank-blocked'].map(function(it){
       var scout = it.scout, elig = it.elig;
-      return '<tr><td class="oatrk-name">'+esc(scout.name)+'</td><td>'+esc(scout.rank||'—')+'</td>'+
+      return '<tr><td class="oatrk-name">'+esc(scout.name)+oatrkLapsedNoteHtml(elig.lapsedElection)+'</td><td>'+esc(scout.rank||'—')+'</td>'+
         '<td class="oatrk-num">'+(elig.uncompletedReqs!=null ? elig.uncompletedReqs : '<span class="oatrk-tag">no data found</span>')+'</td></tr>';
     }).join('');
     sections.push(oatrkBuildSection('block', 'Rank-blocked', 'Camping nights met — needs First Class',
@@ -1580,7 +1592,7 @@ function oatrkRenderSelfServiceResults(items){
       var needsLabel = needsParts.join(' + ') || 'nothing — recheck data';
       var pct = Math.min(100, Math.round((elig.st/10)*100));
       var barLabel = elig.st+'/10 short-term nights'+(elig.scheduledSt?' (incl. scheduled)':'')+' logged toward the target date';
-      return '<tr><td class="oatrk-name">'+esc(scout.name)+'</td><td>'+esc(scout.rank||'—')+'</td>'+
+      return '<tr><td class="oatrk-name">'+esc(scout.name)+oatrkLapsedNoteHtml(elig.lapsedElection)+'</td><td>'+esc(scout.rank||'—')+'</td>'+
         '<td><span class="oatrk-tag">'+esc(needsLabel)+'</span></td>'+
         '<td class="oatrk-bar-cell"><div class="oatrk-bar-track"><div class="oatrk-bar-fill" style="width:'+pct+'%"></div></div>'+
         '<div class="oatrk-bar-label">'+esc(barLabel)+'</div></td></tr>';
@@ -1823,6 +1835,15 @@ function ordealDeadlineInfo(electionDate){
   return { deadlineStr: mm+'/'+dd+'/'+yyyy, daysLeft: daysLeft, overdue: daysLeft < 0 };
 }
 
+/* Small sub-line shown under a name once their prior OA election has
+   expired (18-month Ordeal window passed with no Ordeal completed) and
+   they've been folded back into the normal eligibility pipeline. Used
+   by both leader mode and self-service mode. */
+function oatrkLapsedNoteHtml(lapsed){
+  if(!lapsed) return '';
+  return '<div class="oatrk-lapsed-note">election expired '+esc(lapsed.deadlineStr)+' — needs re-election</div>';
+}
+
 /* Brotherhood eligibility: 6 full months since the Ordeal date, and no
    higher honor already earned. */
 var OATRK_BROTHERHOOD_WAIT_MONTHS = 6;
@@ -1889,7 +1910,7 @@ function runReport(oaRows, adultRows, eventRows, reqRows, rosterRows, includedTy
      before the eligibility loops below because anyone still inside their
      18-month window is excluded from "Eligible Now" — they're already
      in the pipeline, not a new nomination. */
-  var list4 = (rosterRows||[]).filter(function(r){
+  var electedNoOrdeal = (rosterRows||[]).filter(function(r){
     return (r['OA Election']||'').trim() && !(r['OA Ordeal']||'').trim();
   }).map(function(r){
     var info = ordealDeadlineInfo(r['OA Election']);
@@ -1901,14 +1922,31 @@ function runReport(oaRows, adultRows, eventRows, reqRows, rosterRows, includedTy
       daysLeft: info ? info.daysLeft : null,
       overdue: info ? info.overdue : false
     };
-  }).sort(function(a,b){
-    if(a.daysLeft==null) return 1;
-    if(b.daysLeft==null) return -1;
-    return a.daysLeft - b.daysLeft;
   });
 
-  /* Anyone shown in Awaiting Ordeal is excluded from every other section,
-     overdue or not — that section is their one home. */
+  /* Once the 18-month Ordeal window passes without the Ordeal being
+     completed, the election itself expires — TroopWebHost's own rule is
+     that the member needs to be elected again, so they are NOT "awaiting
+     Ordeal" anymore. Only still-live elections stay in this section and
+     block the pipeline below; expired ones fall back into the normal
+     eligibility evaluation, exactly like anyone who's never been
+     elected, carrying a small "election expired" note wherever they
+     land so the history isn't lost. */
+  var list4 = electedNoOrdeal.filter(function(p){ return !p.overdue; })
+    .sort(function(a,b){
+      if(a.daysLeft==null) return 1;
+      if(b.daysLeft==null) return -1;
+      return a.daysLeft - b.daysLeft;
+    });
+
+  var lapsedElectionMap = {};
+  electedNoOrdeal.filter(function(p){ return p.overdue; }).forEach(function(p){
+    lapsedElectionMap[normName(p.name)] = p;
+  });
+
+  /* Anyone still shown in Awaiting Ordeal (live election) is excluded
+     from every other section — that section is their one home until
+     the Ordeal is done or the election lapses. */
   var awaitingOrdealSet = {};
   list4.forEach(function(p){ awaitingOrdealSet[normName(p.name)] = true; });
 
@@ -1924,8 +1962,11 @@ function runReport(oaRows, adultRows, eventRows, reqRows, rosterRows, includedTy
     if(awaitingOrdealSet[normName(name)]) return; // already shown in Awaiting Ordeal
 
     if(/already/i.test(status)){ alreadyOACount++; return; }
+
+    var lapsed = lapsedElectionMap[normName(name)] || null;
+
     if(/^eligible/i.test(status)){
-      list1.push({name:name, rank:rank, lt:lt, st:st});
+      list1.push({name:name, rank:rank, lt:lt, st:st, lapsed:lapsed});
       return;
     }
 
@@ -1937,13 +1978,13 @@ function runReport(oaRows, adultRows, eventRows, reqRows, rosterRows, includedTy
       var needsParts = [];
       if(lt < 5) needsParts.push('a long-term trip');
       if(ev.stNeeded > 0) needsParts.push(ev.stNeeded+' more short-term night'+(ev.stNeeded===1?'':'s'));
-      list2.push({ name:name, rank:rank, lt:lt, st:st, stNeeded:ev.stNeeded, needsLabel: needsParts.join(' + ') || 'nothing — recheck export' });
+      list2.push({ name:name, rank:rank, lt:lt, st:st, stNeeded:ev.stNeeded, needsLabel: needsParts.join(' + ') || 'nothing — recheck export', lapsed:lapsed });
     } else {
       var key = normName(name);
       var r = reqMap[key] || {};
       var tf = r['Tenderfoot']||0, sc = r['Second Class']||0, fc = r['First Class']||0;
       var hasData = (tf+sc+fc) > 0;
-      list3.push({ name:name, rank:rank, total: tf+sc+fc, hasData:hasData });
+      list3.push({ name:name, rank:rank, total: tf+sc+fc, hasData:hasData, lapsed:lapsed });
     }
   });
 
@@ -1966,7 +2007,8 @@ function runReport(oaRows, adultRows, eventRows, reqRows, rosterRows, includedTy
       name: row['Name'],
       leadership: row['Leadership'] || '',
       lt: parseInt(row['Long-Term Camping Nights'],10) || 0,
-      st: parseInt(row['Short-Term Camping Nights'],10) || 0
+      st: parseInt(row['Short-Term Camping Nights'],10) || 0,
+      lapsed: lapsedElectionMap[normName(row['Name'])] || null
     };
   }).sort(function(a,b){ return (b.lt+b.st) - (a.lt+a.st); });
 
@@ -2000,7 +2042,7 @@ function render(list1, list2, list3, list4, list5, list6, upcoming, availableSho
 
   var t1 = document.getElementById('oatrk-tbl1');
   t1.innerHTML = list1.length ? list1.map(function(s){ return (
-    '<tr><td class="oatrk-name">'+esc(s.name)+'</td><td>'+esc(s.rank)+'</td>'+
+    '<tr><td class="oatrk-name">'+esc(s.name)+oatrkLapsedNoteHtml(s.lapsed)+'</td><td>'+esc(s.rank)+'</td>'+
     '<td class="oatrk-num">'+s.lt+'</td><td class="oatrk-num">'+s.st+'</td></tr>'
   ); }).join('') : '<tr><td class="oatrk-empty-row" colspan="4">No one currently meets all three requirements.</td></tr>';
 
@@ -2008,7 +2050,7 @@ function render(list1, list2, list3, list4, list5, list6, upcoming, availableSho
   t2.innerHTML = list2.length ? list2.map(function(s){
     var pct = Math.min(100, Math.round((s.st/10)*100));
     return (
-      '<tr><td class="oatrk-name">'+esc(s.name)+'</td><td>'+esc(s.rank)+'</td>'+
+      '<tr><td class="oatrk-name">'+esc(s.name)+oatrkLapsedNoteHtml(s.lapsed)+'</td><td>'+esc(s.rank)+'</td>'+
       '<td><span class="oatrk-tag">'+esc(s.needsLabel)+'</span></td>'+
       '<td class="oatrk-bar-cell"><div class="oatrk-bar-track"><div class="oatrk-bar-fill" style="width:'+pct+'%"></div></div>'+
       '<div class="oatrk-bar-label">'+s.st+'/10 short-term nights logged · '+availableShortNights+' more available on the calendar</div></td></tr>'
@@ -2030,7 +2072,7 @@ function render(list1, list2, list3, list4, list5, list6, upcoming, availableSho
 
   var t3 = document.getElementById('oatrk-tbl3');
   t3.innerHTML = list3.length ? list3.map(function(s){
-    return '<tr><td class="oatrk-name">'+esc(s.name)+'</td><td>'+esc(s.rank||'—')+'</td>'+
+    return '<tr><td class="oatrk-name">'+esc(s.name)+oatrkLapsedNoteHtml(s.lapsed)+'</td><td>'+esc(s.rank||'—')+'</td>'+
       '<td class="oatrk-num">'+(s.hasData ? s.total : '<span class="oatrk-tag">no data found</span>')+'</td></tr>';
   }).join('') : '<tr><td class="oatrk-empty-row" colspan="3">No one is being held up by rank alone right now.</td></tr>';
 
@@ -2054,7 +2096,7 @@ function render(list1, list2, list3, list4, list5, list6, upcoming, availableSho
 
   var t6 = document.getElementById('oatrk-tbl6');
   t6.innerHTML = list6.length ? list6.map(function(s){
-    return '<tr><td class="oatrk-name">'+esc(s.name)+'</td><td>'+esc(s.leadership||'—')+'</td>'+
+    return '<tr><td class="oatrk-name">'+esc(s.name)+oatrkLapsedNoteHtml(s.lapsed)+'</td><td>'+esc(s.leadership||'—')+'</td>'+
       '<td class="oatrk-num">'+s.lt+'</td><td class="oatrk-num">'+s.st+'</td></tr>';
   }).join('') : '<tr><td class="oatrk-empty-row" colspan="4">No adults with camping nights in this window.</td></tr>';
 }
