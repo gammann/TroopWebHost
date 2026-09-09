@@ -7,9 +7,11 @@ split by Scout/Adult and Active/Former/All.
 
 It runs entirely inside TroopWebHost as a Custom Page. Seven categories
 update live on every page load; Merit Badges and former-member data
-are published periodically by a leader through a built-in admin panel
-(no addresses, medical info, or other sensitive fields ever leave
-that action — just names and totals).
+are refreshed and published automatically, in the background, the
+next time a leader with the right permissions opens the page — no
+button to click, no admin panel to open (no addresses, medical info,
+or other sensitive fields ever leave that action — just names and
+totals).
 
 <p align="center">
 <img width="421" height="533" alt="image" src="https://github.com/user-attachments/assets/de485f81-6c75-4d15-a3c0-4a85549fcd56" />
@@ -22,7 +24,7 @@ The **Event Participation Summary for Date Range** report contains Total Camping
 
 The **Export Roster to Excel** report contains Camping Nights, Total Hiking Miles, Total Service Hours and Number of Merit Badges for anyone who is or has been a member of the Troop.  This also has date that someone left the troop, thus being able to determine who is a current and who is a former member.
 
-With the correct permissions granted to all members, the Active Scout/Adult data, with the exception of Merit Badges is always live, while the Former Scout/Adult and Merit Badge data is updated when a leader with the correct permissions loads the page.  The Former Scout/Adult data only needs to be updated when someone's membership is changed, since their stats will not change once they are a former member, or when Active Scouts earn new Merit Badges.
+With the correct permissions granted to all members, the Active Scout/Adult data, with the exception of Merit Badges is always live, while the Former Scout/Adult and Merit Badge data is refreshed and published automatically, in the background, whenever a leader with the correct permissions loads the page.  The Former Scout/Adult data only needs to be updated when someone's membership is changed, since their stats will not change once they are a former member, or when Active Scouts earn new Merit Badges — so it's fine if it only refreshes whenever a leader happens to load the page next, rather than instantly.
 
 This code uses [SheetJS](https://sheetjs.com/) to parse Excel reports exported from TroopWebHost.
 
@@ -41,11 +43,10 @@ a couple of permissions.
 - Admin access to your troop's TroopWebHost site
 - Access to Manage Custom Pages
 - Someone with the **View Membership Information** and **Web Page
-  Editor** tasks (needed to publish former-member and merit-badge
-  data — see Step 4)
-- A modern browser with DevTools (Chrome, Edge, or Firefox), only
-  needed if you set up auto-save (optional) or if something doesn't
-  work out of the box
+  Editor** tasks (needed for former-member and merit-badge data to
+  auto-publish — see Step 3)
+- A modern browser, only needed to check DevTools (F12) console
+  messages if something doesn't work out of the box
 
 
 ---
@@ -76,38 +77,7 @@ Open the page and confirm the 6 live categories load with real
 numbers. If something's wrong, open the browser console (F12) — error
 messages there will point at what failed.
 
-## Step 2 — Set up Auto-Save
-
-Auto-save writes refreshed former-member/merit-badge data directly
-back into this Custom Page's saved source, instead of copying and
-pasting it in manually. It needs one site-specific value:
-`SELF_SECTION_ID`.  Each section on every custom page has a unique id called the `SelectedSectionID`.  You will need to find this for the section you have pasted the Leaderboard code in, so that the Auto-Save function can update it.
-
-1. Manually edit the Leaderboard Page once.
-2. Navigate to the new page: **Menu > Home > (your page name, e.g.
-   Troop Leaderboards).**
-3. In the upper right-hand corner, click the **Gear icon → Edit This
-   Page.**
-4. Click **Source** for Leaderboard section.
-5. Open the Developer Tools for your browser (Edge/Chrome/Firefox **Ctrl+Shift+I**, Safari **Cmd + Option + I**).
-6. Select the Network tab in Developer Tools, ensure it's recording, click **Save** on the Leaderboard section.
-7. Find the **POST to `formCustomEdit.aspx`** with
-   `Selected_Action=SaveContentEdit` in its form data.
-8. Find the `SelectedSectionID` value from that request, typical a 3 digit number (depending on the number of custom sections on your site).
-
-    <img width="749" height="506" alt="image" src="https://github.com/user-attachments/assets/14df8a94-445b-4745-9b24-0b4857db6427" />
-    
-9. Click **Source** for Leaderboard section.
-10. Find `SELF_SECTION_ID` near the top of the script, and enter the number from Step 8.
-11. Save the page.
-
-
-
-
-If you'd rather skip this, that's fine — the manual copy/paste flow
-in Step 4 always works as a fallback regardless.
-
-## Step 3 — Grant permission for live data
+## Step 2 — Grant permission for live data
 
 Everyone who should see the live (Active) leaderboard data needs the
 **View Event Participation Reports** task:
@@ -119,30 +89,28 @@ Assign the **View Event Participation Reports** task to both the
 **Adult** and **Scout** roles (or whichever roles you want to have
 access).
 
-## Step 4 — Publish former-member and merit-badge data
+## Step 3 — Former-member and merit-badge data publishes itself
 
-When anyone with **View Membership Information** and **Web Page Editor** tasks opens the page, it will automatically update the former member and merit badge data provided you followed **Step 2 — Set up Auto-Save**.  You only need to do the below steps, if you do not do **Step 2 — Set up Auto-Save** and you want to update the leaderboard manually for former members.  Do do that you can follow these steps:
+Nothing to configure here. The first time anyone with the **View
+Membership Information** and **Web Page Editor** tasks opens the
+page, it automatically:
 
-1. Open the Leaderboard page, scroll down, and open **Admin: Publish former
-   member data.**
-   
-<img width="404" height="172" alt="image" src="https://github.com/user-attachments/assets/f89f8002-3121-4d08-8d80-29329bbe6987" />
+1. Pulls the roster export and merit-badge/former-member numbers.
+2. Finds this page's own Custom Page section (no site-specific value
+   to look up or paste in — it works this out on its own).
+3. Saves the refreshed data straight back into the page's source, so
+   every future visitor — leader or not — sees it too.
 
-2. Click **Generate.**
-   
-<img width="398" height="161" alt="image" src="https://github.com/user-attachments/assets/872889fd-927d-490d-a0ca-a96491d92b66" />
+All of this happens in the background; the leader who triggered it
+doesn't need to do or click anything, and won't see a difference
+other than the Former/Merit Badges tabs having current data. Anyone
+without those two tasks just sees whatever was published most
+recently — nothing to do on their end either.
 
-3. Either click **Save this to the page now** to publish
-   automatically, or copy the code shown and paste it over the
-   `FORMER_SNAPSHOT_DATE` / `FORMER_SNAPSHOT_DATA` lines near the top
-   of the script yourself, then save.
-
- <img width="386" height="290" alt="image" src="https://github.com/user-attachments/assets/5e940e8c-c542-4e63-955b-e488ee674a07" />
-
-
-
-Repeat this periodically (whenever membership changes) — there's no
-automatic refresh schedule.
+Since it only refreshes when a leader with the right tasks happens to
+load the page, there's no fixed schedule — but that's fine, since this
+data only changes when someone's membership status changes or an
+Active Scout earns a new Merit Badge.
 
 
 
@@ -154,11 +122,10 @@ automatic refresh schedule.
 
 | Symptom | Likely cause |
 |---|---|
-| Everything blank, error shown | The viewer lacks the View Event Participation Reports permission (Step 3), or one of the Known site-wide values doesn't match your site — see below |
-| Former tab always empty | Nobody's published former-member data yet (Step 4) |
+| Everything blank, error shown | The viewer lacks the View Event Participation Reports permission (Step 2), or one of the Known site-wide values doesn't match your site — see below |
+| Former tab always empty | No one with the View Membership Information and Web Page Editor tasks has opened the page yet (Step 3) |
 | Merit Badges tab always empty | Same as above — Merit Badges is published only, not live |
-| Auto-save button fails | `SELF_SECTION_ID` or `SELF_FORM_ID` is wrong, or the page was recreated since you found it — use the manual copy/paste fallback instead |
-| Admin panel doesn't appear at all | Your account doesn't have the tasks listed in Step 4 — this is intentional, only permitted accounts see it |
+| Former/Merit Badges data looks stale | It only refreshes when a leader with the right tasks loads the page — have one of them open it again |
 
 
 ---
@@ -212,6 +179,7 @@ place in TroopWebHost's menus:
 addresses, medical details, driver's license numbers, etc. Make sure
 whoever has access to it on your site is appropriately restricted
 (normally just troop leadership). The code only ever extracts name +
-a few numeric totals from it, and only when someone with the right
-tasks explicitly runs the publish action — but the underlying report
-access itself should stay tightly controlled on your end regardless.
+a few numeric totals from it, and only pulls it at all when someone
+with the right tasks (View Membership Information, Web Page Editor)
+loads the page — but the underlying report access itself should stay
+tightly controlled on your end regardless.

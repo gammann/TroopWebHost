@@ -255,53 +255,6 @@
     }
     #twl-root .twl-badge.live { background: rgba(92,122,90,0.18); color: var(--moss); }
     #twl-root .twl-badge.snapshot { background: rgba(193,101,47,0.15); color: var(--ember); }
-    #twl-root .twl-admin-panel {
-      margin-top: 32px;
-      padding: 16px 18px;
-      border: 1px dashed var(--moss);
-      border-radius: 6px;
-      background: rgba(92,122,90,0.06);
-    }
-    #twl-root .twl-admin-panel summary {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--moss);
-      cursor: pointer;
-    }
-    #twl-root .twl-admin-panel textarea {
-      width: 100%;
-      margin-top: 10px;
-      font-family: monospace;
-      font-size: 11px;
-      padding: 8px;
-      border: 1px solid var(--line);
-      border-radius: 4px;
-      background: #fff;
-      color: var(--ink);
-      resize: vertical;
-    }
-    #twl-root .twl-admin-panel button {
-      margin-top: 8px;
-      font-family: 'Inter', sans-serif;
-      font-size: 12px;
-      font-weight: 600;
-      padding: 7px 12px;
-      border-radius: 4px;
-      border: 1px solid var(--moss);
-      background: var(--moss);
-      color: var(--canvas);
-      cursor: pointer;
-    }
-    #twl-root .twl-admin-note {
-      font-size: 12px;
-      color: rgba(43,38,32,0.6);
-      margin-top: 8px;
-    }
-    #twl-root .twl-admin-error {
-      font-size: 12px;
-      color: var(--ember);
-      margin-top: 8px;
-    }
   </style>
 
   <div class="twl-masthead">
@@ -316,7 +269,6 @@
     <div id="twl-tabs" class="twl-tabs" style="display:none;"></div>
     <div id="twl-body"><div class="twl-state" id="twl-state">Requesting the full-history summary report…</div></div>
     <div class="twl-footer" id="twl-footer"></div>
-    <div id="twl-admin-slot"></div>
   </div>
 </div>
 
@@ -503,16 +455,12 @@
   // Lets the admin panel write a refreshed FORMER_SNAPSHOT_DATE/FORMER_SNAPSHOT_DATA
   // directly back into this Custom Page's saved source, instead of
   // copy/pasting manually. Menu_Item_ID and Custom_Form_ID are read
-  // automatically from this page's own URL. SELF_SECTION_ID cannot be
-  // auto-detected — it identifies which content block on this Custom
-  // Page holds this script. Get it once by watching the browser's
-  // Network tab (or asking Claude with a HAR capture) while manually
-  // editing/saving this page, and searching the save request for
-  // "SelectedSectionID". If this page's content is ever recreated in a
-  // new section, update this value — saving to the wrong section ID
-  // would overwrite the WRONG content block.
+  // automatically from this page's own URL. The Section ID — which
+  // content block on this Custom Page holds this script — is discovered
+  // at runtime by discoverSelfSectionId() below instead of being
+  // hardcoded, so copying this page into a new Custom Page section never
+  // requires updating a stale ID by hand.
   var SELF_FORM_ID = "7323";        // TroopWebHost's custom-section editor form
-  var SELF_SECTION_ID = "148";      // confirm this matches YOUR page's section
   // ---------------------------------------------------------------------
 
   var statusTabsEl = document.getElementById('twl-status-tabs');
@@ -522,7 +470,6 @@
   var stateEl = document.getElementById('twl-state');
   var subtitleEl = document.getElementById('twl-subtitle');
   var footerEl = document.getElementById('twl-footer');
-  var adminSlotEl = document.getElementById('twl-admin-slot');
 
   var leaderboards = {}; // group -> status -> category -> [{name, value}]
   var activeGroup = GROUPS[0].key;
@@ -756,7 +703,7 @@
       var dependsOnUnpublishedData = !formerDataAvailable && (activeStatus !== 'Active' || cat.key === 'Merit Badges');
       if (dependsOnUnpublishedData) {
         var whatsMissing = cat.key === 'Merit Badges' ? 'Merit Badges hasn\u2019t been published yet.' : 'Former-member data hasn\u2019t been published yet.';
-        var howToFix = hasAdminAccess ? ' See the admin panel below.' : ' Ask a troop leader to publish it.';
+        var howToFix = hasAdminAccess ? ' It should auto-publish next time this page is reloaded.' : ' Ask a troop leader to open this page to publish it.';
         empty.textContent = whatsMissing + howToFix;
       } else {
         empty.textContent = 'No one matches this view for ' + cat.label.toLowerCase() + '.';
@@ -921,7 +868,57 @@
     };
   }
 
-  function fetchCurrentSectionSource(menuItemId, customFormId) {
+  // ---- SELF-SECTION AUTO-DISCOVERY (admin-only, read-only) ---------------
+  // This page can discover its own Custom Page "Section ID" — the
+  // identifier TroopWebHost's Custom Page editor uses to address THIS
+  // specific block of pasted HTML — entirely read-only, no save involved.
+  // Same mechanism as OA Tracker's oatrkDiscoverSectionId(): a captured
+  // HAR of opening (not saving) the page editor —
+  //   GET formCustomEdit.aspx?Menu_Item_ID=<own>&Form_ID=7323&Custom_Form_ID=<own>
+  // — returns the editor screen, which already embeds
+  //   onclick="easyEditSectionContent('N')"
+  // right next to this page's own content, no save required to see it.
+  //
+  // This only succeeds for a login with Custom Page *editing* rights,
+  // narrower than "troop leader" — checkRosterAccess() above is the gate
+  // that actually decides whether auto-publish runs at all; this
+  // discovery just finds WHERE to save once that gate has already
+  // passed. A discovery failure is treated as "skip auto-save this
+  // time", never as a fatal error, since the leaderboard data itself has
+  // already rendered by the time this runs.
+  //
+  // Result is cached per page load once found, so it's only fetched once
+  // no matter how many times auto-publish/manual-save run.
+  var cachedSectionId = null;
+
+  function discoverSelfSectionId(menuItemId, customFormId) {
+    if (cachedSectionId) return Promise.resolve(cachedSectionId);
+    var url = 'formCustomEdit.aspx?Menu_Item_ID=' + menuItemId + '&Form_ID=' + SELF_FORM_ID + '&Custom_Form_ID=' + customFormId;
+    return fetch(url, { credentials: 'include' })
+      .then(function (res) {
+        if (!res.ok) throw new Error('could not open the page editor to discover this page\u2019s section id (status ' + res.status + ')');
+        if (res.redirected) throw new Error('redirected to ' + res.url + ' (this login likely can\u2019t edit Custom Pages)');
+        return res.text();
+      })
+      .then(function (html) {
+        // If this page ever has more than one section, prefer whichever
+        // easyEditSectionContent('N') sits closest to this script's own
+        // root div rather than just taking the first match on the page.
+        var marker = html.indexOf('id="twl-root"');
+        var re = /easyEditSectionContent\('(\d+)'\)/g;
+        var best = null, bestDist = Infinity, m;
+        while ((m = re.exec(html))) {
+          var dist = marker === -1 ? m.index : Math.abs(m.index - marker);
+          if (dist < bestDist) { bestDist = dist; best = m[1]; }
+        }
+        if (!best) throw new Error('editor page loaded, but no section markers were found on it');
+        cachedSectionId = best;
+        return best;
+      });
+  }
+  // ---------------------------------------------------------------------
+
+  function fetchCurrentSectionSource(menuItemId, customFormId, sectionId) {
     var fd = new FormData();
     fd.append('menuopenflag', 'N');
     fd.append('Selected_Action', 'EditSectionSource');
@@ -939,7 +936,7 @@
     fd.append('Current_URL', location.origin + '/formCustomEdit.aspx?Menu_Item_ID=' + menuItemId + '&Form_ID=' + SELF_FORM_ID + '&Custom_Form_ID=' + customFormId);
     fd.append('Page_Layout', '1');
     fd.append('Report_option', '2');
-    fd.append('SelectedSectionID', SELF_SECTION_ID);
+    fd.append('SelectedSectionID', sectionId);
     fd.append('WidgetType', '131');
     fd.append('WidgetMaximumRows', '10');
     fd.append('MaximumWidth', '160');
@@ -957,7 +954,7 @@
       .then(function (html) {
         var doc = new DOMParser().parseFromString(html, 'text/html');
         var ta = doc.getElementById('SectionTextContent');
-        if (!ta) throw new Error('could not find this page\u2019s current saved content in the response \u2014 SELF_SECTION_ID may be wrong');
+        if (!ta) throw new Error('could not find this page\u2019s current saved content in the response \u2014 the discovered section id may be wrong');
         return ta.value;
       });
   }
@@ -973,7 +970,7 @@
     return updated;
   }
 
-  function saveSectionSource(menuItemId, customFormId, newContent) {
+  function saveSectionSource(menuItemId, customFormId, sectionId, newContent) {
     var fd = new FormData();
     fd.append('menuopenflag', 'N');
     fd.append('Selected_Action', 'SaveContentEdit');
@@ -992,7 +989,7 @@
     fd.append('Page_Layout', '1');
     fd.append('Report_option', '2');
     fd.append('Custom_Form_ID', customFormId);
-    fd.append('SelectedSectionID', SELF_SECTION_ID);
+    fd.append('SelectedSectionID', sectionId);
     fd.append('SectionTextContent', newContent);
     fd.append('FirstControl', '');
 
@@ -1003,155 +1000,7 @@
       });
   }
 
-  function renderAdminPanel() {
-    adminSlotEl.innerHTML = '';
-    var details = document.createElement('details');
-    details.className = 'twl-admin-panel';
-    var summary = document.createElement('summary');
-    summary.textContent = 'Admin: Former member data (auto-published \u2014 click for manual controls)';
-    details.appendChild(summary);
 
-    var note = document.createElement('p');
-    note.className = 'twl-admin-note';
-    note.textContent = 'This already ran automatically when you loaded the page (your account has roster-export access), so the data above is current. Use this panel to re-check manually if you want, or to publish by hand if auto-save couldn\u2019t (e.g. this page\u2019s URL didn\u2019t have the info it needed). Pulls only name + the needed metric values \u2014 no addresses, medical info, or other sensitive fields ever leave this action.';
-    details.appendChild(note);
-
-    var btn = document.createElement('button');
-    btn.type = 'button';
-    btn.textContent = 'Generate';
-    details.appendChild(btn);
-
-    var errorP = document.createElement('p');
-    errorP.className = 'twl-admin-error';
-    errorP.style.display = 'none';
-    details.appendChild(errorP);
-
-    var textarea = document.createElement('textarea');
-    textarea.rows = 8;
-    textarea.readOnly = true;
-    textarea.style.display = 'none';
-    details.appendChild(textarea);
-
-    var selfIds = getSelfPageIds();
-    var canAutoSave = !!(selfIds.menuItemId && selfIds.customFormId);
-    var saveBtn = document.createElement('button');
-    saveBtn.type = 'button';
-    saveBtn.textContent = 'Save this to the page now';
-    saveBtn.style.display = 'none';
-    saveBtn.style.marginLeft = '8px';
-    details.appendChild(saveBtn);
-
-    var saveStatusP = document.createElement('p');
-    saveStatusP.className = 'twl-admin-note';
-    saveStatusP.style.display = 'none';
-    details.appendChild(saveStatusP);
-
-    var pendingStamp = null;
-    var pendingList = null;
-
-    saveBtn.addEventListener('click', function () {
-      if (!pendingList) return;
-      var ok = window.confirm(
-        'This will overwrite this Custom Page\u2019s saved content (section ' + SELF_SECTION_ID + ') with refreshed former-member data. ' +
-        'Only the FORMER_SNAPSHOT_DATE/FORMER_SNAPSHOT_DATA lines change \u2014 everything else, including live Active data, is copied through as-is. Continue?'
-      );
-      if (!ok) return;
-
-      saveBtn.disabled = true;
-      saveStatusP.style.display = 'block';
-      saveStatusP.style.color = '';
-      saveStatusP.textContent = 'Fetching this page\u2019s current saved content…';
-
-      fetchCurrentSectionSource(selfIds.menuItemId, selfIds.customFormId)
-        .then(function (currentSource) {
-          saveStatusP.textContent = 'Saving…';
-          var updated = replaceSnapshotLines(currentSource, pendingStamp, pendingList);
-          return saveSectionSource(selfIds.menuItemId, selfIds.customFormId, updated);
-        })
-        .then(function () {
-          saveStatusP.style.color = 'var(--moss)';
-          saveBtn.disabled = false;
-
-          var secondsLeft = 3;
-          saveStatusP.textContent = 'Saved. Reloading in ' + secondsLeft + '\u2026';
-          var countdown = setInterval(function () {
-            secondsLeft--;
-            if (secondsLeft <= 0) {
-              clearInterval(countdown);
-              location.reload();
-            } else {
-              saveStatusP.textContent = 'Saved. Reloading in ' + secondsLeft + '\u2026';
-            }
-          }, 1000);
-        })
-        .catch(function (err) {
-          saveStatusP.style.color = 'var(--ember)';
-          saveStatusP.textContent = 'Auto-save failed (' + err.message + '). Use the copy/paste code above instead \u2014 nothing was changed.';
-          saveBtn.disabled = false;
-        });
-    });
-
-    btn.addEventListener('click', function () {
-      errorP.style.display = 'none';
-      textarea.style.display = 'none';
-      saveBtn.style.display = 'none';
-      saveStatusP.style.display = 'none';
-      btn.disabled = true;
-      btn.textContent = 'Fetching roster export…';
-
-      var byName;
-      fetch(ROSTER_REPORT_URL, { credentials: 'include' })
-        .then(function (res) {
-          if (!res.ok) throw new Error('roster export status ' + res.status);
-          return res.text();
-        })
-        .then(function (csvText) {
-          var wb = XLSX.read(csvText, { type: 'string' });
-          var sheet = wb.Sheets[wb.SheetNames[0]];
-          var rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
-          byName = parseRosterRecords(rows);
-
-          btn.textContent = 'Fetching event participation report…';
-          return submitDateRange();
-        })
-        .then(function () { return fetchEventWorkbook(); })
-        .then(function (workbook) {
-          mergeEventValuesIntoRoster(byName, eventWorkbookRows(workbook));
-          var list = buildFormerMemberList(byName);
-
-          var stamp = new Date().toLocaleString();
-          var code = '  var FORMER_SNAPSHOT_DATE = ' + JSON.stringify(stamp) + ';\n' +
-                     '  var FORMER_SNAPSHOT_DATA = ' + JSON.stringify(list) + ';';
-          textarea.value = code;
-          textarea.style.display = 'block';
-          textarea.focus();
-          textarea.select();
-
-          pendingStamp = stamp;
-          pendingList = list;
-          if (canAutoSave) {
-            saveBtn.style.display = 'inline-block';
-          } else {
-            saveStatusP.style.display = 'block';
-            saveStatusP.style.color = '';
-            saveStatusP.textContent = 'Auto-save isn\u2019t available in this context (couldn\u2019t read Menu_Item_ID/Custom_Form_ID from the page URL) \u2014 use the copy/paste code above.';
-          }
-
-          btn.disabled = false;
-          btn.textContent = 'Generate';
-        })
-        .catch(function (err) {
-          errorP.textContent = 'Could not generate former-member data (' + err.message + '). This usually means your account doesn\u2019t have roster-export permission — that\u2019s expected for most people.';
-          errorP.style.display = 'block';
-          btn.disabled = false;
-          btn.textContent = 'Generate';
-        });
-    });
-
-    adminSlotEl.appendChild(details);
-  }
-
-  // ---- Boot -------------------------------------------------------------
 
   leaderboards = emptyLeaderboardShell();
 
@@ -1183,10 +1032,13 @@
             if (changed) {
               var selfIds = getSelfPageIds();
               if (selfIds.menuItemId && selfIds.customFormId) {
-                fetchCurrentSectionSource(selfIds.menuItemId, selfIds.customFormId)
-                  .then(function (currentSource) {
-                    var updated = replaceSnapshotLines(currentSource, result.stamp, result.list);
-                    return saveSectionSource(selfIds.menuItemId, selfIds.customFormId, updated);
+                discoverSelfSectionId(selfIds.menuItemId, selfIds.customFormId)
+                  .then(function (sectionId) {
+                    return fetchCurrentSectionSource(selfIds.menuItemId, selfIds.customFormId, sectionId)
+                      .then(function (currentSource) {
+                        var updated = replaceSnapshotLines(currentSource, result.stamp, result.list);
+                        return saveSectionSource(selfIds.menuItemId, selfIds.customFormId, sectionId, updated);
+                      });
                   })
                   .then(function () {
                     console.log('[Troop Leaderboards] Former-member data auto-published.');
@@ -1222,13 +1074,12 @@
       footerEl.textContent = 'Active updated ' + new Date().toLocaleString() +
         (formerDataAvailable
           ? '  ·  former members ' + (hasAdminAccess ? 'auto-published just now' : 'from snapshot dated ' + (FORMER_SNAPSHOT_DATE || 'an earlier date'))
-          : '  ·  former members not yet published' + (hasAdminAccess ? ' — see admin panel below' : ''));
+          : '  ·  former members not yet published' + (hasAdminAccess ? ' — will auto-publish on next reload' : ''));
 
       renderStatusTabs();
       renderGroupTabs();
       renderTabs();
       renderPanel();
-      if (hasAdminAccess) renderAdminPanel();
     })
     .catch(function (err) {
       console.error('[Troop Leaderboards]', err);
