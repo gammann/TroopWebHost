@@ -239,6 +239,7 @@
     background:var(--brick-light-bg); color:var(--brick-light);
   }
   #oatrk-root .oatrk-lapsed-note{ display:block; font-size:10.5px; font-weight:400; color:var(--brick-light); margin-top:2px; }
+  #oatrk-root .oatrk-attn-note{ display:block; font-size:10.5px; font-weight:400; color:var(--brass-text); margin-top:2px; }
   #oatrk-root .oatrk-empty-row{ padding:18px 10px; color:var(--parchment-dim); font-size:12.5px; font-style:italic; }
   #oatrk-root details.oatrk-audit{ border:1px solid var(--hair); border-radius:4px; padding:11px 15px; margin-top:6px; }
   #oatrk-root details.oatrk-audit summary{
@@ -324,13 +325,26 @@
   <div class="oatrk-section">
     <div class="oatrk-section-head">
       <span class="oatrk-stamp block">Rank-blocked</span>
-      <span class="oatrk-section-title">Camping nights met — needs First Class</span>
+      <span class="oatrk-section-title">Rank is the only thing left</span>
       <span class="oatrk-section-count" id="oatrk-cnt3"></span>
     </div>
-    <p class="oatrk-section-desc">Scouts only — camping requirement is already satisfied (or reachable on this calendar) — rank is the only thing standing between them and eligibility.</p>
+    <p class="oatrk-section-desc">Scouts only — camping nights are already met from real logged trips. Rank is the only thing standing between them and eligibility.</p>
     <table>
       <thead><tr><th>Scout</th><th>Current rank</th><th class="oatrk-num-h">Requirements left to First Class</th></tr></thead>
       <tbody id="oatrk-tbl3"></tbody>
+    </table>
+  </div>
+
+  <div class="oatrk-section">
+    <div class="oatrk-section-head">
+      <span class="oatrk-stamp block">Rank + Camping</span>
+      <span class="oatrk-section-title">Needs rank and camping nights</span>
+      <span class="oatrk-section-count" id="oatrk-cnt3b"></span>
+    </div>
+    <p class="oatrk-section-desc">Scouts only — rank isn't there yet, and neither are camping nights from real logged trips. Camping is only reachable if the Scout attends campout(s) already on the calendar — shown the same way as "Can become eligible on this calendar" above, for consistency.</p>
+    <table>
+      <thead><tr><th>Scout</th><th>Current rank</th><th>Still needs</th><th class="oatrk-bar-cell">Nights needed vs. available</th><th class="oatrk-num-h">Requirements left to First Class</th></tr></thead>
+      <tbody id="oatrk-tbl3b"></tbody>
     </table>
   </div>
 
@@ -1295,6 +1309,17 @@ function oatrkComputeSelfEligibility(scout, campouts){
   var campingOk = hasLongTrip && st >= 10;
   var rankOk = rankAtLeastFirstClass(scout.rank);
 
+  /* campingOk above counts nights already scheduled on the calendar but
+     not yet attended — useful for "is this reachable at all", but not
+     the same as "already done". Track the from-logged-only picture too
+     so a Scout/parent can tell whether they still need to actually show
+     up to a campout, not just whether the numbers pencil out. */
+  var campingMetFromLogged = loggedLt > 0 && loggedSt >= 10;
+  var campingNeedsFromLoggedParts = [];
+  if(loggedLt <= 0) campingNeedsFromLoggedParts.push('a long-term trip');
+  var loggedStNeeded = Math.max(0, 10 - loggedSt);
+  if(loggedStNeeded > 0) campingNeedsFromLoggedParts.push(loggedStNeeded+' more short-term night'+(loggedStNeeded===1?'':'s'));
+
   var honor = scout.oa.vigil ? 'Vigil' : (scout.oa.brotherhood ? 'Brotherhood' : (scout.oa.ordeal ? 'Ordeal' : null));
   var honorDate = scout.oa.vigil || scout.oa.brotherhood || scout.oa.ordeal || null;
   var electedNoOrdeal = !!(scout.oa.election && !scout.oa.ordeal);
@@ -1323,6 +1348,7 @@ function oatrkComputeSelfEligibility(scout, campouts){
     rankOk:rankOk, lt:lt, st:st, loggedLt:loggedLt, loggedSt:loggedSt,
     scheduledLt:scheduledLt, scheduledSt:scheduledSt,
     campingOk:campingOk, hasLongTrip:hasLongTrip,
+    campingMetFromLogged:campingMetFromLogged, campingNeedsFromLoggedLabel:campingNeedsFromLoggedParts.join(' + '),
     stNeeded: Math.max(0, 10-st), uncompletedReqs: scout.uncompletedReqs,
     targetDate: targetDate
   };
@@ -1559,7 +1585,7 @@ function oatrkRenderSelfServiceResults(items){
   if(buckets.eligible.length){
     var rows = buckets.eligible.map(function(it){
       var scout = it.scout, elig = it.elig;
-      return '<tr><td class="oatrk-name">'+esc(scout.name)+oatrkLapsedNoteHtml(elig.lapsedElection)+'</td><td>'+esc(scout.rank||'—')+'</td>'+
+      return '<tr><td class="oatrk-name">'+esc(scout.name)+oatrkLapsedNoteHtml(elig.lapsedElection)+oatrkAttendNoteHtml(elig)+'</td><td>'+esc(scout.rank||'—')+'</td>'+
         '<td class="oatrk-num">'+elig.lt+'</td><td class="oatrk-num">'+elig.st+'</td></tr>';
     }).join('');
     sections.push(oatrkBuildSection('go', 'Eligible', 'Eligible now',
@@ -1569,15 +1595,37 @@ function oatrkRenderSelfServiceResults(items){
   }
 
   if(buckets['rank-blocked'].length){
-    var rows = buckets['rank-blocked'].map(function(it){
-      var scout = it.scout, elig = it.elig;
-      return '<tr><td class="oatrk-name">'+esc(scout.name)+oatrkLapsedNoteHtml(elig.lapsedElection)+'</td><td>'+esc(scout.rank||'—')+'</td>'+
-        '<td class="oatrk-num">'+(elig.uncompletedReqs!=null ? elig.uncompletedReqs : '<span class="oatrk-tag">no data found</span>')+'</td></tr>';
-    }).join('');
-    sections.push(oatrkBuildSection('block', 'Rank-blocked', 'Camping nights met — needs First Class',
-      buckets['rank-blocked'].length + ' scout' + (buckets['rank-blocked'].length===1?'':'s'),
-      'Camping requirement is already satisfied (or reachable — see below) — rank is the only thing standing between them and eligibility.',
-      '<th>Scout</th><th>Current rank</th><th class="oatrk-num-h">Requirements left to First Class</th>', rows));
+    var rankOnly = buckets['rank-blocked'].filter(function(it){ return it.elig.campingMetFromLogged; });
+    var rankAndCamping = buckets['rank-blocked'].filter(function(it){ return !it.elig.campingMetFromLogged; });
+
+    if(rankOnly.length){
+      var rows = rankOnly.map(function(it){
+        var scout = it.scout, elig = it.elig;
+        return '<tr><td class="oatrk-name">'+esc(scout.name)+oatrkLapsedNoteHtml(elig.lapsedElection)+'</td><td>'+esc(scout.rank||'—')+'</td>'+
+          '<td class="oatrk-num">'+(elig.uncompletedReqs!=null ? elig.uncompletedReqs : '<span class="oatrk-tag">no data found</span>')+'</td></tr>';
+      }).join('');
+      sections.push(oatrkBuildSection('block', 'Rank-blocked', 'Rank is the only thing left',
+        rankOnly.length + ' scout' + (rankOnly.length===1?'':'s'),
+        'Camping nights are already met from real logged trips. Rank is the only thing standing between your Scout and eligibility.',
+        '<th>Scout</th><th>Current rank</th><th class="oatrk-num-h">Requirements left to First Class</th>', rows));
+    }
+
+    if(rankAndCamping.length){
+      var rows2 = rankAndCamping.map(function(it){
+        var scout = it.scout, elig = it.elig;
+        var pct = Math.min(100, Math.round((elig.loggedSt/10)*100));
+        var barLabel = elig.loggedSt+'/10 short-term nights logged · '+elig.scheduledSt+' more already scheduled on the calendar';
+        return '<tr><td class="oatrk-name">'+esc(scout.name)+oatrkLapsedNoteHtml(elig.lapsedElection)+'</td><td>'+esc(scout.rank||'—')+'</td>'+
+          '<td><span class="oatrk-tag">'+esc(elig.campingNeedsFromLoggedLabel)+'</span></td>'+
+          '<td class="oatrk-bar-cell"><div class="oatrk-bar-track"><div class="oatrk-bar-fill" style="width:'+pct+'%"></div></div>'+
+          '<div class="oatrk-bar-label">'+esc(barLabel)+'</div></td>'+
+          '<td class="oatrk-num">'+(elig.uncompletedReqs!=null ? elig.uncompletedReqs : '<span class="oatrk-tag">no data found</span>')+'</td></tr>';
+      }).join('');
+      sections.push(oatrkBuildSection('block', 'Rank + Camping', 'Needs rank and camping nights',
+        rankAndCamping.length + ' scout' + (rankAndCamping.length===1?'':'s'),
+        'Rank isn\'t there yet, and neither are camping nights from real logged trips — camping is only reachable if your Scout attends campout(s) already on the calendar, shown the same way as "Working toward eligibility" below, for consistency.',
+        '<th>Scout</th><th>Current rank</th><th>Still needs</th><th class="oatrk-bar-cell">Nights needed vs. calendar</th><th class="oatrk-num-h">Requirements left to First Class</th>', rows2));
+    }
   }
 
   if(buckets['not-yet'].length){
@@ -1844,6 +1892,15 @@ function oatrkLapsedNoteHtml(lapsed){
   return '<div class="oatrk-lapsed-note">election expired '+esc(lapsed.deadlineStr)+' — needs re-election</div>';
 }
 
+/* Self-service "Eligible now" can count nights from a campout still on
+   the calendar, not yet attended — same assumption leader-mode's
+   "Within Reach" makes. Flag that plainly so a family doesn't think
+   the Scout is already fully done when a campout still needs attending. */
+function oatrkAttendNoteHtml(elig){
+  if(!elig || elig.campingMetFromLogged) return '';
+  return '<div class="oatrk-attn-note">counts on attending an upcoming campout — still needs '+esc(elig.campingNeedsFromLoggedLabel)+'</div>';
+}
+
 /* Brotherhood eligibility: 6 full months since the Ordeal date, and no
    higher honor already earned. */
 var OATRK_BROTHERHOOD_WAIT_MONTHS = 6;
@@ -1950,7 +2007,7 @@ function runReport(oaRows, adultRows, eventRows, reqRows, rosterRows, includedTy
   var awaitingOrdealSet = {};
   list4.forEach(function(p){ awaitingOrdealSet[normName(p.name)] = true; });
 
-  var list1 = [], list2 = [], list3 = [], alreadyOACount = 0;
+  var list1 = [], list2 = [], list3 = [], list3b = [], alreadyOACount = 0;
 
   oaRows.forEach(function(row){
     var status = (row['OA Eligibility']||'').trim();
@@ -1984,7 +2041,23 @@ function runReport(oaRows, adultRows, eventRows, reqRows, rosterRows, includedTy
       var r = reqMap[key] || {};
       var tf = r['Tenderfoot']||0, sc = r['Second Class']||0, fc = r['First Class']||0;
       var hasData = (tf+sc+fc) > 0;
-      list3.push({ name:name, rank:rank, total: tf+sc+fc, hasData:hasData, lapsed:lapsed });
+      /* "Reachable" (ev.reachable, checked above) can mean camping is
+         already fully met from real logged nights, OR that it only
+         clears the bar if the Scout attends campout(s) still on the
+         calendar. Those are two different situations for a Scout to
+         hear ("just needs rank" vs. "needs rank AND to show up to a
+         campout"), so they get their own sections entirely rather than
+         a single list with a column that contradicts the section title. */
+      var campingMet = lt >= 5 && st >= 10;
+      if(campingMet){
+        list3.push({ name:name, rank:rank, total: tf+sc+fc, hasData:hasData, lapsed:lapsed });
+      } else {
+        var campingNeedsParts = [];
+        if(lt < 5) campingNeedsParts.push('a long-term trip');
+        if(ev.stNeeded > 0) campingNeedsParts.push(ev.stNeeded+' more short-term night'+(ev.stNeeded===1?'':'s'));
+        list3b.push({ name:name, rank:rank, total: tf+sc+fc, hasData:hasData, lapsed:lapsed,
+          st:st, stNeeded:ev.stNeeded, campingNeedsLabel: campingNeedsParts.join(' + ') || 'nothing — recheck export' });
+      }
     }
   });
 
@@ -2028,14 +2101,15 @@ function runReport(oaRows, adultRows, eventRows, reqRows, rosterRows, includedTy
     };
   });
 
-  render(list1, list2, list3, list4, list5, list6, upcoming, availableShortNights, hasLongAvailable, longEvents, shortEvents);
+  render(list1, list2, list3, list3b, list4, list5, list6, upcoming, availableShortNights, hasLongAvailable, longEvents, shortEvents);
 }
 
-function render(list1, list2, list3, list4, list5, list6, upcoming, availableShortNights, hasLongAvailable, longEvents, shortEvents){
+function render(list1, list2, list3, list3b, list4, list5, list6, upcoming, availableShortNights, hasLongAvailable, longEvents, shortEvents){
   document.getElementById('oatrk-results').classList.add('oatrk-show');
   document.getElementById('oatrk-cnt1').textContent = list1.length + ' scout' + (list1.length===1?'':'s');
   document.getElementById('oatrk-cnt2').textContent = list2.length + ' scout' + (list2.length===1?'':'s');
   document.getElementById('oatrk-cnt3').textContent = list3.length + ' scout' + (list3.length===1?'':'s');
+  document.getElementById('oatrk-cnt3b').textContent = list3b.length + ' scout' + (list3b.length===1?'':'s');
   document.getElementById('oatrk-cnt4').textContent = list4.length + ' member' + (list4.length===1?'':'s');
   document.getElementById('oatrk-cnt5').textContent = list5.length + ' member' + (list5.length===1?'':'s');
   document.getElementById('oatrk-cnt6').textContent = list6.length + ' adult' + (list6.length===1?'':'s');
@@ -2075,6 +2149,16 @@ function render(list1, list2, list3, list4, list5, list6, upcoming, availableSho
     return '<tr><td class="oatrk-name">'+esc(s.name)+oatrkLapsedNoteHtml(s.lapsed)+'</td><td>'+esc(s.rank||'—')+'</td>'+
       '<td class="oatrk-num">'+(s.hasData ? s.total : '<span class="oatrk-tag">no data found</span>')+'</td></tr>';
   }).join('') : '<tr><td class="oatrk-empty-row" colspan="3">No one is being held up by rank alone right now.</td></tr>';
+
+  var t3b = document.getElementById('oatrk-tbl3b');
+  t3b.innerHTML = list3b.length ? list3b.map(function(s){
+    var pct = Math.min(100, Math.round((s.st/10)*100));
+    return '<tr><td class="oatrk-name">'+esc(s.name)+oatrkLapsedNoteHtml(s.lapsed)+'</td><td>'+esc(s.rank||'—')+'</td>'+
+      '<td><span class="oatrk-tag">'+esc(s.campingNeedsLabel)+'</span></td>'+
+      '<td class="oatrk-bar-cell"><div class="oatrk-bar-track"><div class="oatrk-bar-fill" style="width:'+pct+'%"></div></div>'+
+      '<div class="oatrk-bar-label">'+s.st+'/10 short-term nights logged · '+availableShortNights+' more available on the calendar</div></td>'+
+      '<td class="oatrk-num">'+(s.hasData ? s.total : '<span class="oatrk-tag">no data found</span>')+'</td></tr>';
+  }).join('') : '<tr><td class="oatrk-empty-row" colspan="5">No one is being held up by both rank and camping right now.</td></tr>';
 
   var t4 = document.getElementById('oatrk-tbl4');
   t4.innerHTML = list4.length ? list4.map(function(s){

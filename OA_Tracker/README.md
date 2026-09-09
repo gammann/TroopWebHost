@@ -1,6 +1,6 @@
 # OA Tracker
 
-A single-file custom page for TroopWebHost that automatically pulls the reports needed for Order of the Arrow eligibility and First Class advancement, cross-references them, and sorts every scout and adult leader into one of six buckets — no manual exports, no spreadsheet wrangling.
+A single-file custom page for TroopWebHost that automatically pulls the reports needed for Order of the Arrow eligibility and First Class advancement, cross-references them, and sorts every scout and adult leader into one of seven buckets — no manual exports, no spreadsheet wrangling.
 
 It adapts to who's logged in:
 
@@ -13,12 +13,13 @@ Official OA eligibility requirements: [oa-scouting.org/about/membership](https:/
 
 1. **Eligible now** — scouts only. Rank and both camping-night minimums are already met.
 2. **Within reach** — scouts already First Class or higher whose camping nights are short, but the campouts already on the calendar between today and your target date supply enough nights to close the gap.
-3. **Camping nights met — needs First Class** — scouts only. Camping requirement is satisfied (or reachable), rank is the only blocker. Shows how many Tenderfoot + Second Class + First Class requirements are still open.
-4. **Awaiting Ordeal** — anyone with a *still-live* OA Election date but no Ordeal date yet, youth and adults alike, sorted most-urgent-deadline-first. **Elections expire 18 months after the election date** if the Ordeal isn't completed — once that deadline passes, the election itself is void and the member needs to be elected again, so they no longer belong in this section. They're automatically re-evaluated in Sections 1–3 (or Section 6 for adults) exactly like anyone who's never been elected, with a small "election expired — needs re-election" note carried under their name so the history isn't lost.
-5. **Already in the Order of the Arrow** — fully inducted members, with their OA Honor (Ordeal, Brotherhood, or Vigil — whichever is highest on file) and the date of that most recent honor. Anyone whose current honor is Ordeal-only and at least 6 months old is flagged eligible for Brotherhood.
-6. **Adults with camping nights in this window** — informational only, not a pass/fail list. Adults no longer have a camping-night threshold under current OA rules, so this just surfaces every adult with any camping nights logged in the 2-year window, most-nights-first, as a starting point for discussion rather than a determination.
+3. **Rank is the only thing left** — scouts only. Camping nights are already met from real logged trips; rank is the only thing standing between them and eligibility.
+4. **Needs rank and camping nights** — scouts only. Rank isn't there yet, and neither are camping nights from real logged trips — camping is only reachable if the scout attends campout(s) already on the calendar. This used to be lumped into the same section as #3 under the title "Camping nights met," which was misleading for exactly these scouts — they're now split into their own section, shown with the exact same "Still needs" tag and progress bar as #2 above, for a consistent message. Both sections show how many Tenderfoot + Second Class + First Class requirements are still open.
+5. **Awaiting Ordeal** — anyone with a *still-live* OA Election date but no Ordeal date yet, youth and adults alike, sorted most-urgent-deadline-first. **Elections expire 18 months after the election date** if the Ordeal isn't completed — once that deadline passes, the election itself is void and the member needs to be elected again, so they no longer belong in this section. They're automatically re-evaluated in Sections 1–4 (or Section 7 for adults) exactly like anyone who's never been elected, with a small "election expired — needs re-election" note carried under their name so the history isn't lost.
+6. **Already in the Order of the Arrow** — fully inducted members, with their OA Honor (Ordeal, Brotherhood, or Vigil — whichever is highest on file) and the date of that most recent honor. Anyone whose current honor is Ordeal-only and at least 6 months old is flagged eligible for Brotherhood.
+7. **Adults with camping nights in this window** — informational only, not a pass/fail list. Adults no longer have a camping-night threshold under current OA rules, so this just surfaces every adult with any camping nights logged in the 2-year window, most-nights-first, as a starting point for discussion rather than a determination.
 
-**A member appears in exactly one section.** Anyone in Awaiting Ordeal — overdue or not — is excluded from every other section; that's their one home until their Ordeal is resolved (or their election expires). Section 6 also excludes anyone already shown in Section 4 or 5.
+**A member appears in exactly one section.** Anyone in Awaiting Ordeal — overdue or not — is excluded from every other section; that's their one home until their Ordeal is resolved (or their election expires). Section 7 also excludes anyone already shown in Section 5 or 6.
 
 ![Leader mode](screenshots/leader-mode.png)
 
@@ -30,8 +31,9 @@ If TroopWebHost redirects the OA Eligibility screen away from you — which it d
 
 - **Already in the Order of the Arrow** — your Scout's own OA Honor and date, straight from their own status page.
 - **Awaiting Ordeal** — a *still-live* OA Election date with no Ordeal date yet, with the same 18-month deadline tracking as leader mode. Once that deadline passes, the election is void — your Scout is automatically re-evaluated in whichever of the other buckets fits their current rank and camping nights, with a small "election expired — needs re-election" note kept under their name.
-- **Eligible now** — rank and camping nights both satisfied.
-- **Camping nights met — needs First Class** — rank is the only blocker, with a live count of Tenderfoot/Second Class/First Class requirements still open.
+- **Eligible now** — rank and camping nights both satisfied. If any of the counted nights are only scheduled (not yet attended), a note under the Scout's name says so plainly — "counts on attending an upcoming campout — still needs..." — so a family doesn't mistake "on track" for "already done."
+- **Rank is the only thing left** — camping nights are already met from real logged trips; rank is the only blocker, with a live count of Tenderfoot/Second Class/First Class requirements still open.
+- **Needs rank and camping nights** — rank isn't there yet, and neither are camping nights from real logged trips — camping is only reachable if your Scout attends campout(s) already on the calendar. Split out from the section above (rather than one section with a misleading title), shown with the same "Still needs" tag and progress bar as "Working toward eligibility" below, for a consistent message.
 - **Working toward eligibility** — neither rank nor camping nights are there yet, with a progress bar and a plain-language list of what's still needed.
 - **Error** — if a page couldn't be parsed for one of your Scouts, it's called out by name rather than silently dropped.
 
