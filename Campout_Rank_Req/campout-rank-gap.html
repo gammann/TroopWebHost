@@ -1,0 +1,2221 @@
+<!--
+
+Campout Rank-Requirement Gap
+
+----------------------------------------
+
+Paste this WHOLE block into TroopWebHost: Manage Custom Pages -> (new or
+
+existing Custom Page) -> HTML editor. It must run ON troopwebhost.org
+
+(same-origin) so the requests below inherit your logged-in session.
+
+It will NOT work pasted into an external site or previewed elsewhere --
+
+the fetch calls will be blocked without your session cookie.
+
+READ BEFORE USING
+
+------------------
+
+1. Everything this page fetches is a read-only report or page load -- no
+
+   side effects, no saves. Confirmed against captured requests on this
+
+   troop's site (see CONFIG comment below for exact URLs).
+
+2. This page is leader-only. The "Upcoming Events" list and the
+
+   Uncompleted Requirements report both require Adult Leader access on
+
+   TroopWebHost; a Scout or parent login gets redirected elsewhere, which
+
+   this page detects (same res.redirected technique as the other custom
+
+   pages) and shows a plain "restricted" message instead of guessing at
+
+   a Scout/parent-scoped view.
+
+3. "Upcoming" campouts come from the same "Upcoming Events" widget you'd
+
+   see on the TroopWebHost home page, which returns up to 100 rows by
+
+   default. If your troop calendar has more than 100 events between now
+
+   and its far horizon, older upcoming events could be pushed off the
+
+   list -- in practice this covered a full 3+ months out when this page
+
+   was built. If that ever becomes a problem, bump CRG_ROWS_HINT below
+
+   (not yet wired to an actual "rows per page" request parameter -- see
+
+   the comment on CRG_EVENTS_LIST_URL).
+
+4. The rank-requirement gap for each Scout comes entirely from the
+
+   Uncompleted Requirements report pulled ONCE per page load, then
+
+   matched to whoever is attending the campout you select -- there is no
+
+   per-Scout network request. That report only lists requirements a
+
+   Scout has NOT yet had signed off, so a Scout with nothing shown under
+
+   a given rank has either already completed it or hasn't reached that
+
+   tier's prerequisites -- both read the same way here ("nothing left up
+
+   to First Class"), which matches what this page needs to show.
+
+5. If a fetch comes back empty or SheetJS fails to parse the requirements
+
+   report, check Tools -> Reporting Options on TroopWebHost -- if it's
+
+   set to "PDF only," that report may return a PDF instead, which
+
+   SheetJS can't read.
+
+-->
+
+<div id="crg-root">
+
+<style>
+
+#crg-root, #crg-root *{ box-sizing:border-box; }
+
+#crg-root{
+
+  /* THEME -- see the big comment block in oatrkApplyLiveSiteTheme() in
+
+     OA_Tracker/OA_tracker.html for the full rationale; this is the same
+
+     probe-and-adapt approach, same variable roles, just re-scoped under
+
+     #crg-root and with this page's own accent name (--gold instead of
+
+     --brass) purely for readability -- functionally identical split:
+
+     --gold / --gold-light  : RAW probed fill color, paired with the
+
+       fixed --accent-ink text color (buttons, badges).
+
+     --gold-text            : the SAME accent, contrast-adjusted for use
+
+       as bare text/links/borders directly on the canvas.
+
+     --accent-ink is fixed dark in both modes, same reasoning as OA
+
+     Tracker: text sitting on a gold-colored fill needs to stay dark
+
+     regardless of which canvas mode the rest of the page is in.
+
+     Canvas/text tokens (--woods-*, --parchment*) DO swap between light
+
+     and dark via the .crg-light class below, following the live site's
+
+     own detected background luminance. */
+
+  --woods-950:#122016; --woods-900:#182b1e; --woods-800:#203a28;
+
+  --parchment:#eee7d2; --parchment-dim:#cdc4a5;
+
+  --gold:#c08a2e; --gold-light:#e0b464; --gold-text:#e0b464; --gold-glow:rgba(192,138,46,0.08);
+
+  --sage:#a9c397; --rust:#d98266; --rust-bg:rgba(217,130,102,0.25);
+
+  --hair:rgba(238,231,210,0.14); --hair-strong:rgba(238,231,210,0.28);
+
+  --accent-ink:#241a08;
+
+  --navy:#1e3626; --navy-dark:#101f17;
+
+  --surface-1:rgba(255,255,255,0.025); --surface-2:rgba(0,0,0,0.25);
+
+  --surface-3:rgba(0,0,0,0.3); --surface-4:rgba(255,255,255,0.08);
+
+  background:linear-gradient(180deg, var(--woods-950), var(--woods-900) 40%, var(--woods-950));
+
+  color:var(--parchment);
+
+  font-family:'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+
+  padding:28px 24px 60px;
+
+  border-radius:6px;
+
+  max-width:1100px;
+
+  margin:20px auto;
+
+  /* Hidden until crgApplyLiveSiteTheme() decides light vs. dark, so the
+
+     page never flashes its dark default before switching to a light
+
+     site's real colors. Visibility (not display) so layout/scroll
+
+     position aren't affected. */
+
+  visibility:hidden;
+
+}
+
+#crg-root.crg-ready{ visibility:visible; }
+
+#crg-root.crg-light{
+
+  --woods-950:#f6f1e2; --woods-900:#fbf8ee; --woods-800:#efe8d1;
+
+  --parchment:#20301f; --parchment-dim:#51624c;
+
+  --sage:#2f6b2f;
+
+  --hair:rgba(32,48,31,0.12); --hair-strong:rgba(32,48,31,0.24);
+
+  --surface-1:rgba(0,0,0,0.025); --surface-2:rgba(0,0,0,0.06);
+
+  --surface-3:rgba(0,0,0,0.08); --surface-4:rgba(0,0,0,0.06);
+
+}
+
+#crg-root a{ color:var(--gold-text); }
+
+#crg-root header.crg-masthead{
+
+  border:1px solid var(--hair-strong);
+
+  border-bottom:6px solid var(--gold);
+
+  border-radius:4px;
+
+  padding:24px 26px 20px; margin-bottom:24px;
+
+  background-image:linear-gradient(160deg, var(--navy) 0%, var(--navy-dark) 100%);
+
+  color:#fff;
+
+}
+
+#crg-root .crg-eyebrow{
+
+  font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.16em;
+
+  text-transform:uppercase; color:rgba(255,255,255,0.82); margin:0 0 10px;
+
+}
+
+#crg-root h1{
+
+  font-family:'Roboto Slab', Georgia, serif; font-weight:700;
+
+  font-size:clamp(24px,3.4vw,32px); margin:0 0 8px; line-height:1.1;
+
+}
+
+#crg-root header.crg-masthead p.crg-sub{
+
+  margin:0; max-width:66ch; color:rgba(255,255,255,0.82); font-size:14px; line-height:1.55;
+
+}
+
+#crg-root .crg-status{ font-size:12px; color:var(--parchment-dim); }
+
+#crg-root .crg-status.crg-err{ color:var(--rust); }
+
+#crg-root .crg-restricted{
+
+  border:1px solid var(--hair-strong); border-radius:4px; padding:18px 20px;
+
+  background:var(--surface-1); font-size:13.5px; line-height:1.6;
+
+}
+
+#crg-root .crg-restricted strong{ color:var(--gold-text); }
+
+#crg-root .crg-sheet{
+
+  border:1px solid var(--hair-strong); border-radius:4px;
+
+  background:var(--surface-1); padding:22px 24px 24px; margin-bottom:24px;
+
+}
+
+#crg-root .crg-sheet h2{ font-family:'Roboto Slab',Georgia,serif; font-size:17px; margin:0 0 4px; }
+
+#crg-root .crg-sheet-sub{ font-size:12.5px; color:var(--parchment-dim); margin:0 0 16px; }
+
+#crg-root table{ width:100%; border-collapse:collapse; font-size:13px; }
+
+#crg-root thead th{
+
+  text-align:left; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.06em;
+
+  text-transform:uppercase; color:var(--parchment-dim); font-weight:600;
+
+  padding:0 10px 7px; border-bottom:1px solid var(--hair-strong);
+
+}
+
+#crg-root tbody td{ padding:10px 10px; border-bottom:1px solid var(--hair); vertical-align:middle; }
+
+#crg-root tbody tr:last-child td{ border-bottom:none; }
+
+#crg-root tbody tr.crg-event-row{ cursor:pointer; }
+
+#crg-root tbody tr.crg-event-row:hover{ background:var(--surface-2); }
+
+#crg-root tbody tr.crg-event-row.crg-selected{ background:var(--gold-glow); }
+
+#crg-root td.crg-name{ font-weight:600; }
+
+#crg-root .crg-btn{
+
+  -webkit-appearance:none; appearance:none;
+
+  font-family:'Roboto Slab',Georgia,serif; font-weight:700; font-size:13px; letter-spacing:.01em;
+
+  color:var(--accent-ink); background:var(--gold-light);
+
+  border:none; border-radius:5px; padding:8px 16px; cursor:pointer;
+
+}
+
+#crg-root .crg-btn:hover:not(:disabled){ background:var(--gold); }
+
+#crg-root .crg-btn:disabled{ opacity:0.4; cursor:not-allowed; }
+
+#crg-root .crg-btn-ghost{
+
+  -webkit-appearance:none; appearance:none;
+
+  font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.04em; text-transform:uppercase;
+
+  color:var(--gold-text); background:transparent; border:1px solid var(--hair-strong);
+
+  border-radius:4px; padding:6px 12px; cursor:pointer;
+
+}
+
+#crg-root .crg-btn-ghost:hover{ border-color:var(--gold); }
+
+#crg-root .crg-empty-row{ padding:18px 10px; color:var(--parchment-dim); font-size:12.5px; font-style:italic; }
+
+#crg-root .crg-results{ display:none; }
+
+#crg-root .crg-results.crg-show{ display:block; }
+
+#crg-root .crg-gap-head{
+
+  display:flex; align-items:baseline; justify-content:space-between; gap:14px; flex-wrap:wrap;
+
+  margin-bottom:4px;
+
+}
+
+#crg-root .crg-gap-head h2{ font-family:'Roboto Slab',Georgia,serif; font-size:19px; margin:0; }
+
+#crg-root .crg-gap-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+
+#crg-root .crg-gap-meta{ font-size:12.5px; color:var(--parchment-dim); margin:0 0 18px; }
+
+#crg-root .crg-summary-row{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:18px; }
+
+#crg-root .crg-summary-chip{
+
+  font-family:'JetBrains Mono',monospace; font-size:11px; padding:6px 12px;
+
+  border-radius:4px; background:var(--surface-4); color:var(--parchment-dim);
+
+  border:1px solid var(--hair);
+
+}
+
+#crg-root .crg-toolbar{ display:flex; gap:10px; margin-bottom:14px; }
+
+#crg-root details.crg-scout{
+
+  border:1px solid var(--hair); border-radius:5px; margin-bottom:10px; overflow:hidden;
+
+}
+
+#crg-root details.crg-scout > summary{
+
+  cursor:pointer; list-style:none; padding:12px 16px;
+
+  display:flex; align-items:center; gap:12px; flex-wrap:wrap;
+
+  background:var(--surface-1);
+
+}
+
+#crg-root details.crg-scout > summary::-webkit-details-marker{ display:none; }
+
+#crg-root details.crg-scout > summary::before{
+
+  content:'\25B8'; font-size:20px; line-height:1; color:var(--gold-text); transition:transform .12s ease; flex-shrink:0;
+
+}
+
+#crg-root details.crg-scout[open] > summary::before{ transform:rotate(90deg); }
+
+#crg-root .crg-scout-name{ font-weight:600; font-size:14px; }
+
+#crg-root .crg-scout-patrol{
+
+  font-family:'JetBrains Mono',monospace; font-size:10px; padding:2px 7px;
+
+  border-radius:3px; background:var(--surface-4); color:var(--parchment-dim);
+
+}
+
+#crg-root .crg-scout-clear{
+
+  font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--sage);
+
+}
+
+#crg-root .crg-tier-tag{
+
+  font-family:'JetBrains Mono',monospace; font-size:10px; padding:2px 7px;
+
+  border-radius:3px; background:var(--rust-bg); color:var(--rust);
+
+}
+
+#crg-root .crg-scout-body{ padding:4px 16px 14px; }
+
+#crg-root .crg-tier-block{ margin-top:12px; }
+
+#crg-root .crg-tier-block:first-child{ margin-top:4px; }
+
+#crg-root .crg-tier-title{
+
+  font-family:'Roboto Slab',Georgia,serif; font-size:13px; margin:0 0 6px;
+
+  display:flex; align-items:center; gap:8px;
+
+}
+
+#crg-root .crg-tier-count{ font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--parchment-dim); }
+
+#crg-root .crg-req-line{
+
+  display:grid; grid-template-columns:52px 1fr; gap:10px;
+
+  padding:7px 0; border-top:1px solid var(--hair);
+
+}
+
+#crg-root .crg-req-line:first-of-type{ border-top:none; }
+
+#crg-root .crg-req-code{
+
+  font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--gold-text);
+
+  padding-top:1px;
+
+}
+
+#crg-root .crg-req-text{ font-size:12.5px; line-height:1.5; color:var(--parchment); }
+
+#crg-root .crg-footnote{ font-size:11.5px; color:var(--parchment-dim); margin-top:18px; }
+
+#crg-root .crg-section-title{
+
+  font-family:'Roboto Slab',Georgia,serif; font-size:16px; margin:26px 0 3px;
+
+  padding-top:18px; border-top:1px solid var(--hair-strong);
+
+}
+
+#crg-root .crg-section-title:first-child{ margin-top:0; padding-top:0; border-top:none; }
+
+#crg-root .crg-section-desc{ font-size:12px; color:var(--parchment-dim); margin:0 0 14px; max-width:70ch; line-height:1.5; }
+
+#crg-root .crg-reqgroup-line{
+
+  display:grid; grid-template-columns:52px 1fr; gap:10px;
+
+  padding:10px 0; border-top:1px solid var(--hair);
+
+}
+
+#crg-root .crg-reqgroup-line:first-of-type{ border-top:none; }
+
+#crg-root .crg-reqgroup-badge{
+
+  display:inline-block; font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600;
+
+  padding:2px 8px; border-radius:3px; background:var(--gold-glow); color:var(--gold-text); margin-bottom:5px;
+
+}
+
+#crg-root .crg-reqgroup-names{ font-size:11.5px; color:var(--parchment-dim); line-height:1.5; }
+
+#crg-root .crg-category-block{ margin:14px 0 4px; padding-left:12px; border-left:2px solid var(--hair-strong); }
+
+#crg-root .crg-category-title{
+
+  font-family:'Roboto Slab',Georgia,serif; font-size:13.5px; margin:0 0 6px;
+
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+
+}
+
+#crg-root .crg-category-badge{
+
+  display:inline-block; font-family:'JetBrains Mono',monospace; font-size:10.5px; font-weight:600;
+
+  padding:2px 8px; border-radius:3px; background:var(--surface-4); color:var(--sage);
+
+}
+
+#crg-root .crg-rank-tag{
+
+  display:inline-block; font-family:'JetBrains Mono',monospace; font-size:10px;
+
+  padding:2px 7px; border-radius:3px; background:var(--surface-4); color:var(--gold-text);
+
+}
+
+#crg-root .crg-reqgroup-badges{ display:flex; gap:6px; flex-wrap:wrap; margin-bottom:4px; }
+
+#crg-root .crg-ranks-present{ font-size:11px; color:var(--parchment-dim); font-weight:400; }
+
+/* Collapsible group-level sections (By Requirement / By Category) -- same
+
+   disclosure-triangle pattern as the per-scout <details> cards, just
+
+   scoped to a whole section instead of one Scout, to keep the drill-down
+
+   screen from being wall-to-wall content by default. */
+
+#crg-root details.crg-section{
+
+  border:1px solid var(--hair-strong); border-radius:5px; margin:0 0 14px; overflow:hidden;
+
+}
+
+#crg-root details.crg-section > summary{
+
+  cursor:pointer; list-style:none; padding:13px 18px;
+
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+
+  background:var(--surface-1);
+
+}
+
+#crg-root details.crg-section > summary::-webkit-details-marker{ display:none; }
+
+#crg-root details.crg-section > summary::before{
+
+  content:'\25B8'; font-size:20px; line-height:1; color:var(--gold-text); transition:transform .12s ease; flex-shrink:0;
+
+}
+
+#crg-root details.crg-section[open] > summary::before{ transform:rotate(90deg); }
+
+#crg-root details.crg-section > summary h3{ margin:0; font-family:'Roboto Slab',Georgia,serif; font-size:15.5px; }
+
+#crg-root .crg-section-count{ font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--parchment-dim); }
+
+#crg-root .crg-section-body{ padding:2px 18px 16px; }
+
+#crg-root .crg-section-body .crg-section-desc{ margin-top:0; }
+
+</style>
+
+<header class="crg-masthead">
+
+<p class="crg-eyebrow">Troop Advancement Desk</p>
+
+<h1>Campout Rank-Requirement Gap</h1>
+
+<p class="crg-sub">Pulls the upcoming campouts, who's signed up for each one, and the Uncompleted Requirements report -- then shows exactly which Scout, Tenderfoot, Second Class, and First Class requirements each attending Scout still needs, so leaders and parents on the trip know what to work on.</p>
+
+</header>
+
+<div class="crg-status" id="crg-modeCheck">Checking your TroopWebHost access level&hellip;</div>
+
+<div class="crg-restricted" id="crg-restricted" style="display:none;">
+
+<strong>This page is restricted to Adult Leaders.</strong>
+
+<p style="margin:8px 0 0;">Your TroopWebHost login doesn't have permission to pull the Upcoming Events list or the Uncompleted Requirements report -- both of those screens are leader-only on this site. If you believe this is a mistake, contact your Troop's TroopWebHost administrator.</p>
+
+</div>
+
+<div class="crg-sheet" id="crg-listSheet" style="display:none;">
+
+<h2>Upcoming campouts</h2>
+
+<p class="crg-sheet-sub" id="crg-listSub">Loading&hellip;</p>
+
+<table>
+
+<thead><tr><th>Campout</th><th>Dates</th><th>Location</th><th></th></tr></thead>
+
+<tbody id="crg-eventsTbl"></tbody>
+
+</table>
+
+</div>
+
+<div class="crg-results" id="crg-results">
+
+<div class="crg-sheet">
+
+<div class="crg-gap-head">
+
+<h2 id="crg-gapTitle">Requirements gap</h2>
+
+<div class="crg-gap-actions">
+
+<button class="crg-btn" id="crg-exportXlsx" type="button" disabled>Export to Excel</button>
+
+<button class="crg-btn-ghost" id="crg-closeGap" type="button">Close</button>
+
+</div>
+
+</div>
+
+<p class="crg-gap-meta" id="crg-gapMeta"></p>
+
+<div class="crg-status" id="crg-gapStatus">Loading attendees&hellip;</div>
+
+<div id="crg-gapBody"></div>
+
+</div>
+
+</div>
+
+</div><!-- /#crg-root -->
+
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+
+<script>
+
+(function(){
+
+/* ============ CONFIG -- verify these against your own site ============
+
+   Upcoming Events widget (the same one on the TroopWebHost home page):
+
+     GET FormList.aspx?Menu_Item_ID=56931&Form_ID=163&Stack=2
+
+   Confirmed from a captured request on this troop's site. Returns up to
+
+   100 rows (the site's own default "Rows Per Page" setting on this
+
+   list) -- not yet wired to request a larger page size directly, since
+
+   this troop's calendar never approached that limit when this page was
+
+   built (see note #3 above).
+
+   Campout event detail page (same Menu_Item_ID, different Form_ID,
+
+   keyed by the event's own ID from the row above):
+
+     GET FormDetail.aspx?Menu_Item_ID=56931&Form_ID=259&ID=<id>&Stack=3
+
+   Confirmed -- embeds a "Scouts Attending This Event" table with
+
+   Participant/Leadership/Patrol/Medical Forms Needed/Current
+
+   Balance/Comment/Signed Up columns, distinguishable from the
+
+   neighboring "Adults Attending This Event" table (same columns except
+
+   "Patrol" is replaced by "SYT Status") by the presence of a "Patrol"
+
+   header.
+
+   Uncompleted Requirements export -- the SAME report OA Tracker already
+
+   uses for its "Rank is the only thing left" section:
+
+     GET FormReport.aspx?Menu_Item_ID=46046&Stack=1&ReportFormat=XLS
+
+   Confirmed from a captured request -- the response's Content-Disposition
+
+   file name matched "Uncompleted Requirements for Rank Advancement In
+
+   Progress" exactly. Despite ReportFormat=XLS, the server actually
+
+   returns plain CSV text -- SheetJS handles this transparently either
+
+   way. Columns: Scout, Rank Date, Weeks To 18, Award, Code, Uncompleted
+
+   Requirement. "Award" is the rank the requirement belongs to (e.g.
+
+   "Second Class (Current requirements)") -- a Scout only has rows under
+
+   a given rank while that rank is still open, so this report already
+
+   only lists requirements genuinely outstanding right now, across every
+
+   rank a Scout hasn't fully closed out yet (confirmed: a Scout who is
+
+   Tenderfoot-and-working-on-Second-Class had Second Class AND First
+
+   Class rows, but no Tenderfoot rows).
+
+   ========================================================================= */
+
+var CRG_EVENTS_LIST_URL = 'FormList.aspx?Menu_Item_ID=56931&Form_ID=163&Stack=2';
+
+var CRG_EVENT_MENU_ITEM_ID = '56931';
+
+var CRG_EVENT_DETAIL_FORM_ID = '259';
+
+function crgEventDetailUrl(id){ return 'FormDetail.aspx?Menu_Item_ID='+CRG_EVENT_MENU_ITEM_ID+'&Form_ID='+CRG_EVENT_DETAIL_FORM_ID+'&ID='+id+'&Stack=3'; }
+
+var CRG_REQS_URL = 'FormReport.aspx?Menu_Item_ID=46046&Stack=1&ReportFormat=XLS';
+
+var CRG_CAMPOUT_EVENT_TYPE = 'campout'; // matched lowercase against the Event Type column
+
+var CRG_RANK_TIERS = ['Scout','Tenderfoot','Second Class','First Class']; // display + filter order
+
+/* Official rank-requirement categories, as supplied by the troop (current
+
+   BSA requirement numbering) -- cross-checked against every distinct
+
+   "Code" value that actually appears in a real Uncompleted Requirements
+
+   export for Tenderfoot/Second Class/First Class: every code matched
+
+   one of these categories exactly, with none left over. "Scout" rank
+
+   has no category breakdown here since none was supplied -- it's still
+
+   covered by the flat by-requirement section above. */
+
+var CRG_CATEGORIES = {
+
+  'Tenderfoot': [
+
+    { name:'Camping and Outdoor Ethics', codes:['1a','1b','1c'] },
+
+    { name:'Cooking', codes:['2a','2b','2c'] },
+
+    { name:'Tools', codes:['3a','3b','3c','3d'] },
+
+    { name:'First Aid and Nature', codes:['4a','4b','4c','4d'] },
+
+    { name:'Hiking', codes:['5a','5b','5c','5d'] },
+
+    { name:'Fitness', codes:['6a','6b','6c'] },
+
+    { name:'Citizenship', codes:['7a','7b'] },
+
+    { name:'Leadership', codes:['8'] },
+
+    { name:'Scout Spirit', codes:['9','10','11'] }
+
+  ],
+
+  'Second Class': [
+
+    { name:'Camping and Outdoor Ethics', codes:['1a','1b','1c'] },
+
+    { name:'Cooking and Tools', codes:['2a','2b','2c','2d','2e','2f','2g'] },
+
+    { name:'Navigation', codes:['3a','3b','3c','3d'] },
+
+    { name:'Nature', codes:['4'] },
+
+    { name:'Aquatics', codes:['5a','5b','5c','5d'] },
+
+    { name:'First Aid and Emergency Preparedness', codes:['6a','6b','6c','6d','6e'] },
+
+    { name:'Fitness', codes:['7a','7b','7c'] },
+
+    { name:'Citizenship', codes:['8a','8b','8c','8d','8e'] },
+
+    { name:'Personal Safety Awareness', codes:['9a','9b'] },
+
+    { name:'Scout Spirit', codes:['10','11','12'] }
+
+  ],
+
+  'First Class': [
+
+    { name:'Camping and Outdoor Ethics', codes:['1a','1b'] },
+
+    { name:'Cooking', codes:['2a','2b','2c','2d','2e'] },
+
+    { name:'Tools', codes:['3a','3b','3c','3d'] },
+
+    { name:'Navigation', codes:['4a','4b'] },
+
+    { name:'Nature', codes:['5a','5b','5c','5d'] },
+
+    { name:'Aquatics', codes:['6a','6b','6c','6d','6e'] },
+
+    { name:'First Aid and Emergency Preparedness', codes:['7a','7b','7c','7d','7e','7f'] },
+
+    { name:'Fitness', codes:['8a','8b'] },
+
+    { name:'Citizenship', codes:['9a','9b','9c','9d'] },
+
+    { name:'Leadership', codes:['10'] },
+
+    { name:'Scout Spirit', codes:['11','12','13'] }
+
+  ]
+
+};
+
+// Turns a raw report code like "06.a" or "04." into the same short form
+
+// used in CRG_CATEGORIES above ("6a", "4") so the two can be matched --
+
+// strips zero-padding, the trailing period, and any whitespace.
+
+function normalizeReqCode(rawCode){
+
+  var c = (rawCode||'').replace(/\s+/g,'');
+
+  var m = c.match(/^0*(\d+)\.?([a-zA-Z]?)$/);
+
+  if(!m) return c.toLowerCase();
+
+  return String(parseInt(m[1],10)) + m[2].toLowerCase();
+
+}
+
+// Display order for the combined-across-ranks category section: first-seen
+
+// order walking Tenderfoot -> Second Class -> First Class, de-duplicated.
+
+// A category name that appears in more than one rank (e.g. "Fitness",
+
+// identical in all three) only takes one slot here; the ranks in it get
+
+// grouped underneath. Category names that differ across ranks (e.g.
+
+// Second Class's "Cooking and Tools" vs. Tenderfoot/First Class's plain
+
+// "Cooking") are treated as distinct categories on purpose -- they're
+
+// genuinely different requirement groupings, not just a repeat.
+
+var CRG_CATEGORY_DISPLAY_ORDER = (function(){
+
+  var seen = {}; var order = [];
+
+  CRG_RANK_TIERS.forEach(function(tier){
+
+    var defs = CRG_CATEGORIES[tier];
+
+    if(!defs) return;
+
+    defs.forEach(function(def){
+
+      if(!seen[def.name]){ seen[def.name] = true; order.push(def.name); }
+
+    });
+
+  });
+
+  return order;
+
+})();
+
+var CRG_FETCH_TIMEOUT_MS = 15000;
+
+/* ================= LIVE SITE THEME =================
+
+   Ported from OA Tracker's oatrkProbeSiteTheme()/oatrkApplyLiveSiteTheme()
+
+   -- same probe markup, same sentinel-color technique, same two-role
+
+   accent split. See the big CSS comment above for the variable-naming
+
+   rationale specific to this page. */
+
+var crgSiteTheme = null;
+
+function crgSafeColor(v){
+
+  if(!v) return null;
+
+  if(/rgba?\(\s*0,\s*0,\s*0,\s*0\s*\)/.test(v) || v === 'transparent') return null;
+
+  return v;
+
+}
+
+function crgDarkenColor(rgbStr, amt){
+
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+
+  if(!m) return null;
+
+  var r = Math.round(parseInt(m[1],10) * (1-amt));
+
+  var g = Math.round(parseInt(m[2],10) * (1-amt));
+
+  var b = Math.round(parseInt(m[3],10) * (1-amt));
+
+  return 'rgb('+r+', '+g+', '+b+')';
+
+}
+
+function crgToRgba(rgbStr, alpha){
+
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+
+  if(!m) return null;
+
+  return 'rgba('+m[1]+','+m[2]+','+m[3]+','+alpha+')';
+
+}
+
+function crgProbeSiteTheme(){
+
+  var SENTINEL = 'rgb(1, 2, 3)';
+
+  var wrap = document.createElement('div');
+
+  wrap.style.cssText = 'position:absolute; left:-9999px; top:-9999px; visibility:hidden; pointer-events:none; color:'+SENTINEL+'; border-color:'+SENTINEL+';';
+
+  wrap.innerHTML =
+
+    '<div class="navtable" id="__crg_probe_navtable">'+
+
+      '<span class="navicon" id="__crg_probe_navicon"></span>'+
+
+      '<span class="navlink" id="__crg_probe_navlink"><a href="#" id="__crg_probe_navlink_a">x</a></span>'+
+
+    '</div>'+
+
+    '<div class="banner-div" id="__crg_probe_banner"></div>'+
+
+    '<ul class="nav-tabs"><li><a href="#" id="__crg_probe_tab">x</a></li></ul>'+
+
+    '<table class="table-striped"><thead><tr id="__crg_probe_gridhead"><th>x</th></tr></thead></table>'+
+
+    '<table class="table-curved"><tbody><tr><td id="__crg_probe_border">x</td></tr></tbody></table>'+
+
+    '<input class="form-control" id="__crg_probe_input">'+
+
+    '<span class="RequiredIndicator" id="__crg_probe_required">*</span>'+
+
+    '<a href="#" id="__crg_probe_control_a">x</a>'; // unclassed control anchor -- see note below
+
+  document.body.appendChild(wrap);
+
+  function byId(id){ return document.getElementById(id); }
+
+  function cs(el){ return el ? getComputedStyle(el) : null; }
+
+  var bg = function(v){ return crgSafeColor(v); };
+
+  var inherited = function(v){ return (v && v !== SENTINEL) ? v : null; };
+
+  var navtableCs = cs(byId('__crg_probe_navtable'));
+
+  var bannerCs = cs(byId('__crg_probe_banner'));
+
+  var navlinkACs = cs(byId('__crg_probe_navlink_a'));
+
+  var controlACs = cs(byId('__crg_probe_control_a'));
+
+  var tabCs = cs(byId('__crg_probe_tab'));
+
+  var gridheadCs = cs(byId('__crg_probe_gridhead'));
+
+  var borderCs = cs(byId('__crg_probe_border'));
+
+  var inputCs = cs(byId('__crg_probe_input'));
+
+  var requiredCs = cs(byId('__crg_probe_required'));
+
+  var result = {
+
+    navy: bg(navtableCs && navtableCs.backgroundColor),
+
+    navyDark: bg(bannerCs && bannerCs.backgroundColor),
+
+    // Anchor tags get their own User-Agent-stylesheet default color
+
+    // (the classic default link blue) rather than truly inheriting --
+
+    // the SENTINEL-inheritance trick used for every other probed value
+
+    // can't tell "TWH styled this yellow" apart from "nothing styled
+
+    // this, browser default kicked in" for an <a>. Comparing against an
+
+    // unclassed control anchor (which gets the same UA default when no
+
+    // site CSS targets .navlink) sidesteps that: only trust the value if
+
+    // it's actually different from the plain anchor's default.
+
+    yellow: (navlinkACs && controlACs && navlinkACs.color !== controlACs.color) ? navlinkACs.color : null,
+
+    gold: bg(tabCs && tabCs.backgroundColor),
+
+    gridHead: bg(gridheadCs && gridheadCs.backgroundColor),
+
+    line: inherited(borderCs && borderCs.borderLeftColor),
+
+    card: bg(inputCs && inputCs.backgroundColor),
+
+    red: inherited(requiredCs && requiredCs.color),
+
+    paper: bg(getComputedStyle(document.body).backgroundColor)
+
+  };
+
+  wrap.remove();
+
+  if(!result.navyDark && result.navy) result.navyDark = crgDarkenColor(result.navy, 0.35);
+
+  return result;
+
+}
+
+function crgLuminance(rgbStr){
+
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+
+  if(!m) return null;
+
+  function lin(c){ c = c/255; return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); }
+
+  return 0.2126*lin(+m[1]) + 0.7152*lin(+m[2]) + 0.0722*lin(+m[3]);
+
+}
+
+function crgMixWithWhite(rgbStr, amount){
+
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+
+  if(!m) return null;
+
+  function clamp(v){ return Math.max(0, Math.min(255, Math.round(v))); }
+
+  var r = clamp(parseInt(m[1],10)*(1-amount) + 255*amount);
+
+  var g = clamp(parseInt(m[2],10)*(1-amount) + 255*amount);
+
+  var b = clamp(parseInt(m[3],10)*(1-amount) + 255*amount);
+
+  return 'rgb('+r+', '+g+', '+b+')';
+
+}
+
+function crgEnsureContrast(rgbStr, wantLight){
+
+  if(!rgbStr) return rgbStr;
+
+  var lum = crgLuminance(rgbStr);
+
+  if(lum == null) return rgbStr;
+
+  if(wantLight && lum < 0.45) return crgMixWithWhite(rgbStr, 0.55);
+
+  if(!wantLight && lum > 0.55) return crgDarkenColor(rgbStr, 0.55);
+
+  return rgbStr;
+
+}
+
+function crgApplyLiveSiteTheme(){
+
+  var root = document.getElementById('crg-root');
+
+  try{
+
+    var detected = crgProbeSiteTheme();
+
+    crgSiteTheme = detected;
+
+    if(!root) return;
+
+    var paperLum = detected.paper ? crgLuminance(detected.paper) : null;
+
+    var isLight = paperLum != null && paperLum > 0.5;
+
+    root.classList.toggle('crg-light', isLight);
+
+    var wantLightText = !isLight;
+
+    if(detected.navy){
+
+      root.style.setProperty('--navy', detected.navy);
+
+      root.style.setProperty('--navy-dark', detected.navyDark || crgDarkenColor(detected.navy, 0.35) || detected.navy);
+
+    }
+
+    var gold = detected.gold || detected.yellow;
+
+    if(gold){
+
+      root.style.setProperty('--gold', gold);
+
+      root.style.setProperty('--gold-light', gold);
+
+      root.style.setProperty('--gold-text', crgEnsureContrast(gold, wantLightText));
+
+      root.style.setProperty('--gold-glow', crgToRgba(gold, 0.1) || 'rgba(192,138,46,0.08)');
+
+    }
+
+    if(detected.red){
+
+      var rustText = crgEnsureContrast(detected.red, wantLightText);
+
+      root.style.setProperty('--rust', rustText);
+
+      root.style.setProperty('--rust-bg', crgToRgba(rustText, 0.25) || 'rgba(217,130,102,0.25)');
+
+    }
+
+  }catch(e){
+
+    console.warn('Campout Rank Gap: theme detection failed, using built-in defaults:', e);
+
+  }finally{
+
+    if(root) root.classList.add('crg-ready');
+
+  }
+
+}
+
+// Runs immediately, not on DOMContentLoaded -- this script tag sits after
+
+// all of #crg-root's markup, so the element already exists here, and
+
+// waiting would only widen the flash-of-wrong-theme window.
+
+crgApplyLiveSiteTheme();
+
+/* ================= FETCH HELPERS (ported from OA Tracker) ================= */
+
+function crgFetchRaw(url, opts){
+
+  var controller = new AbortController();
+
+  var timer = setTimeout(function(){ controller.abort(); }, CRG_FETCH_TIMEOUT_MS);
+
+  var fetchOpts = { credentials:'same-origin', signal: controller.signal };
+
+  if(opts) for(var k in opts) fetchOpts[k] = opts[k];
+
+  return fetch(url, fetchOpts)
+
+    .catch(function(e){
+
+      if(e.name === 'AbortError') throw new Error(url+' timed out after '+(CRG_FETCH_TIMEOUT_MS/1000)+'s.');
+
+      throw e;
+
+    })
+
+    .then(function(res){
+
+      if(!res.ok) throw new Error(url+' responded HTTP '+res.status+'.');
+
+      if(res.redirected) throw new Error('REDIRECTED:'+res.url);
+
+      return res;
+
+    })
+
+    .finally(function(){ clearTimeout(timer); });
+
+}
+
+function crgFetchDoc(url){
+
+  return crgFetchRaw(url).then(function(res){ return res.text(); })
+
+    .then(function(text){ return new DOMParser().parseFromString(text, 'text/html'); });
+
+}
+
+function crgFetchReportBuffer(url){
+
+  return crgFetchRaw(url).then(function(res){
+
+    var ct = (res.headers.get('content-type')||'').toLowerCase();
+
+    if(ct.indexOf('html') !== -1) throw new Error(url+' returned a webpage instead of report data.');
+
+    return res.arrayBuffer();
+
+  });
+
+}
+
+function bufferToObjects(buf){
+
+  var wb = XLSX.read(buf, {type:'array'});
+
+  var ws = wb.Sheets[wb.SheetNames[0]];
+
+  return XLSX.utils.sheet_to_json(ws, {defval:'', raw:false});
+
+}
+
+/* ---- generic table-parsing helpers (ported from OA Tracker / Eagle Scout tool) ---- */
+
+function crgHeaderCells(table){
+
+  var headRow = table.querySelector('thead tr') || table.querySelector('tr');
+
+  if(!headRow) return [];
+
+  var cells = Array.prototype.slice.call(headRow.querySelectorAll('th,td'));
+
+  return cells.map(function(c){ return c.textContent.replace(/\s+/g,' ').trim(); });
+
+}
+
+function crgTableHasHeaders(table, headerWords){
+
+  var cells = crgHeaderCells(table);
+
+  var txt = cells.join(' | ').toLowerCase();
+
+  return headerWords.every(function(w){ return txt.indexOf(w.toLowerCase()) !== -1; });
+
+}
+
+function crgFindTable(doc, headerWords){
+
+  var tables = Array.prototype.slice.call(doc.querySelectorAll('table'));
+
+  for(var i=0;i<tables.length;i++){
+
+    if(crgTableHasHeaders(tables[i], headerWords)) return tables[i];
+
+  }
+
+  return null;
+
+}
+
+function crgColIndex(headerCells, label){
+
+  var l = label.toLowerCase();
+
+  // Exact match first -- e.g. "Event" must NOT match the "Event Type"
+
+  // header just because it's a substring of it. Only fall back to a
+
+  // substring match if no header is an exact match.
+
+  for(var i=0;i<headerCells.length;i++){
+
+    if(headerCells[i].toLowerCase() === l) return i;
+
+  }
+
+  for(var i=0;i<headerCells.length;i++){
+
+    if(headerCells[i].toLowerCase().indexOf(l) !== -1) return i;
+
+  }
+
+  return -1;
+
+}
+
+function esc(s){ var d=document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
+
+/* ================= NAME MATCHING (same approach as OA Tracker's normName) =================
+
+   TroopWebHost renders names as "Last, First [Middle...]" pretty much
+
+   everywhere -- the campout attendee table and the Uncompleted
+
+   Requirements report both use this format, confirmed against the real
+
+   CSV and HAR. Matching on last name + first word of the first name
+
+   only (ignoring middle names/initials/suffixes) is deliberately loose,
+
+   the same tradeoff OA Tracker already makes, since the two exports
+
+   don't always agree on how much of the middle name to include. */
+
+function normName(name){
+
+  var parts = (name||'').split(',');
+
+  var last = (parts[0]||'').trim().toLowerCase();
+
+  var firstPart = (parts[1]||'').trim().toLowerCase();
+
+  var first = firstPart.split(/\s+/)[0] || '';
+
+  return last+'|'+first;
+
+}
+
+/* ================= DATE PARSING (same approach as OA Tracker's parseEventDate) ================= */
+
+function parseEventDate(s){
+
+  if(!s) return null;
+
+  var datePart = String(s).trim().split(' ')[0];
+
+  var m = datePart.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+
+  if(!m) return null;
+
+  var mo = m[1], da = m[2], yr = m[3];
+
+  yr = yr.length===2 ? (2000+parseInt(yr,10)) : parseInt(yr,10);
+
+  return new Date(yr, parseInt(mo,10)-1, parseInt(da,10));
+
+}
+
+function fmtDateRange(startStr, endStr){
+
+  return startStr === endStr ? startStr : (startStr+' - '+endStr);
+
+}
+
+/* ================= FETCH: upcoming campouts ================= */
+
+function fetchUpcomingCampouts(){
+
+  return crgFetchDoc(CRG_EVENTS_LIST_URL).then(function(doc){
+
+    var table = crgFindTable(doc, ['Event Type','Event','Start','End']);
+
+    if(!table) throw new Error('Upcoming Events list didn\'t have the expected columns -- TroopWebHost may have changed this page\'s layout.');
+
+    var headers = crgHeaderCells(table);
+
+    var idxType = crgColIndex(headers, 'Event Type');
+
+    var idxName = crgColIndex(headers, 'Event');
+
+    var idxLoc = crgColIndex(headers, 'Location');
+
+    var idxStart = crgColIndex(headers, 'Start');
+
+    var idxEnd = crgColIndex(headers, 'End');
+
+    var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr'));
+
+    var today = new Date(); today.setHours(0,0,0,0);
+
+    var out = [];
+
+    rows.forEach(function(row){
+
+      var cells = row.cells;
+
+      // TWH renders a single colspan placeholder row (e.g. "No data is
+
+      // currently available to display.") instead of an empty tbody when
+
+      // there's nothing to show -- catch it generically by row width
+
+      // rather than matching that message's exact wording.
+
+      if(!cells || cells.length < headers.length) return; // skip TWH's colspan "no data" placeholder row
+
+      var typeText = (idxType>=0 && cells[idxType]) ? cells[idxType].textContent.replace(/\s+/g,' ').trim() : '';
+
+      if(typeText.toLowerCase() !== CRG_CAMPOUT_EVENT_TYPE) return;
+
+      var nameCell = idxName>=0 ? cells[idxName] : null;
+
+      var nameText = nameCell ? nameCell.textContent.replace(/\s+/g,' ').trim() : '';
+
+      var link = nameCell ? nameCell.querySelector('a[onclick]') : null;
+
+      var idMatch = link ? link.getAttribute('onclick').match(/[?&]ID=(\d+)/) : null;
+
+      if(!idMatch) return; // no ID -> can't fetch attendees, skip defensively
+
+      var startText = (idxStart>=0 && cells[idxStart]) ? cells[idxStart].textContent.replace(/\s+/g,' ').trim() : '';
+
+      var endText = (idxEnd>=0 && cells[idxEnd]) ? cells[idxEnd].textContent.replace(/\s+/g,' ').trim() : '';
+
+      var startDate = parseEventDate(startText);
+
+      if(startDate && startDate < today) return; // defensive -- widget should already be "upcoming" only
+
+      out.push({
+
+        id: idMatch[1],
+
+        name: nameText || '(untitled campout)',
+
+        location: (idxLoc>=0 && cells[idxLoc]) ? cells[idxLoc].textContent.replace(/\s+/g,' ').trim() : '',
+
+        start: startText, end: endText, startDate: startDate
+
+      });
+
+    });
+
+    out.sort(function(a,b){
+
+      if(a.startDate && b.startDate) return a.startDate - b.startDate;
+
+      return 0;
+
+    });
+
+    return out;
+
+  });
+
+}
+
+/* ================= FETCH: attendees for one campout ================= */
+
+function fetchCampoutScouts(eventId){
+
+  return crgFetchDoc(crgEventDetailUrl(eventId)).then(function(doc){
+
+    var table = crgFindTable(doc, ['Participant','Patrol']); // Adults table has "SYT Status" instead of "Patrol"
+
+    if(!table) return []; // no Scouts signed up yet -- not an error
+
+    var headers = crgHeaderCells(table);
+
+    var idxName = crgColIndex(headers, 'Participant');
+
+    var idxPatrol = crgColIndex(headers, 'Patrol');
+
+    var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr'));
+
+    var out = [];
+
+    rows.forEach(function(row){
+
+      var cells = row.cells;
+
+      // Same placeholder-row guard as the events list -- catch TWH's
+
+      // colspan "No data is currently available to display." row by
+
+      // width rather than message text.
+
+      if(!cells || cells.length < headers.length) return; // skip TWH's colspan "no data" placeholder row
+
+      var name = (idxName>=0 && cells[idxName]) ? cells[idxName].textContent.replace(/\s+/g,' ').trim() : '';
+
+      if(!name) return;
+
+      var patrol = (idxPatrol>=0 && cells[idxPatrol]) ? cells[idxPatrol].textContent.replace(/\s+/g,' ').trim() : '';
+
+      out.push({ name:name, patrol:patrol, key:normName(name) });
+
+    });
+
+    out.sort(function(a,b){ return a.name.localeCompare(b.name); });
+
+    return out;
+
+  });
+
+}
+
+/* ================= FETCH: uncompleted requirements (once per page load) ================= */
+
+function fetchUncompletedReqs(){
+
+  return crgFetchReportBuffer(CRG_REQS_URL).then(function(buf){
+
+    var rows = bufferToObjects(buf);
+
+    if(!rows.length) throw new Error('Uncompleted Requirements report came back with zero rows.');
+
+    var found = Object.keys(rows[0]);
+
+    if(found.indexOf('Award') === -1 || found.indexOf('Scout') === -1){
+
+      throw new Error('Uncompleted Requirements report didn\'t have the expected columns. Found: ['+found.join(', ')+'].');
+
+    }
+
+    var byScout = {};
+
+    rows.forEach(function(row){
+
+      var award = (row['Award']||'').replace(/\s*\(Current requirements\)\s*$/i, '').trim();
+
+      if(CRG_RANK_TIERS.indexOf(award) === -1) return; // Star/Life/Eagle/Palms etc. -- out of scope for this page
+
+      var key = normName(row['Scout']);
+
+      if(!byScout[key]) byScout[key] = { displayName: row['Scout'], tiers: {} };
+
+      if(!byScout[key].tiers[award]) byScout[key].tiers[award] = [];
+
+      byScout[key].tiers[award].push({
+
+        code: (row['Code']||'').trim(),
+
+        text: (row['Uncompleted Requirement']||'').trim()
+
+      });
+
+    });
+
+    return byScout;
+
+  });
+
+}
+
+/* ================= RENDER: campout list ================= */
+
+var elModeCheck = document.getElementById('crg-modeCheck');
+
+var elRestricted = document.getElementById('crg-restricted');
+
+var elListSheet = document.getElementById('crg-listSheet');
+
+var elListSub = document.getElementById('crg-listSub');
+
+var elEventsTbl = document.getElementById('crg-eventsTbl');
+
+var elResults = document.getElementById('crg-results');
+
+var elGapTitle = document.getElementById('crg-gapTitle');
+
+var elGapMeta = document.getElementById('crg-gapMeta');
+
+var elGapStatus = document.getElementById('crg-gapStatus');
+
+var elGapBody = document.getElementById('crg-gapBody');
+
+var elCloseGap = document.getElementById('crg-closeGap');
+
+var elExportXlsx = document.getElementById('crg-exportXlsx');
+
+var reqsByScout = null; // filled once, reused for every campout selected
+
+var attendeeCache = {}; // eventId -> Promise<scouts[]>
+
+// Snapshot of whatever's currently on screen, refreshed each time a
+
+// campout finishes loading -- the Export button reads from this rather
+
+// than recomputing, so the export always matches what's rendered.
+
+var currentGapExport = null;
+
+function renderEventsTable(events){
+
+  elEventsTbl.innerHTML = '';
+
+  if(!events.length){
+
+    var tr = document.createElement('tr');
+
+    tr.innerHTML = '<td colspan="4" class="crg-empty-row">No upcoming campouts found on the calendar.</td>';
+
+    elEventsTbl.appendChild(tr);
+
+    return;
+
+  }
+
+  events.forEach(function(ev){
+
+    var tr = document.createElement('tr');
+
+    tr.className = 'crg-event-row';
+
+    tr.setAttribute('data-event-id', ev.id);
+
+    tr.innerHTML =
+
+      '<td class="crg-name">'+esc(ev.name)+'</td>'+
+
+      '<td>'+esc(fmtDateRange(ev.start, ev.end))+'</td>'+
+
+      '<td>'+esc(ev.location)+'</td>'+
+
+      '<td><button class="crg-btn" type="button">View Gap</button>';
+
+    tr.addEventListener('click', function(){ selectEvent(ev, tr); });
+
+    elEventsTbl.appendChild(tr);
+
+  });
+
+}
+
+function selectEvent(ev, rowEl){
+
+  Array.prototype.slice.call(elEventsTbl.querySelectorAll('tr.crg-selected')).forEach(function(r){ r.classList.remove('crg-selected'); });
+
+  if(rowEl) rowEl.classList.add('crg-selected');
+
+  elResults.classList.add('crg-show');
+
+  elGapTitle.textContent = ev.name;
+
+  elGapMeta.textContent = fmtDateRange(ev.start, ev.end) + (ev.location ? ' \u2014 ' + ev.location : '');
+
+  elGapBody.innerHTML = '';
+
+  elGapStatus.style.display = '';
+
+  elGapStatus.classList.remove('crg-err');
+
+  elGapStatus.textContent = 'Loading attendees\u2026';
+
+  elExportXlsx.disabled = true;
+
+  currentGapExport = null;
+
+  elResults.scrollIntoView({ behavior:'smooth', block:'start' });
+
+  if(!attendeeCache[ev.id]) attendeeCache[ev.id] = fetchCampoutScouts(ev.id);
+
+  attendeeCache[ev.id].then(function(scouts){
+
+    renderGap(scouts, ev);
+
+  }).catch(function(err){
+
+    elGapStatus.classList.add('crg-err');
+
+    elGapStatus.textContent = 'Could not load attendees: '+err.message;
+
+  });
+
+}
+
+/* Inverts the per-scout view: groups every outstanding requirement across
+
+   the attending Scouts, so a leader can see at a glance which single
+
+   requirement the most Scouts on this trip still need -- useful for
+
+   planning a group instruction session rather than one-on-one signoffs.
+
+   Keyed by tier+code (not tier+code+text) since the same requirement
+
+   code should carry identical text everywhere in one report pull; the
+
+   first Scout's copy of the text is kept as the display copy. */
+
+function buildRequirementGroups(scouts){
+
+  var groups = {};
+
+  scouts.forEach(function(scout){
+
+    var record = reqsByScout[scout.key];
+
+    if(!record) return;
+
+    CRG_RANK_TIERS.forEach(function(tier){
+
+      var list = record.tiers[tier];
+
+      if(!list) return;
+
+      list.forEach(function(req){
+
+        var key = tier+'|'+req.code;
+
+        if(!groups[key]) groups[key] = { tier:tier, code:req.code, text:req.text, names:[] };
+
+        groups[key].names.push(scout.name);
+
+      });
+
+    });
+
+  });
+
+  return groups;
+
+}
+
+function renderReqGroupsHtml(groups, totalScouts){
+
+  var keys = Object.keys(groups);
+
+  if(!keys.length) return '';
+
+  var body = '<p class="crg-section-desc">Every outstanding Scout/Tenderfoot/Second Class/First Class requirement across everyone signed up for this campout, sorted by how many Scouts still need it -- for planning a group session rather than tracking one Scout at a time.</p>';
+
+  CRG_RANK_TIERS.forEach(function(tier){
+
+    var items = keys.map(function(k){ return groups[k]; }).filter(function(g){ return g.tier === tier; });
+
+    if(!items.length) return;
+
+    items.sort(function(a,b){
+
+      if(b.names.length !== a.names.length) return b.names.length - a.names.length;
+
+      return a.code.localeCompare(b.code);
+
+    });
+
+    body += '<div class="crg-tier-block">';
+
+    body += '<h4 class="crg-tier-title">'+esc(tier)+' <span class="crg-tier-count">'+items.length+' distinct requirement'+(items.length===1?'':'s')+' outstanding</span></h4>';
+
+    items.forEach(function(g){
+
+      body += '<div class="crg-reqgroup-line">';
+
+      body += '<div class="crg-req-code">'+esc(g.code)+'</div>';
+
+      body += '<div>';
+
+      body += '<div class="crg-reqgroup-badge">'+g.names.length+' of '+totalScouts+' Scout'+(totalScouts===1?'':'s')+'</div>';
+
+      body += '<div class="crg-req-text">'+esc(g.text)+'</div>';
+
+      body += '<div class="crg-reqgroup-names">'+esc(g.names.join(', '))+'</div>';
+
+      body += '</div></div>';
+
+    });
+
+    body += '</div>';
+
+  });
+
+  return '<details class="crg-section"><summary><h3>Requirements Needed By This Group</h3><span class="crg-section-count">'+keys.length+' distinct requirement'+(keys.length===1?'':'s')+'</span></summary><div class="crg-section-body">'+body+'</div></details>';
+
+}
+
+/* Same underlying data as buildRequirementGroups(), but grouped by the
+
+   official rank-requirement category NAME, combined across every rank
+
+   that uses that exact name (e.g. one "Fitness" group covering the
+
+   Tenderfoot, Second Class, and First Class Fitness requirements
+
+   together, each line tagged with which rank it belongs to) -- useful
+
+   for planning one activity station (a Fitness circuit, a Cooking
+
+   review) that covers a Scout's gap at whatever rank they're at. */
+
+function buildCombinedCategoryGroups(scouts){
+
+  var combined = {}; // categoryName -> { itemsByKey:{ "tier|code": {...} }, scoutSet:{} }
+
+  CRG_RANK_TIERS.forEach(function(tier){
+
+    var catDefs = CRG_CATEGORIES[tier];
+
+    if(!catDefs) return; // no category breakdown supplied for this tier (e.g. "Scout")
+
+    var lookup = {};
+
+    catDefs.forEach(function(def){ def.codes.forEach(function(code){ lookup[code] = def.name; }); });
+
+    scouts.forEach(function(scout){
+
+      var record = reqsByScout[scout.key];
+
+      if(!record) return;
+
+      var list = record.tiers[tier];
+
+      if(!list) return;
+
+      list.forEach(function(req){
+
+        var norm = normalizeReqCode(req.code);
+
+        // Defensive fallback only -- every code in a real export matched a
+
+        // supplied category when this was built, so "Other" should stay
+
+        // empty, but a future BSA renumbering shouldn't drop data silently.
+
+        var catName = lookup.hasOwnProperty(norm) ? lookup[norm] : 'Other / Uncategorized';
+
+        if(!combined[catName]) combined[catName] = { itemsByKey:{}, scoutSet:{} };
+
+        var key = tier+'|'+norm;
+
+        if(!combined[catName].itemsByKey[key]) combined[catName].itemsByKey[key] = { tier:tier, code:req.code, text:req.text, names:[] };
+
+        combined[catName].itemsByKey[key].names.push(scout.name);
+
+        combined[catName].scoutSet[scout.key] = true;
+
+      });
+
+    });
+
+  });
+
+  return combined;
+
+}
+
+function renderCombinedCategoryGroupsHtml(combined, totalScouts){
+
+  var order = CRG_CATEGORY_DISPLAY_ORDER.concat(
+
+    Object.keys(combined).filter(function(name){ return CRG_CATEGORY_DISPLAY_ORDER.indexOf(name) === -1; }) // e.g. "Other / Uncategorized"
+
+  );
+
+  var namesWithData = order.filter(function(name){ return combined[name] && Object.keys(combined[name].itemsByKey).length; });
+
+  if(!namesWithData.length) return '';
+
+  var totalReqs = 0;
+
+  namesWithData.forEach(function(name){ totalReqs += Object.keys(combined[name].itemsByKey).length; });
+
+  var body = '<p class="crg-section-desc">The same outstanding requirements, grouped by category and combined across ranks -- so, for example, every rank\'s Fitness requirement still open shows up together, tagged with which rank it\'s for. Handy for setting up one activity station that covers a Scout\'s gap at whatever rank they\'re working on.</p>';
+
+  namesWithData.forEach(function(catName){
+
+    var cat = combined[catName];
+
+    var items = Object.keys(cat.itemsByKey).map(function(k){ return cat.itemsByKey[k]; });
+
+    var ranksPresent = CRG_RANK_TIERS.filter(function(t){ return items.some(function(it){ return it.tier === t; }); });
+
+    items.sort(function(a,b){
+
+      var ta = CRG_RANK_TIERS.indexOf(a.tier), tb = CRG_RANK_TIERS.indexOf(b.tier);
+
+      if(ta !== tb) return ta - tb;
+
+      if(b.names.length !== a.names.length) return b.names.length - a.names.length;
+
+      return a.code.localeCompare(b.code);
+
+    });
+
+    var scoutCount = Object.keys(cat.scoutSet).length;
+
+    body += '<div class="crg-category-block">';
+
+    body += '<h5 class="crg-category-title">'+esc(catName)+
+
+      ' <span class="crg-category-badge">'+scoutCount+' of '+totalScouts+' Scout'+(totalScouts===1?'':'s')+' need something here</span>'+
+
+      ' <span class="crg-ranks-present">('+ranksPresent.map(esc).join(', ')+')</span></h5>';
+
+    items.forEach(function(it){
+
+      body += '<div class="crg-reqgroup-line">';
+
+      body += '<div class="crg-req-code">'+esc(it.code)+'</div>';
+
+      body += '<div>';
+
+      body += '<div class="crg-reqgroup-badges"><span class="crg-reqgroup-badge">'+it.names.length+' of '+totalScouts+' Scout'+(totalScouts===1?'':'s')+'</span><span class="crg-rank-tag">'+esc(it.tier)+'</span></div>';
+
+      body += '<div class="crg-req-text">'+esc(it.text)+'</div>';
+
+      body += '<div class="crg-reqgroup-names">'+esc(it.names.join(', '))+'</div>';
+
+      body += '</div></div>';
+
+    });
+
+    body += '</div>';
+
+  });
+
+  return '<details class="crg-section"><summary><h3>Requirements Needed By Category</h3><span class="crg-section-count">'+namesWithData.length+' categor'+(namesWithData.length===1?'y':'ies')+' &middot; '+totalReqs+' requirement'+(totalReqs===1?'':'s')+'</span></summary><div class="crg-section-body">'+body+'</div></details>';
+
+}
+
+function renderGap(scouts, ev){
+
+  if(!scouts.length){
+
+    elGapStatus.textContent = '';
+
+    elGapStatus.style.display = 'none';
+
+    elGapBody.innerHTML = '<p class="crg-status">No Scouts are currently signed up for this campout.</p>';
+
+    currentGapExport = { event: ev, scouts: scouts, groups: {}, categoryData: {} };
+
+    elExportXlsx.disabled = false;
+
+    return;
+
+  }
+
+  var withGaps = 0;
+
+  var html = '';
+
+  scouts.forEach(function(scout){
+
+    var record = reqsByScout[scout.key];
+
+    var tiers = record ? record.tiers : {};
+
+    var tierCounts = CRG_RANK_TIERS.map(function(t){ return { tier:t, list: tiers[t]||[] }; }).filter(function(x){ return x.list.length; });
+
+    var total = tierCounts.reduce(function(sum,x){ return sum + x.list.length; }, 0);
+
+    if(total > 0) withGaps++;
+
+    html += '<details class="crg-scout">';
+
+    html += '<summary>';
+
+    html += '<span class="crg-scout-name">'+esc(scout.name)+'</span>';
+
+    if(scout.patrol) html += '<span class="crg-scout-patrol">'+esc(scout.patrol)+'</span>';
+
+    if(total === 0){
+
+      html += '<span class="crg-scout-clear">Nothing outstanding through First Class</span>';
+
+    } else {
+
+      tierCounts.forEach(function(x){
+
+        html += '<span class="crg-tier-tag">'+esc(x.tier)+': '+x.list.length+'</span>';
+
+      });
+
+    }
+
+    html += '</summary>';
+
+    if(total > 0){
+
+      html += '<div class="crg-scout-body">';
+
+      tierCounts.forEach(function(x){
+
+        html += '<div class="crg-tier-block">';
+
+        html += '<h4 class="crg-tier-title">'+esc(x.tier)+' <span class="crg-tier-count">'+x.list.length+' remaining</span></h4>';
+
+        x.list.forEach(function(req){
+
+          html += '<div class="crg-req-line"><div class="crg-req-code">'+esc(req.code)+'</div><div class="crg-req-text">'+esc(req.text)+'</div></div>';
+
+        });
+
+        html += '</div>';
+
+      });
+
+      html += '</div>';
+
+    }
+
+    html += '</details>';
+
+  });
+
+  elGapStatus.style.display = 'none';
+
+  var groups = buildRequirementGroups(scouts);
+
+  var summaryHtml = '<div class="crg-summary-row">'+
+
+    '<span class="crg-summary-chip">'+scouts.length+' Scout'+(scouts.length===1?'':'s')+' signed up</span>'+
+
+    '<span class="crg-summary-chip">'+withGaps+' with outstanding requirements</span>'+
+
+    '<span class="crg-summary-chip">'+Object.keys(groups).length+' distinct requirement'+(Object.keys(groups).length===1?'':'s')+' outstanding overall</span>'+
+
+    '</div>';
+
+  var groupsHtml = renderReqGroupsHtml(groups, scouts.length);
+
+  var categoryData = buildCombinedCategoryGroups(scouts);
+
+  var categoryHtml = renderCombinedCategoryGroupsHtml(categoryData, scouts.length);
+
+  var toolbarHtml = '<h3 class="crg-section-title">Individual Scout Checklists</h3>'+
+
+    '<div class="crg-toolbar">'+
+
+    '<button class="crg-btn-ghost" type="button" id="crg-expandAll">Expand All</button>'+
+
+    '<button class="crg-btn-ghost" type="button" id="crg-collapseAll">Collapse All</button>'+
+
+    '</div>';
+
+  elGapBody.innerHTML = summaryHtml + groupsHtml + categoryHtml + toolbarHtml + html;
+
+  var expandBtn = document.getElementById('crg-expandAll');
+
+  var collapseBtn = document.getElementById('crg-collapseAll');
+
+  if(expandBtn) expandBtn.addEventListener('click', function(){
+
+    Array.prototype.slice.call(elGapBody.querySelectorAll('details.crg-scout')).forEach(function(d){ d.open = true; });
+
+  });
+
+  if(collapseBtn) collapseBtn.addEventListener('click', function(){
+
+    Array.prototype.slice.call(elGapBody.querySelectorAll('details.crg-scout')).forEach(function(d){ d.open = false; });
+
+  });
+
+  currentGapExport = { event: ev, scouts: scouts, groups: groups, categoryData: categoryData };
+
+  elExportXlsx.disabled = false;
+
+}
+
+/* ================= EXPORT TO EXCEL =================
+
+   Builds a workbook from whatever's currently in currentGapExport (set
+
+   by renderGap() every time a campout finishes loading), with one tab
+
+   per section already on screen: an overview, the raw attendee list,
+
+   the flattened individual-Scout checklist, the flat by-requirement
+
+   rollup, and the combined-across-ranks by-category rollup. Uses the
+
+   same SheetJS build already loaded for reading the Uncompleted
+
+   Requirements report -- XLSX.writeFile() builds the .xlsx client-side
+
+   and triggers the browser's normal download, no server round trip. */
+
+function sanitizeFilePart(s){
+
+  return String(s||'').replace(/[\\\/:*?"<>|]/g,'').trim();
+
+}
+
+function buildExportWorkbook(data){
+
+  var wb = XLSX.utils.book_new();
+
+  var ev = data.event || {};
+
+  var totalScouts = data.scouts.length;
+
+  var summaryRows = [
+
+    ['Campout', ev.name || ''],
+
+    ['Dates', fmtDateRange(ev.start||'', ev.end||'')],
+
+    ['Location', ev.location || ''],
+
+    ['Scouts Signed Up', totalScouts],
+
+    ['Exported', new Date().toLocaleString()]
+
+  ];
+
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), 'Summary');
+
+  var attendeeRows = data.scouts.map(function(s){ return { Scout:s.name, Patrol:s.patrol }; });
+
+  if(!attendeeRows.length) attendeeRows = [{ Scout:'(none signed up)', Patrol:'' }];
+
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(attendeeRows), 'Attendees');
+
+  var byScoutRows = [];
+
+  data.scouts.forEach(function(scout){
+
+    var record = reqsByScout[scout.key];
+
+    var tiers = record ? record.tiers : {};
+
+    var any = false;
+
+    CRG_RANK_TIERS.forEach(function(tier){
+
+      var list = tiers[tier];
+
+      if(!list) return;
+
+      list.forEach(function(req){
+
+        any = true;
+
+        byScoutRows.push({ Scout:scout.name, Patrol:scout.patrol, Rank:tier, Code:req.code, Requirement:req.text });
+
+      });
+
+    });
+
+    if(!any) byScoutRows.push({ Scout:scout.name, Patrol:scout.patrol, Rank:'', Code:'', Requirement:'Nothing outstanding through First Class' });
+
+  });
+
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(byScoutRows), 'By Scout');
+
+  var byReqRows = Object.keys(data.groups).map(function(k){ return data.groups[k]; });
+
+  byReqRows.sort(function(a,b){
+
+    var ta = CRG_RANK_TIERS.indexOf(a.tier), tb = CRG_RANK_TIERS.indexOf(b.tier);
+
+    if(ta !== tb) return ta - tb;
+
+    if(b.names.length !== a.names.length) return b.names.length - a.names.length;
+
+    return a.code.localeCompare(b.code);
+
+  });
+
+  var byReqSheetRows = byReqRows.map(function(g){
+
+    return { Rank:g.tier, Code:g.code, Requirement:g.text, 'Scouts Needing It':g.names.length, 'Total Scouts':totalScouts, Names:g.names.join('; ') };
+
+  });
+
+  if(!byReqSheetRows.length) byReqSheetRows = [{ Rank:'', Code:'', Requirement:'(nothing outstanding)', 'Scouts Needing It':0, 'Total Scouts':totalScouts, Names:'' }];
+
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(byReqSheetRows), 'By Requirement');
+
+  var catOrder = CRG_CATEGORY_DISPLAY_ORDER.concat(
+
+    Object.keys(data.categoryData).filter(function(n){ return CRG_CATEGORY_DISPLAY_ORDER.indexOf(n) === -1; })
+
+  );
+
+  var byCatSheetRows = [];
+
+  catOrder.forEach(function(name){
+
+    var cat = data.categoryData[name];
+
+    if(!cat) return;
+
+    var items = Object.keys(cat.itemsByKey).map(function(k){ return cat.itemsByKey[k]; });
+
+    items.sort(function(a,b){
+
+      var ta = CRG_RANK_TIERS.indexOf(a.tier), tb = CRG_RANK_TIERS.indexOf(b.tier);
+
+      if(ta !== tb) return ta - tb;
+
+      if(b.names.length !== a.names.length) return b.names.length - a.names.length;
+
+      return a.code.localeCompare(b.code);
+
+    });
+
+    items.forEach(function(it){
+
+      byCatSheetRows.push({ Category:name, Rank:it.tier, Code:it.code, Requirement:it.text, 'Scouts Needing It':it.names.length, 'Total Scouts':totalScouts, Names:it.names.join('; ') });
+
+    });
+
+  });
+
+  if(!byCatSheetRows.length) byCatSheetRows = [{ Category:'', Rank:'', Code:'', Requirement:'(nothing outstanding)', 'Scouts Needing It':0, 'Total Scouts':totalScouts, Names:'' }];
+
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(byCatSheetRows), 'By Category');
+
+  return wb;
+
+}
+
+elExportXlsx.addEventListener('click', function(){
+
+  if(!currentGapExport) return;
+
+  try{
+
+    var wb = buildExportWorkbook(currentGapExport);
+
+    var namePart = sanitizeFilePart(currentGapExport.event && currentGapExport.event.name) || 'Campout';
+
+    XLSX.writeFile(wb, 'Campout Rank Gap - '+namePart+'.xlsx');
+
+  }catch(e){
+
+    console.error('Campout Rank Gap: export failed:', e);
+
+    alert('Could not build the Excel export: '+e.message);
+
+  }
+
+});
+
+elCloseGap.addEventListener('click', function(){
+
+  elResults.classList.remove('crg-show');
+
+  Array.prototype.slice.call(elEventsTbl.querySelectorAll('tr.crg-selected')).forEach(function(r){ r.classList.remove('crg-selected'); });
+
+});
+
+/* ================= INIT ================= */
+
+function init(){
+
+  Promise.all([ fetchUpcomingCampouts(), fetchUncompletedReqs() ])
+
+    .then(function(results){
+
+      var events = results[0];
+
+      reqsByScout = results[1];
+
+      elModeCheck.style.display = 'none';
+
+      elListSheet.style.display = '';
+
+      elListSub.textContent = events.length
+
+        ? 'Click a campout to see who\'s signed up and what rank requirements they still have open through First Class.'
+
+        : 'No upcoming campouts were found on the calendar.';
+
+      renderEventsTable(events);
+
+    })
+
+    .catch(function(err){
+
+      if(String(err.message||'').indexOf('REDIRECTED:') === 0){
+
+        elModeCheck.style.display = 'none';
+
+        elRestricted.style.display = '';
+
+        return;
+
+      }
+
+      elModeCheck.classList.add('crg-err');
+
+      elModeCheck.textContent = 'Could not load this page: '+err.message;
+
+    });
+
+}
+
+init();
+
+})();
+
+</script>
