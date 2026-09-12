@@ -65,16 +65,16 @@ READ BEFORE USING
    (see buildMatchKey/keysMatch). This matters because the Cross
    Reference report formats names differently from the Directory
    reports -- Directory substitutes a Scout's preferred name directly
-   ("Britton, Freddie C"), while Cross Reference gives the legal first
-   name with any nickname in quotes ("Britton, Frederick C
-   \"Freddie\""). buildMatchKey treats both the first real word and
-   any quoted nickname as valid match candidates for exactly this
-   reason -- confirmed against this troop's real export (zero
+   (e.g. "Lastname, Nickname M"), while Cross Reference gives the
+   legal first name with any nickname in quotes (e.g. "Lastname,
+   Legalname M \"Nickname\""). buildMatchKey treats both the first
+   real word and any quoted nickname as valid match candidates for
+   exactly this reason -- confirmed against a real export (zero
    unmatched, zero ambiguous joins). Also confirmed: Adult Directory
    has no Patrol column, so Patrol Roster is joined ONLY against
    adults (scouts already carry their own Patrol column directly from
    Scout Directory) -- joining it against the combined scout+adult
-   list instead would hit real same-name collisions on this troop's
+   list instead would hit real same-name collisions on a real troop's
    own roster (a parent and child sharing an identical "Last, First
    MiddleInitial" string). On any name match with more than one
    candidate, the join is skipped rather than guessed -- silently
@@ -522,12 +522,13 @@ function sanitizeFilePart(s){
    comparison isn't reliable across these particular reports. */
 /* ================= UNIT LABEL AUTO-DETECT =================
    Prefills the Organization field from the site's own page title
-   (TWH sites are titled things like "Troop 997 Ashburn") rather than
-   hardcoding a specific troop number into this file, so the same file
-   works unmodified if it's ever reused on a different troop's site --
-   same reasoning as discoverSelfSectionId() elsewhere in this repo.
-   Always just a starting value: the field stays a plain text input
-   the person can overwrite before generating cards. */
+   (TWH sites are typically titled things like "Troop 1234
+   Somewhere") rather than hardcoding a specific troop number into
+   this file, so the same file works unmodified if it's ever reused
+   on a different troop's site -- same reasoning as
+   discoverSelfSectionId() elsewhere in this repo. Always just a
+   starting value: the field stays a plain text input the person can
+   overwrite before generating cards. */
 function discoverUnitLabel(){
   try{
     var title = document.title || '';

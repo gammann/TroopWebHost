@@ -51,7 +51,7 @@ This only works pasted directly into TroopWebHost's own site (same-origin) — i
 
 1. The page loads the Scout and Adult directories automatically — nothing to click to get started.
 2. Narrow the **Who** list with the search box and/or patrol dropdown, then check the people you want. **Select All Scouts** / **Select All Adults** / **Select Visible** act on the underlying data regardless of what's currently filtered into view; **Clear Selection** empties it.
-3. In **What to include**, check whatever fields you want written onto the cards. The **Organization label** field is prefilled from this site's own page title (e.g. "Troop 997") — edit or clear it if that's wrong.
+3. In **What to include**, check whatever fields you want written onto the cards. The **Organization label** field is prefilled from this site's own page title (e.g. "Troop 1234") — edit or clear it if that's wrong.
 4. Click **Download .vcf (combined)** for one file with every selected person, or **Download .zip (one file per person)** for separate files. Both are disabled until at least one person is selected.
 
 Everything this page does is read-only report fetches — no TroopWebHost data is ever modified. The moment a file downloads, though, it's outside TroopWebHost's own access controls — handle and share it the way you would any other export containing member contact info.
@@ -62,7 +62,7 @@ The output below came from actually running the shipped `buildVCard()` function 
 
 A Scout with every field checked:
 
-```
+```text
 BEGIN:VCARD
 VERSION:3.0
 N:Sullivan;Jack;;;
@@ -84,7 +84,7 @@ A phone or contacts app renders this as the Scout's name, organization "Troop 12
 
 An Adult with every field checked, patrol picked up via the Patrol Roster join:
 
-```
+```text
 BEGIN:VCARD
 VERSION:3.0
 N:Martinez;Elena;;;
@@ -102,7 +102,7 @@ END:VCARD
 
 The same Scout again, but with only Cell and Primary Email checked and Organization cleared — showing how sparse the card gets with most boxes unchecked:
 
-```
+```text
 BEGIN:VCARD
 VERSION:3.0
 N:Sullivan;Jack;;;
@@ -132,7 +132,7 @@ If something needs correcting, the values live in one place — search the file 
 These are lessons from real bugs found while building and testing this page, kept here so they aren't reintroduced by a future edit:
 
 - **No shared ID across these reports.** Unlike the leader-only roster export, these directory-style reports expose only a "Last, First Middle" display name — no BSA ID, no other stable identifier. Every person is keyed on row position (`scoutN` / `adultN`), and Patrol Roster / Parent Cross Reference are joined onto that name-based data rather than an ID.
-- **The Cross Reference report formats names differently from the Directory reports, and a plain string match misses real people because of it.** Directory substitutes a Scout's preferred name directly ("Smith, Thomas B"), while Cross Reference gives the legal first name with any nickname in quotes ("Smith, Thomas B \"Tommy\""). `buildMatchKey()` treats both the first real word and any quoted nickname as valid match candidates for exactly this reason — confirmed against a real export (zero unmatched, zero ambiguous joins across 83 parent rows).
+- **The Cross Reference report formats names differently from the Directory reports, and a plain string match misses real people because of it.** Directory substitutes a Scout's preferred name directly (e.g. "Lastname, Nickname M"), while Cross Reference gives the legal first name with any nickname in quotes (e.g. "Lastname, Legalname M \"Nickname\""). `buildMatchKey()` treats both the first real word and any quoted nickname as valid match candidates for exactly this reason — confirmed against a real export (zero unmatched, zero ambiguous joins across dozens of parent rows).
 - **A same-named parent and child can make a "confirmed unique match" wrong, not just ambiguous.** Patrol Roster has one row per patrol membership, so a parent and child sharing an identical "Last, First MiddleInitial" string (a real case on the troop roster used to build this) produces two different rows that both name-match the same adult. Checking "does this row match exactly one adult" isn't enough — both rows pass that check independently, so whichever came later in the CSV silently won, actually assigning a scout's own patrol to that scout's same-named parent. Fixed by excluding any Patrol Roster row that name-matches a *known Scout* at all before ever trying to match it against adults — the tradeoff is that a genuinely ambiguous adult is left with no patrol shown rather than a wrong one, which is the same "skip rather than guess" rule this repo uses everywhere else for uncertain joins.
 - **Check `res.redirected` before `res.ok`, not after.** An earlier version checked `!res.ok` first, so if a redirect ever landed on a page that itself returned a non-200 (an access-denied page returning its own error status, for instance), the tool reported a generic "responded HTTP 403" message instead of correctly recognizing it as an access restriction. Found while building the screenshot harness below, where the mock "access denied" response surfaced exactly this case. Fixed by checking `res.redirected` first, unconditionally.
 - **Sequential fetches required.** Same as every other tool in this repo: concurrent fetches race TroopWebHost's shared session state and can silently return empty data. All four report fetches here happen one after another, never via `Promise.all`.
@@ -141,11 +141,23 @@ These are lessons from real bugs found while building and testing this page, kep
 
 ## Screenshot generation
 
-`gen_screenshots.js` drives the actual shipped `vcard-export.html` with Playwright, feeding it synthetic fake CSV data through intercepted network requests rather than reimplementing any of the page's own logic. It runs three separate passes — normal, "optional reports redirected" (degraded mode), and "required reports redirected" (restricted state) — to capture all six screenshots above. `test_harness.js` is the non-visual counterpart: it extracts the page's own parsing/matching/vCard-building functions and runs them against real CSV shapes (with fake data substituted in this repo) to check for exceptions, duplicate keys, and correct field output before any of this ships.
+`gen_screenshots.js` drives the actual shipped `vcard-export.html` with Playwright, feeding it synthetic fake CSV data through intercepted network requests rather than reimplementing any of the page's own logic. It runs three separate passes — normal, "optional reports redirected" (degraded mode), and "required reports redirected" (restricted state) — to capture all six screenshots above.
+
+`test_harness.js` is the non-visual counterpart, checking for exceptions, duplicate keys, and correct field/join output before any of this ships. It's fully self-contained — every row of data in it is invented for the test, including two deliberate edge cases (a nickname mismatch between Scout Directory and the Cross Reference report, and a parent/child sharing an identical name) that real exports have been observed to contain. It needs the page's own logic pulled out into a plain `logic_only.js` first, since the shipped file also contains DOM/fetch code that only makes sense running inside TroopWebHost:
+
+```bash
+python3 -c "
+content = open('vcard-export.html').read()
+s = content.index('/* ================= FETCH HELPERS')
+e = content.index('/* ================= STATE / RENDER ================= */')
+open('logic_only.js','w').write(content[s:e])
+"
+node test_harness.js
+```
 
 ## Troubleshooting
 
 - **A pull comes back empty with no error message**: open Tools → Reporting Options on TroopWebHost. If it's set to "PDF only," a report link may return a PDF instead of data, which SheetJS can't read.
 - **Adult patrol grouping or Parent/Guardian contact is unavailable for everyone, every session**: check that Patrol Roster (46017) and Scout Parent Cross Reference With Contact Info (52053) are still open to the same login that can reach Scout/Adult Directory — they might have different permissions configured than the two required reports even though this tool otherwise treats "member-accessible" as one bucket.
 - **A Scout's Parent/Guardian contact is missing even though they clearly have one on file**: matching between Scout Directory and the Cross Reference report is name-based (see Implementation notes above) — a Scout listed under meaningfully different names in the two reports beyond a simple nickname (e.g. a completely different name on file for one vs. the other) won't match. Worth a spot-check against a live export the first time this runs on a new site.
-- **An adult you know has a patrol assignment shows none**: if that adult shares an exact "Last, First MiddleInitial" string with a Scout on the same roster, the join deliberately leaves it blank rather than risk assigning the wrong person's patrol — see the Cohen case in Implementation notes.
+- **An adult you know has a patrol assignment shows none**: if that adult shares an exact "Last, First MiddleInitial" string with a Scout on the same roster, the join deliberately leaves it blank rather than risk assigning the wrong person's patrol — see the same-named parent/child case in Implementation notes.
