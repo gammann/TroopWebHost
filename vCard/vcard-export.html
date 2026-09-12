@@ -1,0 +1,1065 @@
+<!--
+vCard Contact Export
+----------------------------------------
+Paste this WHOLE block into TroopWebHost: Manage Custom Pages -> (new or
+existing Custom Page) -> HTML editor. It must run ON troopwebhost.org
+(same-origin) so the requests below inherit your logged-in session.
+It will NOT work pasted into an external site or previewed elsewhere --
+the fetch calls will be blocked without your session cookie.
+
+READ BEFORE USING
+------------------
+1. v2: rebuilt to run entirely on reports that Scouts, parents, AND
+   leaders can all access -- no leader-only endpoint is used at all,
+   unlike the first version of this tool (which pulled the leader-only
+   "Export Active Roster To Excel" report). Four read-only report
+   fetches, done SEQUENTIALLY (concurrent fetches race TWH's shared
+   session state and silently return empty data -- confirmed pattern
+   from the other tools in this repo):
+     - Scout Directory      Menu_Item_ID=46012  (required)
+     - Adult Directory      Menu_Item_ID=46013  (required)
+     - Patrol Roster        Menu_Item_ID=46017  (optional enrichment)
+     - Scout Parent Cross Reference With Contact Info
+                             Menu_Item_ID=52053  (optional enrichment)
+   "Required" means the tool can't function without it and shows the
+   restricted message if redirected away. "Optional" means the tool
+   still works fully without it -- it just quietly disables the one
+   feature that depends on it (see point 4).
+2. Menu_Item_ID PROVENANCE, so a future troop-report reshuffle is easy
+   to re-diagnose: 46012 and 46013 are HAR-confirmed downloads (Sept
+   2026). 46017 and 52053 were NOT captured in that HAR -- they're
+   inferred from this troop's Reports menu (FormList.aspx?Menu_Item_
+   ID=45890) cross-checked against the actual column headers of the
+   CSVs used to build this page. Each report name on that menu has
+   multiple near-duplicate variants with DIFFERENT IDs -- e.g. "Patrol
+   Roster" (46017, no contact columns -- this one) vs "Patrol Roster
+   w/Contact Info" (46018, has address/phone -- NOT this one); "Scout
+   Parent Cross Reference" (46030, no contact columns) vs "...With
+   Contact Info" (52053, has Parent's Phone/Parent's E-Mail -- this
+   one, confirmed by column match) vs the reversed-direction "Parent
+   Scout Cross Reference" (52055, leads with Parent not Scout). If
+   46017 or 52053 ever 404 or return unexpected columns, re-open
+   Reports on this site, expand the matching entry, and re-grab the
+   "Open in Excel" link's Menu_Item_ID from the address bar or a HAR.
+3. ACCESS -- confirmed by the person who set this page up that Scout
+   Directory and Adult Directory are readable by ordinary Scout/parent
+   logins on this site, which is the whole reason this version exists
+   (the v1 leader-only version is still in this repo as a separate
+   file for anyone who specifically wants the richer, leader-only,
+   full-roster field set). This page still checks res.redirected on
+   every fetch and shows a plain restricted message if that
+   assumption is ever wrong for a given login, rather than assuming
+   any particular pattern of access.
+4. GRACEFUL DEGRADATION -- Patrol Roster and the Parent Cross
+   Reference are each wrapped independently: if either one fails or
+   is redirected for a given login, the page still runs fine on the
+   two required directories; it just disables "Adult patrol/crew"
+   grouping (needs Patrol Roster, since Adult Directory itself has no
+   Patrol column) and/or the "Parent/Guardian contact" field (needs
+   the cross reference), and says so in the status line under the
+   masthead.
+5. NAME-BASED JOINS, NO SHARED ID -- these directory-style reports
+   don't expose BSA ID or any other stable identifier, only a "Last,
+   First Middle" display name, so Patrol Roster and the Parent Cross
+   Reference are joined onto Scout/Adult Directory by name matching
+   (see buildMatchKey/keysMatch). This matters because the Cross
+   Reference report formats names differently from the Directory
+   reports -- Directory substitutes a Scout's preferred name directly
+   ("Britton, Freddie C"), while Cross Reference gives the legal first
+   name with any nickname in quotes ("Britton, Frederick C
+   \"Freddie\""). buildMatchKey treats both the first real word and
+   any quoted nickname as valid match candidates for exactly this
+   reason -- confirmed against this troop's real export (zero
+   unmatched, zero ambiguous joins). Also confirmed: Adult Directory
+   has no Patrol column, so Patrol Roster is joined ONLY against
+   adults (scouts already carry their own Patrol column directly from
+   Scout Directory) -- joining it against the combined scout+adult
+   list instead would hit real same-name collisions on this troop's
+   own roster (a parent and child sharing an identical "Last, First
+   MiddleInitial" string). On any name match with more than one
+   candidate, the join is skipped rather than guessed -- silently
+   attaching the wrong person's patrol or parent contact is worse than
+   just leaving the field blank for that one person.
+6. PRIVACY -- deliberately narrower than v1 by construction, since
+   these are the same fields already visible to every member on the
+   directory pages themselves: no date of birth (Age only), no BSA ID,
+   no medical/emergency-contact field (Parent/Guardian contact via the
+   cross reference is the closest equivalent these reports expose),
+   no bio. As with v1, the moment a file is downloaded it is OUTSIDE
+   TroopWebHost's access controls -- handle/share it accordingly.
+7. Despite ReportFormat=XLS in each URL, the responses are plain CSV
+   text; SheetJS handles this transparently (confirmed pattern from
+   the other tools in this repo).
+-->
+<div id="vce-root">
+<style>
+#vce-root, #vce-root *{ box-sizing:border-box; }
+#vce-root{
+  /* THEME -- ported from campout-rank-gap.html's crgApplyLiveSiteTheme(),
+     which itself ports OA Tracker's probe-and-adapt approach. Same
+     variable roles, this page's own accent name (--brass) purely for
+     readability:
+       --brass / --brass-light : RAW probed fill color, paired with the
+         fixed --accent-ink text color (buttons, badges).
+       --brass-text            : the SAME accent, contrast-adjusted for
+         use as bare text/links/borders directly on the canvas.
+     --accent-ink stays fixed dark in both modes since text sitting on a
+     brass-colored fill needs to stay dark regardless of canvas mode.
+     Canvas/text tokens (--ink-*, --paper*) swap between light and dark
+     via the .vce-light class below, following the live site's own
+     detected background luminance. */
+  --ink-950:#171a24; --ink-900:#1f2432; --ink-800:#2a3143;
+  --paper:#e9e7f0; --paper-dim:#c3c1d2;
+  --brass:#8a7ac0; --brass-light:#a596d8; --brass-text:#a596d8; --brass-glow:rgba(138,122,192,0.1);
+  --sage:#8fb996; --rust:#d98266; --rust-bg:rgba(217,130,102,0.25);
+  --hair:rgba(233,231,240,0.14); --hair-strong:rgba(233,231,240,0.28);
+  --accent-ink:#1c1730;
+  --navy:#242a44; --navy-dark:#141728;
+  --surface-1:rgba(255,255,255,0.025); --surface-2:rgba(0,0,0,0.25);
+  --surface-3:rgba(0,0,0,0.3); --surface-4:rgba(255,255,255,0.08);
+  background:linear-gradient(180deg, var(--ink-950), var(--ink-900) 40%, var(--ink-950));
+  color:var(--paper);
+  font-family:'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  padding:28px 24px 60px;
+  border-radius:6px;
+  max-width:1180px;
+  margin:20px auto;
+  /* Hidden until vceApplyLiveSiteTheme() decides light vs. dark, so the
+     page never flashes its dark default before switching to a light
+     site's real colors. Visibility (not display) so layout/scroll
+     position aren't affected. */
+  visibility:hidden;
+}
+#vce-root.vce-ready{ visibility:visible; }
+#vce-root.vce-light{
+  --ink-950:#f5f3fb; --ink-900:#fbfaff; --ink-800:#ece9f6;
+  --paper:#211f2e; --paper-dim:#544f6b;
+  --sage:#2f6b52;
+  --hair:rgba(33,31,46,0.12); --hair-strong:rgba(33,31,46,0.24);
+  --surface-1:rgba(0,0,0,0.025); --surface-2:rgba(0,0,0,0.06);
+  --surface-3:rgba(0,0,0,0.08); --surface-4:rgba(0,0,0,0.06);
+}
+#vce-root a{ color:var(--brass-text); }
+#vce-root header.vce-masthead{
+  border:1px solid var(--hair-strong);
+  border-bottom:6px solid var(--brass);
+  border-radius:4px;
+  padding:24px 26px 20px; margin-bottom:24px;
+  background-image:linear-gradient(160deg, var(--navy) 0%, var(--navy-dark) 100%);
+  color:#fff;
+}
+#vce-root .vce-eyebrow{
+  font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.16em;
+  text-transform:uppercase; color:rgba(255,255,255,0.82); margin:0 0 10px;
+}
+#vce-root h1{
+  font-family:'Roboto Slab', Georgia, serif; font-weight:700;
+  font-size:clamp(24px,3.4vw,32px); margin:0 0 8px; line-height:1.1;
+}
+#vce-root header.vce-masthead p.vce-sub{
+  margin:0; max-width:70ch; color:rgba(255,255,255,0.82); font-size:14px; line-height:1.55;
+}
+#vce-root .vce-status{ font-size:12px; color:var(--paper-dim); }
+#vce-root .vce-status.vce-err{ color:var(--rust); }
+#vce-root .vce-restricted{
+  border:1px solid var(--hair-strong); border-radius:4px; padding:18px 20px;
+  background:var(--surface-1); font-size:13.5px; line-height:1.6;
+}
+#vce-root .vce-restricted strong{ color:var(--brass-text); }
+#vce-root .vce-sheet{
+  border:1px solid var(--hair-strong); border-radius:4px;
+  background:var(--surface-1); padding:22px 24px 24px; margin-bottom:24px;
+}
+#vce-root .vce-sheet h2{ font-family:'Roboto Slab',Georgia,serif; font-size:17px; margin:0 0 4px; }
+#vce-root .vce-sheet-sub{ font-size:12.5px; color:var(--paper-dim); margin:0 0 16px; max-width:75ch; line-height:1.55; }
+#vce-root .vce-grid{ display:grid; grid-template-columns:1.15fr 1fr; gap:20px; align-items:start; }
+@media (max-width:840px){ #vce-root .vce-grid{ grid-template-columns:1fr; } }
+#vce-root .vce-panel-title{
+  font-family:'Roboto Slab',Georgia,serif; font-size:14.5px; margin:0 0 10px;
+  display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap;
+}
+#vce-root .vce-toolbar{ display:flex; gap:8px; flex-wrap:wrap; margin-bottom:12px; }
+#vce-root input[type="text"], #vce-root select{
+  -webkit-appearance:none; appearance:none;
+  font-family:inherit; font-size:12.5px; color:var(--paper);
+  background:var(--surface-4); border:1px solid var(--hair-strong); border-radius:4px;
+  padding:7px 10px;
+}
+#vce-root .vce-searchrow{ display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap; }
+#vce-root .vce-searchrow input[type="text"]{ flex:1 1 160px; min-width:140px; }
+#vce-root .vce-btn{
+  -webkit-appearance:none; appearance:none;
+  font-family:'Roboto Slab',Georgia,serif; font-weight:700; font-size:13px; letter-spacing:.01em;
+  color:var(--accent-ink); background:var(--brass-light);
+  border:none; border-radius:5px; padding:8px 16px; cursor:pointer;
+}
+#vce-root .vce-btn:hover:not(:disabled){ background:var(--brass); }
+#vce-root .vce-btn:disabled{ opacity:0.4; cursor:not-allowed; }
+#vce-root .vce-btn-ghost{
+  -webkit-appearance:none; appearance:none;
+  font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--brass-text); background:transparent; border:1px solid var(--hair-strong);
+  border-radius:4px; padding:6px 11px; cursor:pointer;
+}
+#vce-root .vce-btn-ghost:hover{ border-color:var(--brass); }
+#vce-root .vce-btn-ghost.vce-active{ border-color:var(--brass); background:var(--brass-glow); }
+#vce-root .vce-people{
+  max-height:420px; overflow-y:auto; border:1px solid var(--hair-strong); border-radius:5px;
+  background:var(--surface-2);
+}
+#vce-root details.vce-group{ border-bottom:1px solid var(--hair); }
+#vce-root details.vce-group:last-child{ border-bottom:none; }
+#vce-root details.vce-group > summary{
+  cursor:pointer; list-style:none; padding:10px 14px;
+  display:flex; align-items:center; gap:10px;
+  background:var(--surface-1); font-family:'Roboto Slab',Georgia,serif; font-size:13px;
+  position:sticky; top:0; z-index:1;
+}
+#vce-root details.vce-group > summary::-webkit-details-marker{ display:none; }
+#vce-root details.vce-group > summary::before{
+  content:'\25B8'; font-size:18px; line-height:1; color:var(--brass-text); transition:transform .12s ease; flex-shrink:0;
+}
+#vce-root details.vce-group[open] > summary::before{ transform:rotate(90deg); }
+#vce-root .vce-group-count{ font-family:'JetBrains Mono',monospace; font-size:10.5px; color:var(--paper-dim); font-weight:400; }
+#vce-root .vce-person-row{
+  display:flex; align-items:center; gap:10px; padding:7px 14px 7px 30px;
+  border-top:1px solid var(--hair);
+}
+#vce-root .vce-person-row:first-of-type{ border-top:none; }
+#vce-root .vce-person-row label{ display:flex; align-items:center; gap:9px; cursor:pointer; width:100%; }
+#vce-root .vce-person-name{ font-size:12.5px; font-weight:600; }
+#vce-root .vce-person-sub{ font-size:11px; color:var(--paper-dim); font-family:'JetBrains Mono',monospace; }
+#vce-root .vce-empty-row{ padding:16px 14px; color:var(--paper-dim); font-size:12px; font-style:italic; }
+#vce-root .vce-fieldgroup{ margin-bottom:16px; }
+#vce-root .vce-fieldgroup:last-child{ margin-bottom:0; }
+#vce-root .vce-fieldgroup-title{
+  font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:.05em; text-transform:uppercase;
+  color:var(--paper-dim); margin:0 0 8px; padding-bottom:6px; border-bottom:1px solid var(--hair);
+}
+#vce-root .vce-check{ display:flex; align-items:flex-start; gap:8px; padding:4px 0; font-size:12.5px; cursor:pointer; }
+#vce-root .vce-check input{ margin-top:2px; }
+#vce-root .vce-check-hint{ display:block; font-size:11px; color:var(--paper-dim); font-family:'JetBrains Mono',monospace; margin-top:1px; }
+#vce-root .vce-unitlabel{ margin-bottom:14px; }
+#vce-root .vce-unitlabel label{ display:block; font-size:11.5px; color:var(--paper-dim); margin-bottom:5px; font-family:'JetBrains Mono',monospace; text-transform:uppercase; letter-spacing:.05em; }
+#vce-root .vce-unitlabel input{ width:100%; }
+#vce-root .vce-summary-row{
+  display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap;
+  margin-top:18px; padding-top:16px; border-top:1px solid var(--hair-strong);
+}
+#vce-root .vce-summary-chip{
+  font-family:'JetBrains Mono',monospace; font-size:11.5px; color:var(--paper-dim);
+}
+#vce-root .vce-summary-chip strong{ color:var(--brass-text); }
+#vce-root .vce-download-actions{ display:flex; gap:10px; flex-wrap:wrap; }
+#vce-root .vce-footnote{ font-size:11.5px; color:var(--paper-dim); margin-top:16px; line-height:1.55; max-width:90ch; }
+#vce-root .vce-gen-status{ font-size:12px; margin-top:10px; color:var(--paper-dim); }
+#vce-root .vce-gen-status.vce-err{ color:var(--rust); }
+#vce-root .vce-gen-status.vce-ok{ color:var(--sage); }
+</style>
+<header class="vce-masthead">
+<p class="vce-eyebrow">Troop Roster Tools</p>
+<h1>vCard Contact Export</h1>
+<p class="vce-sub">Pulls the Scout and Adult directories -- the same ones every member can already open -- and lets you pick exactly who to include and exactly which fields go on each contact card, then downloads standard .vcf files ready to import into any phone or address book.</p>
+</header>
+<div class="vce-status" id="vce-modeCheck">Loading the Scout and Adult directories&hellip;</div>
+<div class="vce-status" id="vce-partial" style="display:none;"></div>
+<div class="vce-restricted" id="vce-restricted" style="display:none;">
+<strong>This page couldn't load the Scout/Adult directories for your login.</strong>
+<p style="margin:8px 0 0;">This page is built to work for every member, but your TroopWebHost login doesn't currently have permission to open the Scout Directory and/or Adult Directory reports it depends on. If you believe this is a mistake, contact your Troop's TroopWebHost administrator.</p>
+</div>
+<div id="vce-main" style="display:none;">
+<div class="vce-sheet">
+<div class="vce-grid">
+<div class="vce-col-who">
+<p class="vce-panel-title">Who <span class="vce-group-count" id="vce-whoCount"></span></p>
+<div class="vce-searchrow">
+<input type="text" id="vce-search" placeholder="Search by name&hellip;">
+<select id="vce-patrolFilter"><option value="">All Patrols</option></select>
+</div>
+<div class="vce-toolbar">
+<button class="vce-btn-ghost" type="button" id="vce-selAllScouts">Select All Scouts</button>
+<button class="vce-btn-ghost" type="button" id="vce-selAllAdults">Select All Adults</button>
+<button class="vce-btn-ghost" type="button" id="vce-selVisible">Select Visible</button>
+<button class="vce-btn-ghost" type="button" id="vce-selNone">Clear Selection</button>
+</div>
+<div class="vce-people" id="vce-people"></div>
+</div>
+<div class="vce-col-what">
+<p class="vce-panel-title">What to include</p>
+<div class="vce-unitlabel">
+<label for="vce-unitName">Organization label (used as ORG on each card)</label>
+<input type="text" id="vce-unitName" placeholder="e.g. Troop 1234">
+<span class="vce-check-hint" id="vce-unitname-hint"></span>
+</div>
+<div class="vce-fieldgroup">
+<div class="vce-fieldgroup-title">Identity</div>
+<label class="vce-check"><input type="checkbox" id="vce-f-org" checked> Organization (label + Patrol/Crew)<span class="vce-check-hint" id="vce-hint-org"></span></label>
+<label class="vce-check"><input type="checkbox" id="vce-f-title" checked> Title (Rank / Leadership position)</label>
+<label class="vce-check"><input type="checkbox" id="vce-f-categories" checked> Categories tag (Scout/Adult + Patrol)</label>
+</div>
+<div class="vce-fieldgroup">
+<div class="vce-fieldgroup-title">Address</div>
+<label class="vce-check"><input type="checkbox" id="vce-f-address" checked> Mailing address</label>
+</div>
+<div class="vce-fieldgroup">
+<div class="vce-fieldgroup-title">Phone numbers</div>
+<label class="vce-check"><input type="checkbox" id="vce-f-cell" checked> Cell phone</label>
+<label class="vce-check"><input type="checkbox" id="vce-f-home" checked> Home phone</label>
+<label class="vce-check"><input type="checkbox" id="vce-f-work"> Business phone</label>
+</div>
+<div class="vce-fieldgroup">
+<div class="vce-fieldgroup-title">Email</div>
+<label class="vce-check"><input type="checkbox" id="vce-f-email1" checked> Primary email</label>
+<label class="vce-check"><input type="checkbox" id="vce-f-email2"> Secondary email</label>
+</div>
+<div class="vce-fieldgroup">
+<div class="vce-fieldgroup-title">Other (in Notes)</div>
+<label class="vce-check"><input type="checkbox" id="vce-f-age"> Age (Scouts only)</label>
+<label class="vce-check"><input type="checkbox" id="vce-f-grade"> Grade (Scouts only)</label>
+<label class="vce-check"><input type="checkbox" id="vce-f-parent" checked> Parent/Guardian contact (Scouts only)<span class="vce-check-hint" id="vce-hint-parent"></span></label>
+</div>
+</div>
+</div>
+<div class="vce-summary-row">
+<div class="vce-summary-chip"><strong id="vce-selCount">0</strong> people selected</div>
+<div class="vce-download-actions">
+<button class="vce-btn" type="button" id="vce-dlCombined" disabled>Download .vcf (combined)</button>
+<button class="vce-btn-ghost" type="button" id="vce-dlZip" disabled>Download .zip (one file per person)</button>
+</div>
+</div>
+<div class="vce-gen-status" id="vce-genStatus"></div>
+<p class="vce-footnote">Field selections above are only what gets WRITTEN into the downloaded file -- unchecking something here doesn't delete or hide it in TroopWebHost, it just leaves it off the card. Every option pulls from the Scout Directory, Adult Directory, Patrol Roster, and Scout Parent Cross Reference reports -- the same fields already visible to any member who opens those pages directly.</p>
+</div>
+</div>
+</div><!-- /#vce-root -->
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script>
+(function(){
+/* ================= CONFIG -- verify against your own site =================
+   See the big comment at the top of this file re: how each ID was
+   confirmed (or, for the two enrichment reports, inferred from the
+   report menu + column-header matching) and the near-duplicate report
+   names to watch out for if any of these ever need re-diagnosing. */
+var VCE_SCOUT_DIR_URL  = 'FormReport.aspx?Menu_Item_ID=46012&Stack=1&ReportFormat=XLS'; // required
+var VCE_ADULT_DIR_URL  = 'FormReport.aspx?Menu_Item_ID=46013&Stack=1&ReportFormat=XLS'; // required
+var VCE_PATROL_URL     = 'FormReport.aspx?Menu_Item_ID=46017&Stack=1&ReportFormat=XLS'; // optional
+var VCE_PARENT_XREF_URL= 'FormReport.aspx?Menu_Item_ID=52053&Stack=1&ReportFormat=XLS'; // optional
+var VCE_FETCH_TIMEOUT_MS = 15000;
+/* ================= LIVE SITE THEME =================
+   Ported verbatim (variable names re-scoped to vce/--brass) from
+   Campout_Rank_Req/campout-rank-gap.html's crgApplyLiveSiteTheme(),
+   itself ported from OA Tracker -- same probe markup, same
+   sentinel-color technique, same two-role accent split. */
+var vceSiteTheme = null;
+function vceSafeColor(v){
+  if(!v) return null;
+  if(/rgba?\(\s*0,\s*0,\s*0,\s*0\s*\)/.test(v) || v === 'transparent') return null;
+  return v;
+}
+function vceDarkenColor(rgbStr, amt){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  var r = Math.round(parseInt(m[1],10) * (1-amt));
+  var g = Math.round(parseInt(m[2],10) * (1-amt));
+  var b = Math.round(parseInt(m[3],10) * (1-amt));
+  return 'rgb('+r+', '+g+', '+b+')';
+}
+function vceToRgba(rgbStr, alpha){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  return 'rgba('+m[1]+','+m[2]+','+m[3]+','+alpha+')';
+}
+function vceProbeSiteTheme(){
+  var SENTINEL = 'rgb(1, 2, 3)';
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:absolute; left:-9999px; top:-9999px; visibility:hidden; pointer-events:none; color:'+SENTINEL+'; border-color:'+SENTINEL+';';
+  wrap.innerHTML =
+    '<div class="navtable" id="__vce_probe_navtable">'+
+      '<span class="navicon" id="__vce_probe_navicon"></span>'+
+      '<span class="navlink" id="__vce_probe_navlink"><a href="#" id="__vce_probe_navlink_a">x</a></span>'+
+    '</div>'+
+    '<div class="banner-div" id="__vce_probe_banner"></div>'+
+    '<ul class="nav-tabs"><li><a href="#" id="__vce_probe_tab">x</a></li></ul>'+
+    '<table class="table-striped"><thead><tr id="__vce_probe_gridhead"><th>x</th></tr></thead></table>'+
+    '<table class="table-curved"><tbody><tr><td id="__vce_probe_border">x</td></tr></tbody></table>'+
+    '<input class="form-control" id="__vce_probe_input">'+
+    '<span class="RequiredIndicator" id="__vce_probe_required">*</span>'+
+    '<a href="#" id="__vce_probe_control_a">x</a>';
+  document.body.appendChild(wrap);
+  function byId(id){ return document.getElementById(id); }
+  function cs(el){ return el ? getComputedStyle(el) : null; }
+  var bg = function(v){ return vceSafeColor(v); };
+  var inherited = function(v){ return (v && v !== SENTINEL) ? v : null; };
+  var navtableCs = cs(byId('__vce_probe_navtable'));
+  var bannerCs = cs(byId('__vce_probe_banner'));
+  var navlinkACs = cs(byId('__vce_probe_navlink_a'));
+  var controlACs = cs(byId('__vce_probe_control_a'));
+  var tabCs = cs(byId('__vce_probe_tab'));
+  var gridheadCs = cs(byId('__vce_probe_gridhead'));
+  var borderCs = cs(byId('__vce_probe_border'));
+  var inputCs = cs(byId('__vce_probe_input'));
+  var requiredCs = cs(byId('__vce_probe_required'));
+  var result = {
+    navy: bg(navtableCs && navtableCs.backgroundColor),
+    navyDark: bg(bannerCs && bannerCs.backgroundColor),
+    yellow: (navlinkACs && controlACs && navlinkACs.color !== controlACs.color) ? navlinkACs.color : null,
+    gold: bg(tabCs && tabCs.backgroundColor),
+    gridHead: bg(gridheadCs && gridheadCs.backgroundColor),
+    line: inherited(borderCs && borderCs.borderLeftColor),
+    card: bg(inputCs && inputCs.backgroundColor),
+    red: inherited(requiredCs && requiredCs.color),
+    paper: bg(getComputedStyle(document.body).backgroundColor)
+  };
+  wrap.remove();
+  if(!result.navyDark && result.navy) result.navyDark = vceDarkenColor(result.navy, 0.35);
+  return result;
+}
+function vceLuminance(rgbStr){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  function lin(c){ c = c/255; return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); }
+  return 0.2126*lin(+m[1]) + 0.7152*lin(+m[2]) + 0.0722*lin(+m[3]);
+}
+function vceMixWithWhite(rgbStr, amount){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  function clamp(v){ return Math.max(0, Math.min(255, Math.round(v))); }
+  var r = clamp(parseInt(m[1],10)*(1-amount) + 255*amount);
+  var g = clamp(parseInt(m[2],10)*(1-amount) + 255*amount);
+  var b = clamp(parseInt(m[3],10)*(1-amount) + 255*amount);
+  return 'rgb('+r+', '+g+', '+b+')';
+}
+function vceEnsureContrast(rgbStr, wantLight){
+  if(!rgbStr) return rgbStr;
+  var lum = vceLuminance(rgbStr);
+  if(lum == null) return rgbStr;
+  if(wantLight && lum < 0.45) return vceMixWithWhite(rgbStr, 0.55);
+  if(!wantLight && lum > 0.55) return vceDarkenColor(rgbStr, 0.55);
+  return rgbStr;
+}
+function vceApplyLiveSiteTheme(){
+  var root = document.getElementById('vce-root');
+  try{
+    var detected = vceProbeSiteTheme();
+    vceSiteTheme = detected;
+    if(!root) return;
+    var paperLum = detected.paper ? vceLuminance(detected.paper) : null;
+    var isLight = paperLum != null && paperLum > 0.5;
+    root.classList.toggle('vce-light', isLight);
+    var wantLightText = !isLight;
+    if(detected.navy){
+      root.style.setProperty('--navy', detected.navy);
+      root.style.setProperty('--navy-dark', detected.navyDark || vceDarkenColor(detected.navy, 0.35) || detected.navy);
+    }
+    var brass = detected.gold || detected.yellow;
+    if(brass){
+      root.style.setProperty('--brass', brass);
+      root.style.setProperty('--brass-light', brass);
+      root.style.setProperty('--brass-text', vceEnsureContrast(brass, wantLightText));
+      root.style.setProperty('--brass-glow', vceToRgba(brass, 0.1) || 'rgba(138,122,192,0.1)');
+    }
+    if(detected.red){
+      var rustText = vceEnsureContrast(detected.red, wantLightText);
+      root.style.setProperty('--rust', rustText);
+      root.style.setProperty('--rust-bg', vceToRgba(rustText, 0.25) || 'rgba(217,130,102,0.25)');
+    }
+  }catch(e){
+    console.warn('vCard Export: theme detection failed, using built-in defaults:', e);
+  }finally{
+    if(root) root.classList.add('vce-ready');
+  }
+}
+// Runs immediately, not on DOMContentLoaded -- see comment on the
+// equivalent call in campout-rank-gap.html.
+vceApplyLiveSiteTheme();
+/* ================= FETCH HELPERS (ported from campout-rank-gap.html) ================= */
+function vceFetchRaw(url, opts){
+  var controller = new AbortController();
+  var timer = setTimeout(function(){ controller.abort(); }, VCE_FETCH_TIMEOUT_MS);
+  var fetchOpts = { credentials:'same-origin', signal: controller.signal };
+  if(opts) for(var k in opts) fetchOpts[k] = opts[k];
+  return fetch(url, fetchOpts)
+    .catch(function(e){
+      if(e.name === 'AbortError') throw new Error(url+' timed out after '+(VCE_FETCH_TIMEOUT_MS/1000)+'s.');
+      throw e;
+    })
+    .then(function(res){
+      // res.redirected is checked BEFORE res.ok on purpose: if a
+      // redirect ever lands on a page that itself returns a non-200
+      // (an access-denied page returning 403, a login page returning
+      // its own error, etc.), it must still be recognized as "this
+      // login got redirected away" rather than surfacing a generic
+      // HTTP-error message that hides the real, more useful reason.
+      if(res.redirected) throw new Error('REDIRECTED:'+res.url);
+      if(!res.ok) throw new Error(url+' responded HTTP '+res.status+'.');
+      return res;
+    })
+    .finally(function(){ clearTimeout(timer); });
+}
+function vceFetchReportBuffer(url){
+  return vceFetchRaw(url).then(function(res){
+    var ct = (res.headers.get('content-type')||'').toLowerCase();
+    if(ct.indexOf('html') !== -1) throw new Error(url+' returned a webpage instead of report data.');
+    return res.arrayBuffer();
+  });
+}
+function bufferToObjects(buf){
+  var wb = XLSX.read(buf, {type:'array'});
+  var ws = wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(ws, {defval:'', raw:false});
+}
+function esc(s){ var d=document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
+function sanitizeFilePart(s){
+  return String(s||'').replace(/[\\\/:*?"<>|]/g,'').trim();
+}
+/* ================= NAME PARSING / MATCHING =================
+   These directory-style reports give only a single "Last, First
+   Middle" display name -- no BSA ID, no separate first/last fields.
+   parseNameString splits that for vCard's N property. buildMatchKey /
+   keysMatch are the nickname-aware join used to attach Patrol Roster
+   and Parent Cross Reference rows onto the right person -- see the
+   big comment at the top of this file for why a plain string
+   comparison isn't reliable across these particular reports. */
+/* ================= UNIT LABEL AUTO-DETECT =================
+   Prefills the Organization field from the site's own page title
+   (TWH sites are titled things like "Troop 997 Ashburn") rather than
+   hardcoding a specific troop number into this file, so the same file
+   works unmodified if it's ever reused on a different troop's site --
+   same reasoning as discoverSelfSectionId() elsewhere in this repo.
+   Always just a starting value: the field stays a plain text input
+   the person can overwrite before generating cards. */
+function discoverUnitLabel(){
+  try{
+    var title = document.title || '';
+    var m = title.match(/\b(Troop|Pack|Crew|Ship|Post)\s*#?\s*\d+[A-Za-z]?\b/i);
+    if(m) return m[0].replace(/\s+/g,' ').replace(/\s*#\s*/,' ').trim();
+  }catch(e){
+    console.warn('vCard Export: unit label auto-detect failed:', e);
+  }
+  return '';
+}
+function parseNameString(raw){
+  raw = String(raw||'').trim();
+  var commaIdx = raw.indexOf(',');
+  if(commaIdx === -1) return {last:'', first:raw, middle:'', display:raw};
+  var last = raw.slice(0,commaIdx).trim();
+  var rest = raw.slice(commaIdx+1).trim();
+  var tokens = rest.split(/\s+/).filter(Boolean);
+  var first = tokens.length ? tokens[0] : '';
+  var middle = tokens.length>1 ? tokens.slice(1).join(' ') : '';
+  return {last:last, first:first, middle:middle, display:raw};
+}
+function buildMatchKey(raw){
+  raw = String(raw||'').trim();
+  var commaIdx = raw.indexOf(',');
+  var last = (commaIdx===-1 ? raw : raw.slice(0,commaIdx)).trim().toLowerCase();
+  var rest = commaIdx===-1 ? '' : raw.slice(commaIdx+1).trim();
+  var nickMatch = rest.match(/"([^"]+)"/);
+  var nickname = nickMatch ? nickMatch[1].trim().toLowerCase() : null;
+  var restClean = rest.replace(/"[^"]+"/g,'').trim();
+  var firstWord = (restClean.split(/\s+/)[0] || '').toLowerCase();
+  var candidates = {};
+  if(firstWord) candidates[firstWord] = true;
+  if(nickname) candidates[nickname] = true;
+  return {last:last, candidates:candidates};
+}
+function keysMatch(a,b){
+  if(!a.last || a.last !== b.last) return false;
+  for(var c in a.candidates){ if(b.candidates[c]) return true; }
+  return false;
+}
+// Finds exactly-one match for `key` among `list` (each {row, key}).
+// Returns null (not a guess) on zero OR more-than-one match -- see
+// point 5 in the top-of-file comment on why ambiguous joins are
+// skipped rather than resolved by picking the first hit.
+function findUniqueMatch(key, list){
+  var found = null, count = 0;
+  for(var i=0;i<list.length;i++){
+    if(keysMatch(key, list[i].key)){ count++; found = list[i]; if(count>1) return null; }
+  }
+  return count===1 ? found : null;
+}
+/* ================= ROSTER PARSING =================
+   Column names confirmed against real Scout Directory / Adult
+   Directory / Patrol Roster / Scout Parent Cross Reference CSV
+   exports from this troop's site (Sept 2026). These directory-style
+   reports simply don't contain a medical/insurance/vehicle/financial
+   column to begin with, unlike the leader-only roster export v1 of
+   this tool used -- there's nothing to deliberately exclude here. */
+function parseScouts(rows){
+  return rows.map(function(row, idx){
+    var name = parseNameString(row['Name']);
+    return {
+      key: 'scout'+idx, adult: false,
+      last:name.last, first:name.first, middle:name.middle, suffix:'',
+      displayName: name.display,
+      matchKey: buildMatchKey(row['Name']),
+      patrol: String(row['Patrol']||'').trim(),
+      rank: String(row['Rank']||'').trim(),
+      leadership: String(row['Leadership']||'').trim(),
+      age: String(row['Age']||'').trim(),
+      grade: String(row['Grade']||'').trim(),
+      addr1: String(row['Mailing Address Line 1']||'').trim(),
+      addr2: String(row['Mailing Address Line 2']||'').trim(),
+      city: String(row['City']||'').trim(),
+      state: String(row['State']||'').trim(),
+      zip: String(row['Zip Code']||'').trim(),
+      homePhone: String(row['Home Phone']||'').trim(),
+      cellPhone: String(row['Cell Phone']||'').trim(),
+      workPhone: '',
+      email1: String(row['Email']||'').trim(),
+      email2: String(row['Email #2']||'').trim(),
+      parents: []
+    };
+  }).filter(function(p){ return p.last || p.first; });
+}
+function parseAdults(rows){
+  return rows.map(function(row, idx){
+    var name = parseNameString(row['Name']);
+    return {
+      key: 'adult'+idx, adult: true,
+      last:name.last, first:name.first, middle:name.middle, suffix:'',
+      displayName: name.display,
+      matchKey: buildMatchKey(row['Name']),
+      patrol: '', // filled in by joinAdultPatrols() if Patrol Roster loaded
+      rank: '',
+      leadership: String(row['Leadership']||'').trim(),
+      age: '', grade: '',
+      addr1: String(row['Mailing Address Line 1']||'').trim(),
+      addr2: String(row['Mailing Address Line 2']||'').trim(),
+      city: String(row['City']||'').trim(),
+      state: String(row['State']||'').trim(),
+      zip: String(row['Zip Code']||'').trim(),
+      homePhone: String(row['Home Phone']||'').trim(),
+      cellPhone: String(row['Cell Phone']||'').trim(),
+      workPhone: String(row['Business Phone']||'').trim(),
+      email1: String(row['Email']||'').trim(),
+      email2: String(row['Email #2']||'').trim(),
+      parents: []
+    };
+  }).filter(function(p){ return p.last || p.first; });
+}
+// Patrol Roster is joined against adults, but with scouts passed in
+// too purely so any Patrol Roster row whose NAME also identifies a
+// scout can be skipped outright. That's necessary, not just
+// defensive: Patrol Roster contains one row per patrol membership, so
+// a parent/child pair sharing an identical "Last, First MiddleInitial"
+// string (confirmed on this troop's own roster) produces two DIFFERENT
+// rows -- one with the child's youth-patrol, one with the parent's
+// adult-patrol -- that both name-match the SAME adult candidate. An
+// earlier version of this join only checked "does this row match
+// exactly one adult," which both rows independently satisfy, so
+// whichever row happened to come later in the CSV silently overwrote
+// the other -- it actually assigned a scout's own patrol to that
+// scout's same-named parent. Excluding any row that name-matches a
+// known scout at all closes that hole; the tradeoff is that a
+// genuinely ambiguous adult is left with no patrol shown rather than
+// a wrong one, which matches this tool's "skip rather than guess"
+// rule everywhere else.
+function joinAdultPatrols(adults, scouts, patrolRows){
+  var scoutKeys = scouts.map(function(s){ return s.matchKey; });
+  var candidates = adults.map(function(p){ return {row:p, key:p.matchKey}; });
+  patrolRows.forEach(function(row){
+    var patrol = String(row['Patrol']||'').trim();
+    if(!patrol) return;
+    var key = buildMatchKey(row['Name']);
+    var collidesWithScout = scoutKeys.some(function(sk){ return keysMatch(key, sk); });
+    if(collidesWithScout) return;
+    var match = findUniqueMatch(key, candidates);
+    if(match) match.row.patrol = patrol;
+  });
+}
+// Scout Parent Cross Reference is joined only against scouts (that
+// report's own "Scout" column is the join key); each scout can have
+// multiple parent/guardian rows, all collected in order.
+function joinParents(scouts, xrefRows){
+  var candidates = scouts.map(function(p){ return {row:p, key:p.matchKey}; });
+  xrefRows.forEach(function(row){
+    var key = buildMatchKey(row['Scout']);
+    var match = findUniqueMatch(key, candidates);
+    if(!match) return;
+    match.row.parents.push({
+      name: String(row['Parent/Guardian']||'').trim(),
+      relationship: String(row['Relationship']||'').trim(),
+      phone: String(row["Parent's Phone"]||'').trim(),
+      email: String(row["Parent's E-Mail"]||'').trim()
+    });
+  });
+}
+function sortPeople(people){
+  people.sort(function(a,b){
+    var ka = (a.last+'|'+a.first).toLowerCase(), kb = (b.last+'|'+b.first).toLowerCase();
+    return ka < kb ? -1 : (ka > kb ? 1 : 0);
+  });
+  return people;
+}
+/* ================= vCARD BUILDING ================= */
+function vEsc(s){
+  return String(s==null?'':s).replace(/\\/g,'\\\\').replace(/\r\n|\r|\n/g,'\\n').replace(/,/g,'\\,').replace(/;/g,'\\;');
+}
+// Char-based line folding to vCard's 75-char guideline. Not strict
+// octet counting per RFC 2426, but this troop's data is overwhelmingly
+// ASCII (US names/addresses), so char count and byte count coincide in
+// the vast majority of real cards -- a reasonable tradeoff for staying
+// dependency-free.
+function foldLine(line){
+  if(line.length<=75) return line;
+  var out = line.slice(0,75);
+  var rest = line.slice(75);
+  while(rest.length){
+    out += '\r\n '+rest.slice(0,74);
+    rest = rest.slice(74);
+  }
+  return out;
+}
+function normalizePhone(raw){
+  var digits = String(raw||'').replace(/[^\d]/g,'');
+  if(digits.length===10) return '('+digits.slice(0,3)+') '+digits.slice(3,6)+'-'+digits.slice(6);
+  if(digits.length===11 && digits.charAt(0)==='1') return '+1 ('+digits.slice(1,4)+') '+digits.slice(4,7)+'-'+digits.slice(7);
+  return String(raw||'').trim();
+}
+function buildVCard(person, opts, unitLabel){
+  var lines = [];
+  lines.push('BEGIN:VCARD');
+  lines.push('VERSION:3.0');
+  lines.push('N:'+vEsc(person.last)+';'+vEsc(person.first)+';'+vEsc(person.middle)+';;'+vEsc(person.suffix));
+  var fn = [person.first, person.last].filter(Boolean).join(' ');
+  lines.push('FN:'+vEsc(fn || person.displayName));
+  if(opts.org){
+    var orgParts = [];
+    if(unitLabel) orgParts.push(unitLabel);
+    if(person.patrol) orgParts.push(person.patrol);
+    if(orgParts.length) lines.push('ORG:'+orgParts.map(vEsc).join(';'));
+  }
+  if(opts.title){
+    var title = person.leadership || person.rank || '';
+    if(title) lines.push('TITLE:'+vEsc(title));
+  }
+  if(opts.categories){
+    var cats = [person.adult ? 'Adult' : 'Scout'];
+    if(person.patrol) cats.push(person.patrol);
+    lines.push('CATEGORIES:'+cats.map(vEsc).join(','));
+  }
+  if(opts.address && (person.addr1 || person.city || person.state || person.zip)){
+    var street = [person.addr1, person.addr2].filter(Boolean).join(' ');
+    lines.push('ADR;TYPE=HOME:;;'+vEsc(street)+';'+vEsc(person.city)+';'+vEsc(person.state)+';'+vEsc(person.zip)+';');
+  }
+  if(opts.cell && person.cellPhone) lines.push('TEL;TYPE=CELL:'+vEsc(normalizePhone(person.cellPhone)));
+  if(opts.home && person.homePhone) lines.push('TEL;TYPE=HOME:'+vEsc(normalizePhone(person.homePhone)));
+  if(opts.work && person.workPhone) lines.push('TEL;TYPE=WORK:'+vEsc(normalizePhone(person.workPhone)));
+  if(opts.email1 && person.email1) lines.push('EMAIL;TYPE=INTERNET:'+vEsc(person.email1));
+  if(opts.email2 && person.email2) lines.push('EMAIL;TYPE=INTERNET:'+vEsc(person.email2));
+  var noteParts = [];
+  if(opts.age && !person.adult && person.age) noteParts.push('Age: '+person.age);
+  if(opts.grade && !person.adult && person.grade) noteParts.push('Grade: '+person.grade);
+  if(opts.parent && !person.adult && person.parents.length){
+    person.parents.forEach(function(p){
+      var bits = [p.name];
+      if(p.relationship) bits.push('('+p.relationship+')');
+      var line = bits.join(' ');
+      if(p.phone) line += ' - '+p.phone;
+      if(p.email) line += ' - '+p.email;
+      noteParts.push('Parent/Guardian: '+line);
+    });
+  }
+  if(noteParts.length) lines.push('NOTE:'+vEsc(noteParts.join('\n')));
+  lines.push('REV:'+new Date().toISOString());
+  lines.push('END:VCARD');
+  return lines.map(foldLine).join('\r\n')+'\r\n';
+}
+function readFieldOptions(){
+  function chk(id){ var el = document.getElementById(id); return !!(el && el.checked); }
+  return {
+    org: chk('vce-f-org'), title: chk('vce-f-title'), categories: chk('vce-f-categories'),
+    address: chk('vce-f-address'),
+    cell: chk('vce-f-cell'), home: chk('vce-f-home'), work: chk('vce-f-work'),
+    email1: chk('vce-f-email1'), email2: chk('vce-f-email2'),
+    age: chk('vce-f-age'), grade: chk('vce-f-grade'), parent: chk('vce-f-parent')
+  };
+}
+/* ================= MINIMAL ZIP WRITER (store method, no compression) =================
+   Hand-rolled rather than pulling in a new CDN dependency for what's
+   otherwise a very small need: one flat directory of .vcf files, no
+   compression required. Format is the standard PK zip local/central
+   directory structure -- see the inline comments below for the exact
+   layout if this ever needs revisiting. */
+var VCE_CRC_TABLE = (function(){
+  var table = [];
+  for(var n=0;n<256;n++){
+    var c = n;
+    for(var k=0;k<8;k++){ c = (c&1) ? (0xEDB88320 ^ (c>>>1)) : (c>>>1); }
+    table[n] = c>>>0;
+  }
+  return table;
+})();
+function vceCrc32(bytes){
+  var crc = 0xFFFFFFFF;
+  for(var i=0;i<bytes.length;i++){ crc = VCE_CRC_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8); }
+  return (crc ^ 0xFFFFFFFF) >>> 0;
+}
+function vceU16(n){ return new Uint8Array([n&0xFF, (n>>>8)&0xFF]); }
+function vceU32(n){ return new Uint8Array([n&0xFF, (n>>>8)&0xFF, (n>>>16)&0xFF, (n>>>24)&0xFF]); }
+function vceDosDateTime(d){
+  var time = (((d.getHours()&0x1F)<<11) | ((d.getMinutes()&0x3F)<<5) | ((Math.floor(d.getSeconds()/2))&0x1F)) & 0xFFFF;
+  var date = ((((d.getFullYear()-1980)&0x7F)<<9) | (((d.getMonth()+1)&0xF)<<5) | (d.getDate()&0x1F)) & 0xFFFF;
+  return {time:time, date:date};
+}
+function buildZipBlob(files){
+  var encoder = new TextEncoder();
+  var localParts = [], centralParts = [], offset = 0, entries = [];
+  var dt = vceDosDateTime(new Date());
+  files.forEach(function(f){
+    var nameBytes = encoder.encode(f.name);
+    var dataBytes = encoder.encode(f.content);
+    var crc = vceCrc32(dataBytes);
+    var localOffset = offset;
+    var local = [
+      vceU32(0x04034b50), vceU16(20), vceU16(0x0800), vceU16(0),
+      vceU16(dt.time), vceU16(dt.date), vceU32(crc),
+      vceU32(dataBytes.length), vceU32(dataBytes.length),
+      vceU16(nameBytes.length), vceU16(0), nameBytes, dataBytes
+    ];
+    local.forEach(function(p){ localParts.push(p); offset += p.length; });
+    entries.push({nameBytes:nameBytes, crc:crc, size:dataBytes.length, offset:localOffset});
+  });
+  var centralStart = offset;
+  entries.forEach(function(e){
+    var central = [
+      vceU32(0x02014b50), vceU16(20), vceU16(20), vceU16(0x0800), vceU16(0),
+      vceU16(dt.time), vceU16(dt.date), vceU32(e.crc), vceU32(e.size), vceU32(e.size),
+      vceU16(e.nameBytes.length), vceU16(0), vceU16(0), vceU16(0), vceU16(0), vceU32(0),
+      vceU32(e.offset), e.nameBytes
+    ];
+    central.forEach(function(p){ centralParts.push(p); offset += p.length; });
+  });
+  var centralSize = offset - centralStart;
+  var end = [
+    vceU32(0x06054b50), vceU16(0), vceU16(0), vceU16(entries.length), vceU16(entries.length),
+    vceU32(centralSize), vceU32(centralStart), vceU16(0)
+  ];
+  var allParts = localParts.concat(centralParts).concat(end);
+  return new Blob(allParts, {type:'application/zip'});
+}
+function triggerDownload(blob, filename){
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+}
+/* ================= STATE / RENDER ================= */
+var allPeople = [];
+var peopleByKey = {};
+var selectedKeys = {};
+var elModeCheck = document.getElementById('vce-modeCheck');
+var elPartial = document.getElementById('vce-partial');
+var elRestricted = document.getElementById('vce-restricted');
+var elMain = document.getElementById('vce-main');
+var elPeople = document.getElementById('vce-people');
+var elWhoCount = document.getElementById('vce-whoCount');
+var elSearch = document.getElementById('vce-search');
+var elPatrolFilter = document.getElementById('vce-patrolFilter');
+var elSelCount = document.getElementById('vce-selCount');
+var elDlCombined = document.getElementById('vce-dlCombined');
+var elDlZip = document.getElementById('vce-dlZip');
+var elGenStatus = document.getElementById('vce-genStatus');
+function visiblePeople(){
+  var q = (elSearch.value||'').trim().toLowerCase();
+  var patrol = elPatrolFilter.value;
+  return allPeople.filter(function(p){
+    if(patrol && p.patrol !== patrol) return false;
+    if(q && p.displayName.toLowerCase().indexOf(q) === -1) return false;
+    return true;
+  });
+}
+function renderPeople(){
+  var visible = visiblePeople();
+  var scouts = visible.filter(function(p){ return !p.adult; });
+  var adults = visible.filter(function(p){ return p.adult; });
+  function rowHtml(p){
+    var sub = [];
+    if(p.patrol) sub.push(p.patrol);
+    if(!p.adult && p.rank) sub.push(p.rank);
+    if(p.adult && p.leadership) sub.push(p.leadership);
+    var checked = selectedKeys[p.key] ? ' checked' : '';
+    return '<div class="vce-person-row">'+
+      '<label><input type="checkbox" class="vce-person-check" data-key="'+esc(p.key)+'"'+checked+'>'+
+      '<span><span class="vce-person-name">'+esc(p.displayName)+'</span>'+
+      (sub.length ? '<br><span class="vce-person-sub">'+esc(sub.join(' \u00b7 '))+'</span>' : '')+
+      '</span></label></div>';
+  }
+  function groupHtml(id, label, list){
+    var body = list.length ? list.map(rowHtml).join('') : '<div class="vce-empty-row">No matches.</div>';
+    return '<details class="vce-group" open id="'+id+'">'+
+      '<summary>'+label+' <span class="vce-group-count">('+list.length+')</span></summary>'+
+      body+'</details>';
+  }
+  elPeople.innerHTML = groupHtml('vce-grpScouts','Scouts', scouts) + groupHtml('vce-grpAdults','Adults', adults);
+  elWhoCount.textContent = '('+allPeople.length+' total)';
+  Array.prototype.slice.call(elPeople.querySelectorAll('.vce-person-check')).forEach(function(cb){
+    cb.addEventListener('change', function(){
+      var key = cb.getAttribute('data-key');
+      if(cb.checked) selectedKeys[key] = true; else delete selectedKeys[key];
+      updateSelectionUi();
+    });
+  });
+}
+function updateSelectionUi(){
+  var count = Object.keys(selectedKeys).length;
+  elSelCount.textContent = String(count);
+  elDlCombined.disabled = count === 0;
+  elDlZip.disabled = count === 0;
+}
+function populatePatrolFilter(){
+  var patrols = {};
+  allPeople.forEach(function(p){ if(p.patrol) patrols[p.patrol] = true; });
+  var names = Object.keys(patrols).sort(function(a,b){ return a.localeCompare(b); });
+  elPatrolFilter.innerHTML = '<option value="">All Patrols</option>' +
+    names.map(function(n){ return '<option value="'+esc(n)+'">'+esc(n)+'</option>'; }).join('');
+}
+elSearch.addEventListener('input', renderPeople);
+elPatrolFilter.addEventListener('change', renderPeople);
+document.getElementById('vce-selAllScouts').addEventListener('click', function(){
+  allPeople.forEach(function(p){ if(!p.adult) selectedKeys[p.key] = true; });
+  renderPeople(); updateSelectionUi();
+});
+document.getElementById('vce-selAllAdults').addEventListener('click', function(){
+  allPeople.forEach(function(p){ if(p.adult) selectedKeys[p.key] = true; });
+  renderPeople(); updateSelectionUi();
+});
+document.getElementById('vce-selVisible').addEventListener('click', function(){
+  visiblePeople().forEach(function(p){ selectedKeys[p.key] = true; });
+  renderPeople(); updateSelectionUi();
+});
+document.getElementById('vce-selNone').addEventListener('click', function(){
+  selectedKeys = {};
+  renderPeople(); updateSelectionUi();
+});
+function selectedPeopleList(){
+  return Object.keys(selectedKeys).map(function(k){ return peopleByKey[k]; }).filter(Boolean);
+}
+function setGenStatus(msg, kind){
+  elGenStatus.textContent = msg || '';
+  elGenStatus.className = 'vce-gen-status' + (kind ? ' vce-'+kind : '');
+}
+elDlCombined.addEventListener('click', function(){
+  var people = selectedPeopleList();
+  if(!people.length) return;
+  try{
+    var opts = readFieldOptions();
+    var unitLabel = (document.getElementById('vce-unitName').value||'').trim();
+    var combined = people.map(function(p){ return buildVCard(p, opts, unitLabel); }).join('');
+    var blob = new Blob([combined], {type:'text/vcard;charset=utf-8'});
+    triggerDownload(blob, 'Troop Contacts.vcf');
+    setGenStatus('Downloaded '+people.length+' contact'+(people.length===1?'':'s')+' as one file.', 'ok');
+  }catch(e){
+    console.error('vCard Export: combined download failed:', e);
+    setGenStatus('Could not build the .vcf file: '+e.message, 'err');
+  }
+});
+elDlZip.addEventListener('click', function(){
+  var people = selectedPeopleList();
+  if(!people.length) return;
+  try{
+    var opts = readFieldOptions();
+    var unitLabel = (document.getElementById('vce-unitName').value||'').trim();
+    var usedNames = {};
+    var files = people.map(function(p){
+      var base = sanitizeFilePart(p.displayName) || 'Contact';
+      var name = base;
+      var n = 2;
+      while(usedNames[name.toLowerCase()]){ name = base+' ('+n+')'; n++; }
+      usedNames[name.toLowerCase()] = true;
+      return { name: name+'.vcf', content: buildVCard(p, opts, unitLabel) };
+    });
+    var blob = buildZipBlob(files);
+    triggerDownload(blob, 'Troop Contacts.zip');
+    setGenStatus('Downloaded '+people.length+' contact'+(people.length===1?'':'s')+' as separate files.', 'ok');
+  }catch(e){
+    console.error('vCard Export: zip download failed:', e);
+    setGenStatus('Could not build the .zip file: '+e.message, 'err');
+  }
+});
+/* ================= INIT =================
+   Sequential, not Promise.all -- concurrent fetches race TWH's shared
+   session state (confirmed pattern from the other tools in this
+   repo). Scout/Adult Directory are required (any failure, including a
+   REDIRECTED permission failure, shows the restricted message and
+   stops). Patrol Roster and the Parent Cross Reference are each
+   caught independently so a failure there only disables the one
+   feature that depends on it -- see point 4 in the top-of-file
+   comment. */
+function applyOptionalFeatureAvailability(patrolOk, parentOk){
+  var notes = [];
+  var elParentCb = document.getElementById('vce-f-parent');
+  var elParentHint = document.getElementById('vce-hint-parent');
+  var elOrgHint = document.getElementById('vce-hint-org');
+  if(!patrolOk){
+    if(elOrgHint) elOrgHint.textContent = ' Adult patrol/crew grouping unavailable this session (Patrol Roster didn\'t load) -- Organization still includes the label for adults, just without a patrol.';
+    notes.push('adult patrol/crew grouping');
+  }
+  if(!parentOk){
+    if(elParentCb){ elParentCb.checked = false; elParentCb.disabled = true; }
+    if(elParentHint) elParentHint.textContent = ' Unavailable this session (Scout Parent Cross Reference didn\'t load).';
+    notes.push('Parent/Guardian contact');
+  }
+  if(notes.length){
+    elPartial.style.display = '';
+    elPartial.textContent = 'Note: could not load '+notes.join(' and ')+' -- everything else works normally.';
+  }
+}
+function init(){
+  var patrolOk = false, parentOk = false;
+  vceFetchReportBuffer(VCE_SCOUT_DIR_URL)
+    .then(function(buf){ return parseScouts(bufferToObjects(buf)); })
+    .then(function(scouts){
+      return vceFetchReportBuffer(VCE_ADULT_DIR_URL)
+        .then(function(buf){ return { scouts: scouts, adults: parseAdults(bufferToObjects(buf)) }; });
+    })
+    .then(function(data){
+      return vceFetchReportBuffer(VCE_PATROL_URL)
+        .then(function(buf){ joinAdultPatrols(data.adults, data.scouts, bufferToObjects(buf)); patrolOk = true; })
+        .catch(function(err){ console.warn('vCard Export: Patrol Roster unavailable, adult patrol grouping disabled:', err.message); })
+        .then(function(){ return data; });
+    })
+    .then(function(data){
+      return vceFetchReportBuffer(VCE_PARENT_XREF_URL)
+        .then(function(buf){ joinParents(data.scouts, bufferToObjects(buf)); parentOk = true; })
+        .catch(function(err){ console.warn('vCard Export: Scout Parent Cross Reference unavailable, parent/guardian field disabled:', err.message); })
+        .then(function(){ return data; });
+    })
+    .then(function(data){
+      allPeople = sortPeople(data.scouts.concat(data.adults));
+      peopleByKey = {};
+      allPeople.forEach(function(p){ peopleByKey[p.key] = p; });
+      elModeCheck.style.display = 'none';
+      elMain.style.display = '';
+      var unitEl = document.getElementById('vce-unitName');
+      var unitHint = document.getElementById('vce-unitname-hint');
+      if(unitEl && !unitEl.value){
+        var detected = discoverUnitLabel();
+        if(detected){
+          unitEl.value = detected;
+          if(unitHint) unitHint.textContent = 'Auto-detected from this site -- edit or clear if it\'s wrong.';
+        }
+      }
+      applyOptionalFeatureAvailability(patrolOk, parentOk);
+      populatePatrolFilter();
+      renderPeople();
+      updateSelectionUi();
+    })
+    .catch(function(err){
+      if(String(err.message||'').indexOf('REDIRECTED:') === 0){
+        elModeCheck.style.display = 'none';
+        elRestricted.style.display = '';
+        return;
+      }
+      elModeCheck.classList.add('vce-err');
+      elModeCheck.textContent = 'Could not load the directories: '+err.message;
+    });
+}
+init();
+})();
+</script>
