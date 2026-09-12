@@ -56,6 +56,64 @@ This only works pasted directly into TroopWebHost's own site (same-origin) — i
 
 Everything this page does is read-only report fetches — no TroopWebHost data is ever modified. The moment a file downloads, though, it's outside TroopWebHost's own access controls — handle and share it the way you would any other export containing member contact info.
 
+## Sample output
+
+The output below came from actually running the shipped `buildVCard()` function against sample data (all names, addresses, and numbers made up) — not hand-written.
+
+A Scout with every field checked:
+
+```
+BEGIN:VCARD
+VERSION:3.0
+N:Sullivan;Jack;;;
+FN:Jack Sullivan
+ORG:Troop 1234;Wolf Patrol
+TITLE:Tenderfoot
+CATEGORIES:Scout,Wolf Patrol
+ADR;TYPE=HOME:;;118 Birchwood Ln;Rivergrove;OH;44120;
+TEL;TYPE=HOME:(216) 555-0142
+EMAIL;TYPE=INTERNET:jack.sullivan.scout@example.com
+NOTE:Age: 12\nGrade: 7\nParent/Guardian: Sullivan\, Mark (Parent) - H: 216-
+ 555-0142\; C: 216-555-0143 - mark.sullivan@example.com\nParent/Guardian: S
+ ullivan\, Rachel (Parent) - C: 216-555-0177 - rachel.sullivan@example.com
+REV:2026-09-12T18:17:23.366Z
+END:VCARD
+```
+
+A phone or contacts app renders this as the Scout's name, organization "Troop 1234, Wolf Patrol", title "Tenderfoot", home phone, email, home address, and a Notes field with one line per Age/Grade/parent — the app unfolds the wrapped `NOTE` line and unescapes `\,` `\;` `\n` back into normal punctuation and line breaks automatically. That long `NOTE` line is the 75-character line folding in action: each continuation line starts with a single leading space, per the vCard spec.
+
+An Adult with every field checked, patrol picked up via the Patrol Roster join:
+
+```
+BEGIN:VCARD
+VERSION:3.0
+N:Martinez;Elena;;;
+FN:Elena Martinez
+ORG:Troop 1234;Old Goat
+TITLE:Assistant Scoutmaster
+CATEGORIES:Adult,Old Goat
+ADR;TYPE=HOME:;;204 Sycamore Ct;Rivergrove;OH;44120;
+TEL;TYPE=CELL:(216) 555-0201
+TEL;TYPE=HOME:(216) 555-0198
+EMAIL;TYPE=INTERNET:elena.martinez@example.com
+REV:2026-09-12T18:17:23.376Z
+END:VCARD
+```
+
+The same Scout again, but with only Cell and Primary Email checked and Organization cleared — showing how sparse the card gets with most boxes unchecked:
+
+```
+BEGIN:VCARD
+VERSION:3.0
+N:Sullivan;Jack;;;
+FN:Jack Sullivan
+EMAIL;TYPE=INTERNET:jack.sullivan.scout@example.com
+REV:2026-09-12T18:17:23.376Z
+END:VCARD
+```
+
+No `TEL` line appears here even though Cell was checked, since this particular fake Scout has no cell number on file — every optional field is simply skipped when empty, never written out blank.
+
 ## Reports used
 
 Every URL below was reverse-engineered from captured network requests, not from official documentation, since TroopWebHost has no public API. Two of the four are inferred from this site's Reports menu rather than directly HAR-captured — see the comment at the top of `vcard-export.html` for exactly how, and the near-duplicate report names to watch for if either ever needs re-diagnosing.
