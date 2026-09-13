@@ -217,7 +217,6 @@ READ BEFORE USING
 #scr-root .scr-save-report.scr-show{ display:block; }
 #scr-root .scr-save-report .scr-save-ok{ color:var(--sage); }
 #scr-root .scr-save-report .scr-save-fail{ color:var(--rust); }
-#scr-root .scr-typeSelect{ font-size:12px; padding:3px 6px; }
 #scr-root .scr-results{ display:none; }
 #scr-root .scr-results.scr-show{ display:block; }
 #scr-root .scr-head-row{
@@ -245,7 +244,14 @@ READ BEFORE USING
   font-family:'JetBrains Mono',monospace; font-size:10px; padding:2px 7px;
   border-radius:3px; background:var(--surface-4); color:var(--parchment-dim);
 }
-#scr-root .scr-toolbar{ display:flex; gap:10px; margin:14px 0; flex-wrap:wrap; }
+#scr-root .scr-toolbar{ display:flex; flex-direction:column; gap:10px; margin:14px 0; align-items:flex-start; }
+#scr-root .scr-toolbar-buttons{ display:flex; gap:10px; flex-wrap:wrap; }
+#scr-root .scr-add-picker{ display:flex; gap:8px; align-items:center; flex-wrap:wrap; width:100%; max-width:100%; }
+#scr-root .scr-add-picker-label{
+  font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--parchment-dim); white-space:nowrap;
+}
+#scr-root .scr-add-picker select{ flex:1 1 220px; min-width:0; max-width:100%; width:auto; }
 #scr-root .scr-footnote{ font-size:11.5px; color:var(--parchment-dim); margin-top:14px; line-height:1.5; }
 #scr-root input.scr-dateInput.scr-stale{
   border-color:var(--rust); background:var(--rust-bg);
@@ -300,9 +306,18 @@ READ BEFORE USING
 <tbody id="scr-rosterTbl"></tbody>
 </table>
 <div class="scr-toolbar" id="scr-toolbar" style="display:none;">
-<button class="scr-btn-ghost" id="scr-addRowBtn" type="button">+ Add person</button>
+<div class="scr-toolbar-buttons">
+<button class="scr-btn-ghost" id="scr-addScoutBtn" type="button">+ Add Scout</button>
+<button class="scr-btn-ghost" id="scr-addAdultBtn" type="button">+ Add Adult</button>
 </div>
-<p class="scr-footnote" id="scr-rosterFootnote" style="display:none;">Medical Recheck (Parts A-B) and the supervisor sign-off block at the bottom of the form are left blank for the test supervisor to fill by hand -- TroopWebHost doesn't track either of those. Rosters over 15 people generate extra copies of the blank form page, filled 15 at a time, with the procedures page attached once at the end. A red "expired" flag on a Test Date means it's more than a year old -- BSA requires swim classification to be renewed annually; that person likely needs a retest before this trip. "Save to TroopWebHost" writes these Test Date / Swim Level values back to TroopWebHost's own swim classification records for each matched person -- a real database change, applied to everyone listed here regardless of whether their checkbox is ticked (the checkbox only controls who's on the generated PDF).</p>
+<div class="scr-add-picker" id="scr-addPicker" style="display:none;">
+<label class="scr-add-picker-label" id="scr-addPickerLabel" for="scr-addPickerSelect">Add Scout:</label>
+<select id="scr-addPickerSelect"></select>
+<button class="scr-btn-ghost" id="scr-addPickerConfirm" type="button">Add to roster</button>
+<button class="scr-btn-ghost" id="scr-addPickerCancel" type="button">Cancel</button>
+</div>
+</div>
+<p class="scr-footnote" id="scr-rosterFootnote" style="display:none;">Medical Recheck (Parts A-B) and the supervisor sign-off block at the bottom of the form are left blank for the test supervisor to fill by hand -- TroopWebHost doesn't track either of those. Rosters over 15 people generate extra copies of the blank form page, filled 15 at a time, with the procedures page attached once at the end. A red "expired" flag on a Test Date means it's more than a year old -- BSA requires swim classification to be renewed annually; that person likely needs a retest before this trip. "Add Scout"/"Add Adult" pulls from TroopWebHost's own swim classification roster and fills in their current Test Date/Swim Level automatically. "Save to TroopWebHost" writes these Test Date / Swim Level values back to TroopWebHost's own swim classification records for each matched person -- a real database change, applied to everyone listed here regardless of whether their checkbox is ticked (the checkbox only controls who's on the generated PDF).</p>
 <div class="scr-save-report" id="scr-saveReport"></div>
 </div>
 </div>
@@ -626,6 +641,20 @@ function fetchCampoutAttendees(eventId){
         out.push({ name:name, type:type, key: type.charAt(0)+'|'+normName(name) });
       });
     });
+    // De-duplicate: the same person can legitimately show up more than
+    // once in the raw HTML -- e.g. if the campout page renders more than
+    // one qualifying table (a waitlist table alongside the main
+    // attending table, both with a Patrol/SYT Status column), or if a
+    // person has multiple rows for different leadership roles on the
+    // same trip. Whatever the cause, nobody should appear twice on the
+    // roster or the generated PDF, so keep only the first occurrence per
+    // Type+Name.
+    var seen = {};
+    out = out.filter(function(p){
+      if(seen[p.key]) return false;
+      seen[p.key] = true;
+      return true;
+    });
     // Scouts first (alphabetical), then Adults (alphabetical) -- NOT one
     // combined alphabetical list, so the generated form reads the way a
     // test supervisor expects (youth roster, then adult roster).
@@ -850,7 +879,6 @@ var elTestDate = document.getElementById('scr-testDate');
 var elRosterTable = document.getElementById('scr-rosterTable');
 var elRosterTbl = document.getElementById('scr-rosterTbl');
 var elToolbar = document.getElementById('scr-toolbar');
-var elAddRowBtn = document.getElementById('scr-addRowBtn');
 var elFootnote = document.getElementById('scr-rosterFootnote');
 var elGenerateBtn = document.getElementById('scr-generateBtn');
 var elSaveBtn = document.getElementById('scr-saveBtn');
@@ -899,16 +927,20 @@ function scrUpdateStaleFlag(tr){
 }
 function renderRosterRow(person){
   var tr = document.createElement('tr');
-  var checked = true;
+  var type = (person.type === 'Adult') ? 'Adult' : 'Scout';
+  tr.dataset.type = type; // fixed at creation time -- Type is not user-editable (see note below)
   tr.innerHTML =
     '<td><input type="checkbox" class="scr-inc" checked></td>'+
     '<td><input type="text" class="scr-nameInput" value="'+esc(person.name)+'" style="min-width:200px;"></td>'+
-    '<td><select class="scr-typeSelect"><option value="Scout">Scout</option><option value="Adult">Adult</option></select></td>'+
+    '<td><span class="scr-type-tag">'+esc(type)+'</span></td>'+
     '<td><input type="text" class="scr-dateInput" value="'+esc(person.date||'')+'" style="min-width:100px;" placeholder="m/d/yyyy">'+
       '<span class="scr-stale-badge" style="display:none;" title="More than a year since this test -- BSA requires annual renewal">expired</span></td>'+
     '<td><select class="scr-levelSelect"></select></td>';
-  var typeSel = tr.querySelector('.scr-typeSelect');
-  typeSel.value = (person.type === 'Adult') ? 'Adult' : 'Scout';
+  // Type is fixed once a row is created (from the campout attendee list,
+  // or from the Add Scout/Add Adult roster picker) -- it determines which
+  // TWH swim admin grid a save is routed to, and letting a leader flip it
+  // after the fact risked silently saving to the wrong person's record
+  // (a same-named Scout and Adult are different database rows).
   var sel = tr.querySelector('.scr-levelSelect');
   LEVEL_OPTIONS.forEach(function(opt){
     var o = document.createElement('option');
@@ -924,9 +956,6 @@ function renderRosterRow(person){
   dateInput.addEventListener('input', function(){ scrUpdateStaleFlag(tr); });
   scrUpdateStaleFlag(tr);
   return tr;
-}
-function addBlankRow(){
-  elRosterTbl.appendChild(renderRosterRow({ name:'', type:'', date:'', level:'' }));
 }
 function selectEvent(ev, rowEl){
   currentEvent = ev;
@@ -986,7 +1015,78 @@ function selectEvent(ev, rowEl){
     elRosterStatus.textContent = 'Could not load attendees: '+err.message;
   });
 }
-elAddRowBtn.addEventListener('click', function(){ addBlankRow(); });
+var elAddScoutBtn = document.getElementById('scr-addScoutBtn');
+var elAddAdultBtn = document.getElementById('scr-addAdultBtn');
+var elAddPicker = document.getElementById('scr-addPicker');
+var elAddPickerLabel = document.getElementById('scr-addPickerLabel');
+var elAddPickerSelect = document.getElementById('scr-addPickerSelect');
+var elAddPickerConfirm = document.getElementById('scr-addPickerConfirm');
+var elAddPickerCancel = document.getElementById('scr-addPickerCancel');
+var addPickerGrid = null; // the grid currently backing the open picker
+function scrRosterHasPerson(type, name){
+  var key = type.charAt(0)+'|'+normName(name);
+  return Array.prototype.slice.call(elRosterTbl.querySelectorAll('tr')).some(function(tr){
+    return tr.dataset.type.charAt(0)+'|'+normName(tr.querySelector('.scr-nameInput').value) === key;
+  });
+}
+function openAddPicker(type){
+  elAddScoutBtn.disabled = true;
+  elAddAdultBtn.disabled = true;
+  elAddPicker.style.display = '';
+  elAddPickerLabel.textContent = 'Add ' + type + ':';
+  elAddPickerConfirm.disabled = true;
+  elAddPickerSelect.innerHTML = '<option>Loading roster...</option>';
+  // Reuses the same cached-per-session grid fetch as the initial roster
+  // join -- if this campout had no Scouts (or no Adults) signed up, the
+  // relevant grid was never fetched yet, so this fetches it on demand.
+  getSwimGrid(type).then(function(grid){
+    addPickerGrid = grid;
+    var available = grid.rows
+      .map(function(rec, idx){ return { idx:idx, name:rec.name }; })
+      .filter(function(r){ return !scrRosterHasPerson(type, r.name); })
+      .sort(function(a,b){ return a.name.localeCompare(b.name); });
+    elAddPickerSelect.innerHTML = '';
+    if(!available.length){
+      var o = document.createElement('option');
+      o.textContent = 'Everyone in this list is already on the roster';
+      elAddPickerSelect.appendChild(o);
+      return;
+    }
+    available.forEach(function(r){
+      var o = document.createElement('option');
+      o.value = r.idx; o.textContent = r.name;
+      elAddPickerSelect.appendChild(o);
+    });
+    elAddPickerConfirm.disabled = false;
+  }).catch(function(err){
+    elAddPickerSelect.innerHTML = '';
+    var o = document.createElement('option');
+    o.textContent = 'Could not load: '+err.message;
+    elAddPickerSelect.appendChild(o);
+  });
+}
+function closeAddPicker(){
+  elAddPicker.style.display = 'none';
+  elAddScoutBtn.disabled = false;
+  elAddAdultBtn.disabled = false;
+  addPickerGrid = null;
+}
+elAddScoutBtn.addEventListener('click', function(){ openAddPicker('Scout'); });
+elAddAdultBtn.addEventListener('click', function(){ openAddPicker('Adult'); });
+elAddPickerCancel.addEventListener('click', function(){ closeAddPicker(); });
+elAddPickerConfirm.addEventListener('click', function(){
+  if(!addPickerGrid || elAddPickerSelect.value === '') return;
+  var rec = addPickerGrid.rows[parseInt(elAddPickerSelect.value, 10)];
+  if(!rec) return;
+  var type = addPickerGrid.type;
+  elRosterTbl.appendChild(renderRosterRow({
+    name: rec.name,
+    type: type,
+    date: rec.dateInput.value.trim(),
+    level: rec.levelSelect.value
+  }));
+  closeAddPicker();
+});
 elCloseBtn.addEventListener('click', function(){
   elResults.classList.remove('scr-show');
   Array.prototype.slice.call(elEventsTbl.querySelectorAll('tr.scr-selected')).forEach(function(r){ r.classList.remove('scr-selected'); });
@@ -1000,7 +1100,7 @@ function scrReadRosterRows(onlyIncluded){
     if(!name) return;
     rows.push({
       name: name,
-      type: tr.querySelector('.scr-typeSelect').value,
+      type: tr.dataset.type,
       date: tr.querySelector('.scr-dateInput').value.trim(),
       level: tr.querySelector('.scr-levelSelect').value
     });
