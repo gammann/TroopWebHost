@@ -1,0 +1,1120 @@
+<!--
+Swim Classification Record Generator
+----------------------------------------
+Paste this WHOLE block into TroopWebHost: Manage Custom Pages -> (new or
+existing Custom Page) -> HTML editor. It must run ON troopwebhost.org
+(same-origin) so the requests below inherit your logged-in session. It
+will NOT work pasted into an external site or previewed elsewhere -- the
+fetch calls will be blocked without your session cookie.
+
+READ BEFORE USING
+------------------
+1. THIS PAGE WRITES TO THE DATABASE. Generating the PDF is read-only, but
+   the "Save to TroopWebHost" button submits real edits to each person's
+   Swim Date / Swim Level record -- exactly as if you'd typed them into
+   TWH's own "Update Swim Test Dates" admin grids and clicked Save. It
+   asks for confirmation before submitting and reports success/failure
+   per person, but there is no undo beyond editing the value again.
+2. This page is leader-only, same as Campout Rank-Requirement Gap -- the
+   "Upcoming Events" list requires Adult Leader access on TroopWebHost; a
+   Scout or parent login gets redirected elsewhere, which this page
+   detects (same res.redirected technique as the other custom pages) and
+   shows a plain "restricted" message instead of guessing at a
+   Scout/parent-scoped view. The two swim-classification admin grids
+   below are the same leader-only area, so this doesn't introduce a new
+   permission boundary.
+3. CONFIRMED ENDPOINTS (see CONFIG comment further down for exact URLs):
+   - Upcoming campouts + attendees: same two calls as Campout
+     Rank-Requirement Gap (FormList Menu_Item_ID=56931 / FormDetail
+     Form_ID=259). Ported directly, plus this page also reads the
+     "Adults Attending This Event" table (identified by "SYT Status"
+     instead of "Patrol" in its header row), since the Swim
+     Classification Record covers adults too.
+   - Swim classification data (read AND write): the same two admin grids
+     a leader uses under "Update Swim Test Dates" --
+     FormList.aspx?Menu_Item_ID=56934&Form_ID=2052&Stack=2 (Scouts) and
+     &Form_ID=7322 (Adults) -- confirmed from a captured request. These
+     replace the earlier Swim Test Results CSV report (Menu_Item_ID=
+     46020) this page used to read from; the admin grids give the same
+     Name/Date/Level data PLUS the internal record IDs needed to save,
+     in one fetch, and -- unlike the CSV -- Scouts and Adults are
+     already on physically separate pages, so there's no Scout/Adult
+     name-collision risk to defend against here the way the old CSV
+     join needed (see the vCard tool's row-position key fix for the
+     general pattern of that kind of problem).
+   - IMPORTANT: this is NOT a standard ASP.NET postback -- there is no
+     __VIEWSTATE or __EVENTVALIDATION anywhere on this page (confirmed
+     by inspecting the fetched HTML). It's TroopWebHost's own "easyform"
+     mechanism (same JS file as everywhere else on the site,
+     easyJSfunctionsV15.js): a single plain <form id="easyform"> holding
+     an OLD-value hidden input and a live input/select for every editable
+     cell across every row on the page (all ~50-80 people at once), plus
+     a handful of state fields the Save button sets right before
+     submitting: Selected_Action=save, Hover_Action=save,
+     Selected_Button_ID=BUTTON2 (confirmed straight out of
+     easyJSfunctionsV15.js's buttonlink() function -- BUTTON2's name is
+     literally "save"). The server compares each field's OLD value
+     against the submitted value to decide what changed, so the correct
+     and only-sane way to save one person's update is: fetch the WHOLE
+     grid page fresh, edit just that person's input(s) in the fetched
+     DOM, then build a real FormData from that page's own <form> element
+     and POST the entire thing back unchanged except for the edits --
+     never hand-build the field list. That's exactly what
+     fetchSwimGrid()/scrSaveChangesToTwh() below do. Column IDs (like
+     "44039" for Scout Swim Date) are internal database IDs specific to
+     this troop's TWH install, so they're never hardcoded here -- each
+     row's date input, level select, and read-only name cell are found
+     by DOM shape (an input[type=text] and a <select> inside the row,
+     same as OA Tracker's SELF_SECTION_ID discovery avoids hardcoding a
+     site-specific ID).
+   - After a save, this page refetches the same grid fresh and checks
+     the person's field actually reflects the new value before reporting
+     success -- a real database write deserves that confirmation rather
+     than assuming the POST worked because the server returned 200.
+4. THE ACTUAL PDF FORM (#19-122, Rev. March 2022) IS A PLAIN WORD EXPORT
+   WITH NO FILLABLE ACROFORM FIELDS -- confirmed by inspecting the file.
+   Rather than embedding the ~200KB file as base64 in this page, it's
+   fetched fresh at runtime from this repo's own
+   Swim_Classification/Swim-Classificaiton-record-430-122.pdf (unmodified
+   copy of the real BSA form) via raw.githubusercontent.com, which sends
+   Access-Control-Allow-Origin: * on public files -- confirmed by
+   checking its response headers -- unlike scouting.org's own PDF host,
+   which sends no CORS header at all, so fetching the original file
+   directly from the browser is blocked. pdf-lib then draws text on top
+   at coordinates measured directly from the form's own PDF text layer +
+   a rendered test overlay (see README for the calibration numbers). If
+   you fork this repo, update SCR_TEMPLATE_PDF_URL in the CONFIG section
+   below to point at your fork, and don't alter the PDF itself or the
+   coordinates will drift. If BSA ever revises this form's layout, the
+   coordinates will need re-measuring against the new file.
+5. The printed form has exactly 15 numbered rows and only ONE "Date of
+   Swim Test" field at the top -- there's no per-person date column.
+   Since test dates vary across your roster, each person's own date is
+   appended after their name in parentheses instead of relying on the
+   single header field (which is left blank unless you type something
+   into it). Rosters longer than 15 people get additional copies of
+   page 1 (same blank template, freshly filled), with the static
+   2-page-of-2 procedures page appended once at the very end.
+6. Medical Recheck (Parts A-B) is a physical/medical-file item TWH
+   doesn't track anywhere this page has found -- left blank for the
+   test supervisor to fill by hand, same as the signature block at the
+   bottom of page 1.
+-->
+<div id="scr-root">
+<style>
+#scr-root, #scr-root *{ box-sizing:border-box; }
+#scr-root{
+
+  /* THEME -- same probe-and-adapt approach as the other custom pages in
+     this repo (see OA_Tracker/OA_tracker.html for the full rationale).
+     --brass / --brass-light : RAW probed fill color, paired with the
+       fixed --accent-ink text color (buttons).
+     --brass-text            : the SAME accent, contrast-adjusted for
+       bare text/links/borders directly on the canvas.
+     Canvas/text tokens (--woods-*, --parchment*) swap between light and
+     dark via the .scr-light class below, following the live site's own
+     detected background luminance. */
+  --woods-950:#122016; --woods-900:#182b1e; --woods-800:#203a28;
+  --parchment:#eee7d2; --parchment-dim:#cdc4a5;
+  --brass:#c08a2e; --brass-light:#e0b464; --brass-text:#e0b464; --brass-glow:rgba(192,138,46,0.08);
+  --sage:#a9c397; --rust:#d98266; --rust-bg:rgba(217,130,102,0.25);
+  --hair:rgba(238,231,210,0.14); --hair-strong:rgba(238,231,210,0.28);
+  --accent-ink:#241a08;
+  --navy:#1e3626; --navy-dark:#101f17;
+  --surface-1:rgba(255,255,255,0.025); --surface-2:rgba(0,0,0,0.25);
+  --surface-3:rgba(0,0,0,0.3); --surface-4:rgba(255,255,255,0.08);
+  background:linear-gradient(180deg, var(--woods-950), var(--woods-900) 40%, var(--woods-950));
+  color:var(--parchment);
+  font-family:'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  padding:28px 24px 60px;
+  border-radius:6px;
+  max-width:1100px;
+  margin:20px auto;
+  visibility:hidden;
+}
+#scr-root.scr-ready{ visibility:visible; }
+#scr-root.scr-light{
+  --woods-950:#f6f1e2; --woods-900:#fbf8ee; --woods-800:#efe8d1;
+  --parchment:#20301f; --parchment-dim:#51624c;
+  --sage:#2f6b2f;
+  --hair:rgba(32,48,31,0.12); --hair-strong:rgba(32,48,31,0.24);
+  --surface-1:rgba(0,0,0,0.025); --surface-2:rgba(0,0,0,0.06);
+  --surface-3:rgba(0,0,0,0.08); --surface-4:rgba(0,0,0,0.06);
+}
+#scr-root a{ color:var(--brass-text); }
+#scr-root header.scr-masthead{
+  border:1px solid var(--hair-strong);
+  border-bottom:6px solid var(--brass);
+  border-radius:4px;
+  padding:24px 26px 20px; margin-bottom:24px;
+  background-image:linear-gradient(160deg, var(--navy) 0%, var(--navy-dark) 100%);
+  color:#fff;
+}
+#scr-root .scr-eyebrow{
+  font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.16em;
+  text-transform:uppercase; color:rgba(255,255,255,0.82); margin:0 0 10px;
+}
+#scr-root h1{
+  font-family:'Roboto Slab', Georgia, serif; font-weight:700;
+  font-size:clamp(24px,3.4vw,32px); margin:0 0 8px; line-height:1.1;
+}
+#scr-root header.scr-masthead p.scr-sub{
+  margin:0; max-width:70ch; color:rgba(255,255,255,0.82); font-size:14px; line-height:1.55;
+}
+#scr-root .scr-status{ font-size:12px; color:var(--parchment-dim); }
+#scr-root .scr-status.scr-err{ color:var(--rust); }
+#scr-root .scr-restricted{
+  border:1px solid var(--hair-strong); border-radius:4px; padding:18px 20px;
+  background:var(--surface-1); font-size:13.5px; line-height:1.6;
+}
+#scr-root .scr-restricted strong{ color:var(--brass-text); }
+#scr-root .scr-sheet{
+  border:1px solid var(--hair-strong); border-radius:4px;
+  background:var(--surface-1); padding:22px 24px 24px; margin-bottom:24px;
+}
+#scr-root .scr-sheet h2{ font-family:'Roboto Slab',Georgia,serif; font-size:17px; margin:0 0 4px; }
+#scr-root .scr-sheet-sub{ font-size:12.5px; color:var(--parchment-dim); margin:0 0 16px; }
+#scr-root table{ width:100%; border-collapse:collapse; font-size:13px; }
+#scr-root thead th{
+  text-align:left; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--parchment-dim); font-weight:600;
+  padding:0 8px 7px; border-bottom:1px solid var(--hair-strong);
+}
+#scr-root tbody td{ padding:8px 8px; border-bottom:1px solid var(--hair); vertical-align:middle; color:var(--parchment); }
+#scr-root tbody tr:last-child td{ border-bottom:none; }
+#scr-root tbody tr.scr-event-row{ cursor:pointer; }
+#scr-root tbody tr.scr-event-row:hover{ background:var(--surface-2); }
+#scr-root tbody tr.scr-event-row.scr-selected{ background:var(--brass-glow); }
+#scr-root td.scr-name{ font-weight:600; }
+#scr-root .scr-empty-row{ padding:18px 10px; color:var(--parchment-dim); font-size:12.5px; font-style:italic; }
+#scr-root .scr-btn{
+  -webkit-appearance:none; appearance:none;
+  font-family:'Roboto Slab',Georgia,serif; font-weight:700; font-size:13px; letter-spacing:.01em;
+  color:var(--accent-ink); background:var(--brass-light);
+  border:none; border-radius:5px; padding:8px 16px; cursor:pointer;
+}
+#scr-root .scr-btn:hover:not(:disabled){ background:var(--brass); }
+#scr-root .scr-btn:disabled{ opacity:0.4; cursor:not-allowed; }
+#scr-root .scr-btn-ghost{
+  -webkit-appearance:none; appearance:none;
+  font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--brass-text); background:transparent; border:1px solid var(--hair-strong);
+  border-radius:4px; padding:6px 12px; cursor:pointer;
+}
+#scr-root .scr-btn-ghost:hover{ border-color:var(--brass); }
+#scr-root .scr-btn-save{
+  -webkit-appearance:none; appearance:none;
+  font-family:'Roboto Slab',Georgia,serif; font-weight:700; font-size:13px; letter-spacing:.01em;
+  color:#fff; background:var(--sage);
+  border:none; border-radius:5px; padding:8px 16px; cursor:pointer;
+}
+#scr-root .scr-btn-save:hover:not(:disabled){ filter:brightness(1.08); }
+#scr-root .scr-btn-save:disabled{ opacity:0.4; cursor:not-allowed; }
+#scr-root .scr-save-report{
+  font-size:12.5px; line-height:1.6; margin:10px 0 0; padding:10px 12px;
+  border-radius:4px; background:var(--surface-2); display:none;
+}
+#scr-root .scr-save-report.scr-show{ display:block; }
+#scr-root .scr-save-report .scr-save-ok{ color:var(--sage); }
+#scr-root .scr-save-report .scr-save-fail{ color:var(--rust); }
+#scr-root .scr-typeSelect{ font-size:12px; padding:3px 6px; }
+#scr-root .scr-results{ display:none; }
+#scr-root .scr-results.scr-show{ display:block; }
+#scr-root .scr-head-row{
+  display:flex; align-items:baseline; justify-content:space-between; gap:14px; flex-wrap:wrap;
+  margin-bottom:4px;
+}
+#scr-root .scr-head-row h2{ font-family:'Roboto Slab',Georgia,serif; font-size:19px; margin:0; }
+#scr-root .scr-actions{ display:flex; gap:8px; flex-wrap:wrap; }
+#scr-root .scr-meta{ font-size:12.5px; color:var(--parchment-dim); margin:0 0 16px; }
+#scr-root .scr-fields-row{ display:flex; gap:18px; flex-wrap:wrap; margin-bottom:18px; }
+#scr-root .scr-field{ display:flex; flex-direction:column; gap:4px; }
+#scr-root .scr-field label{
+  font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--parchment-dim);
+}
+#scr-root input[type="text"], #scr-root select{
+  font-family:inherit; font-size:13px; color:var(--parchment);
+  background:var(--surface-4); border:1px solid var(--hair-strong); border-radius:4px;
+  padding:7px 9px;
+}
+#scr-root input[type="text"]{ min-width:150px; }
+#scr-root input[type="checkbox"]{ width:16px; height:16px; }
+#scr-root .scr-row-excluded{ opacity:0.42; }
+#scr-root .scr-type-tag{
+  font-family:'JetBrains Mono',monospace; font-size:10px; padding:2px 7px;
+  border-radius:3px; background:var(--surface-4); color:var(--parchment-dim);
+}
+#scr-root .scr-toolbar{ display:flex; gap:10px; margin:14px 0; flex-wrap:wrap; }
+#scr-root .scr-footnote{ font-size:11.5px; color:var(--parchment-dim); margin-top:14px; line-height:1.5; }
+#scr-root input.scr-dateInput.scr-stale{
+  border-color:var(--rust); background:var(--rust-bg);
+}
+#scr-root .scr-stale-badge{
+  font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--rust); margin-left:6px;
+}
+</style>
+<header class="scr-masthead">
+<p class="scr-eyebrow">Troop Aquatics Desk</p>
+<h1>Swim Classification Record Generator</h1>
+<p class="scr-sub">Pick an upcoming campout, review who's signed up alongside their swim classification from TroopWebHost's swim test admin grids, then generate a filled BSA #19-122 Swim Classification Record -- and optionally save any corrected dates or levels straight back to TroopWebHost.</p>
+</header>
+<div class="scr-status" id="scr-modeCheck">Checking your TroopWebHost access level&hellip;</div>
+<div class="scr-restricted" id="scr-restricted" style="display:none;">
+<strong>This page is restricted to Adult Leaders.</strong>
+<p style="margin:8px 0 0;">Your TroopWebHost login doesn't have permission to pull the Upcoming Events list -- that screen is leader-only on this site. If you believe this is a mistake, contact your Troop's TroopWebHost administrator.</p>
+</div>
+<div class="scr-sheet" id="scr-listSheet" style="display:none;">
+<h2>Upcoming campouts</h2>
+<p class="scr-sheet-sub" id="scr-listSub">Loading&hellip;</p>
+<table>
+<thead><tr><th>Campout</th><th>Dates</th><th>Location</th><th></th></tr></thead>
+<tbody id="scr-eventsTbl"></tbody>
+</table>
+</div>
+<div class="scr-results" id="scr-results">
+<div class="scr-sheet">
+<div class="scr-head-row">
+<h2 id="scr-rosterTitle">Roster</h2>
+<div class="scr-actions">
+<button class="scr-btn" id="scr-generateBtn" type="button" disabled>Generate PDF</button>
+<button class="scr-btn-save" id="scr-saveBtn" type="button" disabled>Save to TroopWebHost</button>
+<button class="scr-btn-ghost" id="scr-closeBtn" type="button">Close</button>
+</div>
+</div>
+<p class="scr-meta" id="scr-rosterMeta"></p>
+<div class="scr-status" id="scr-rosterStatus">Loading attendees&hellip;</div>
+<div class="scr-fields-row" id="scr-headerFields" style="display:none;">
+<div class="scr-field">
+<label for="scr-unitNumber">Unit Number</label>
+<input type="text" id="scr-unitNumber" placeholder="e.g. Troop 1234">
+</div>
+<div class="scr-field">
+<label for="scr-testDate">Date of Swim Test (header field, optional)</label>
+<input type="text" id="scr-testDate" placeholder="leave blank -- per-person dates are shown by each name">
+</div>
+</div>
+<table id="scr-rosterTable" style="display:none;">
+<thead><tr><th></th><th>Name</th><th>Type</th><th>Test Date</th><th>Swim Level</th></tr></thead>
+<tbody id="scr-rosterTbl"></tbody>
+</table>
+<div class="scr-toolbar" id="scr-toolbar" style="display:none;">
+<button class="scr-btn-ghost" id="scr-addRowBtn" type="button">+ Add person</button>
+</div>
+<p class="scr-footnote" id="scr-rosterFootnote" style="display:none;">Medical Recheck (Parts A-B) and the supervisor sign-off block at the bottom of the form are left blank for the test supervisor to fill by hand -- TroopWebHost doesn't track either of those. Rosters over 15 people generate extra copies of the blank form page, filled 15 at a time, with the procedures page attached once at the end. A red "expired" flag on a Test Date means it's more than a year old -- BSA requires swim classification to be renewed annually; that person likely needs a retest before this trip. "Save to TroopWebHost" writes these Test Date / Swim Level values back to TroopWebHost's own swim classification records for each matched person -- a real database change, applied to everyone listed here regardless of whether their checkbox is ticked (the checkbox only controls who's on the generated PDF).</p>
+<div class="scr-save-report" id="scr-saveReport"></div>
+</div>
+</div>
+</div><!-- /#scr-root -->
+<script src="https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script>
+(function(){
+/* ============ CONFIG -- verify these against your own site ============
+   Upcoming Events widget + campout detail -- IDENTICAL calls to
+   Campout Rank-Requirement Gap, ported directly (see that file for the
+   full confirmation notes):
+     GET FormList.aspx?Menu_Item_ID=56931&Form_ID=163&Stack=2
+     GET FormDetail.aspx?Menu_Item_ID=56931&Form_ID=259&ID=<id>&Stack=3
+   The detail page embeds BOTH a "Scouts Attending This Event" table
+   (has a "Patrol" column) and an "Adults Attending This Event" table
+   (has "SYT Status" instead) -- this page reads both, since swim
+   classification covers everyone on the trip, not just Scouts.
+   Swim classification admin grids -- confirmed from a captured HAR of
+   the leader "Update Swim Test Dates" screens on this troop's site:
+     GET FormList.aspx?Menu_Item_ID=56934&Form_ID=2052&Stack=2  (Scouts)
+     GET FormList.aspx?Menu_Item_ID=56934&Form_ID=7322&Stack=2  (Adults)
+   Same URL for saving -- POST the page's own <form id="easyform">
+   (multipart/form-data) back to FormList.aspx with Selected_Action=save,
+   Hover_Action=save, Selected_Button_ID=BUTTON2 set on it first (that's
+   what clicking the on-page "Save" button does, confirmed straight out
+   of easyJSfunctionsV15.js). See note #3 at the top of this file for
+   the full explanation of why this is NOT an ASP.NET-viewstate postback
+   and why the entire form has to be echoed back rather than hand-built.
+   ========================================================================= */
+var SCR_EVENTS_LIST_URL = 'FormList.aspx?Menu_Item_ID=56931&Form_ID=163&Stack=2';
+var SCR_EVENT_MENU_ITEM_ID = '56931';
+var SCR_EVENT_DETAIL_FORM_ID = '259';
+function scrEventDetailUrl(id){ return 'FormDetail.aspx?Menu_Item_ID='+SCR_EVENT_MENU_ITEM_ID+'&Form_ID='+SCR_EVENT_DETAIL_FORM_ID+'&ID='+id+'&Stack=3'; }
+var SCR_SWIM_ADMIN_MENU_ITEM_ID = '56934';
+var SCR_SWIM_ADMIN_FORM_ID = { Scout:'2052', Adult:'7322' };
+function scrSwimAdminUrl(type){ return 'FormList.aspx?Menu_Item_ID='+SCR_SWIM_ADMIN_MENU_ITEM_ID+'&Form_ID='+SCR_SWIM_ADMIN_FORM_ID[type]+'&Stack=2'; }
+var SCR_LEVEL_VALUES = ['', 'Non-Swimmer', 'Beginner', 'Swimmer'];
+var SCR_CAMPOUT_EVENT_TYPE = 'campout'; // matched lowercase against the Event Type column
+var SCR_FETCH_TIMEOUT_MS = 15000;
+/* ================= LIVE SITE THEME (ported from Campout Rank Gap / OA Tracker) ================= */
+var scrSiteTheme = null;
+function scrSafeColor(v){
+  if(!v) return null;
+  if(/rgba?\(\s*0,\s*0,\s*0,\s*0\s*\)/.test(v) || v === 'transparent') return null;
+  return v;
+}
+function scrDarkenColor(rgbStr, amt){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  var r = Math.round(parseInt(m[1],10) * (1-amt));
+  var g = Math.round(parseInt(m[2],10) * (1-amt));
+  var b = Math.round(parseInt(m[3],10) * (1-amt));
+  return 'rgb('+r+', '+g+', '+b+')';
+}
+function scrToRgba(rgbStr, alpha){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  return 'rgba('+m[1]+','+m[2]+','+m[3]+','+alpha+')';
+}
+function scrProbeSiteTheme(){
+  var SENTINEL = 'rgb(1, 2, 3)';
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:absolute; left:-9999px; top:-9999px; visibility:hidden; pointer-events:none; color:'+SENTINEL+'; border-color:'+SENTINEL+';';
+  wrap.innerHTML =
+    '<div class="navtable" id="__scr_probe_navtable">'+
+      '<span class="navicon" id="__scr_probe_navicon"></span>'+
+      '<span class="navlink" id="__scr_probe_navlink"><a href="#" id="__scr_probe_navlink_a">x</a></span>'+
+    '</div>'+
+    '<div class="banner-div" id="__scr_probe_banner"></div>'+
+    '<ul class="nav-tabs"><li><a href="#" id="__scr_probe_tab">x</a></li></ul>'+
+    '<table class="table-striped"><thead><tr id="__scr_probe_gridhead"><th>x</th></tr></thead></table>'+
+    '<table class="table-curved"><tbody><tr><td id="__scr_probe_border">x</td></tr></tbody></table>'+
+    '<input class="form-control" id="__scr_probe_input">'+
+    '<span class="RequiredIndicator" id="__scr_probe_required">*</span>'+
+    '<a href="#" id="__scr_probe_control_a">x</a>';
+  document.body.appendChild(wrap);
+  function byId(id){ return document.getElementById(id); }
+  function cs(el){ return el ? getComputedStyle(el) : null; }
+  var bg = function(v){ return scrSafeColor(v); };
+  var inherited = function(v){ return (v && v !== SENTINEL) ? v : null; };
+  var navtableCs = cs(byId('__scr_probe_navtable'));
+  var bannerCs = cs(byId('__scr_probe_banner'));
+  var navlinkACs = cs(byId('__scr_probe_navlink_a'));
+  var controlACs = cs(byId('__scr_probe_control_a'));
+  var tabCs = cs(byId('__scr_probe_tab'));
+  var gridheadCs = cs(byId('__scr_probe_gridhead'));
+  var borderCs = cs(byId('__scr_probe_border'));
+  var inputCs = cs(byId('__scr_probe_input'));
+  var requiredCs = cs(byId('__scr_probe_required'));
+  var result = {
+    navy: bg(navtableCs && navtableCs.backgroundColor),
+    navyDark: bg(bannerCs && bannerCs.backgroundColor),
+    yellow: (navlinkACs && controlACs && navlinkACs.color !== controlACs.color) ? navlinkACs.color : null,
+    gold: bg(tabCs && tabCs.backgroundColor),
+    gridHead: bg(gridheadCs && gridheadCs.backgroundColor),
+    line: inherited(borderCs && borderCs.borderLeftColor),
+    card: bg(inputCs && inputCs.backgroundColor),
+    red: inherited(requiredCs && requiredCs.color),
+    paper: bg(getComputedStyle(document.body).backgroundColor)
+  };
+  wrap.remove();
+  if(!result.navyDark && result.navy) result.navyDark = scrDarkenColor(result.navy, 0.35);
+  return result;
+}
+function scrLuminance(rgbStr){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  function lin(c){ c = c/255; return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); }
+  return 0.2126*lin(+m[1]) + 0.7152*lin(+m[2]) + 0.0722*lin(+m[3]);
+}
+function scrMixWithWhite(rgbStr, amount){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  function clamp(v){ return Math.max(0, Math.min(255, Math.round(v))); }
+  var r = clamp(parseInt(m[1],10)*(1-amount) + 255*amount);
+  var g = clamp(parseInt(m[2],10)*(1-amount) + 255*amount);
+  var b = clamp(parseInt(m[3],10)*(1-amount) + 255*amount);
+  return 'rgb('+r+', '+g+', '+b+')';
+}
+function scrEnsureContrast(rgbStr, wantLight){
+  if(!rgbStr) return rgbStr;
+  var lum = scrLuminance(rgbStr);
+  if(lum == null) return rgbStr;
+  if(wantLight && lum < 0.45) return scrMixWithWhite(rgbStr, 0.55);
+  if(!wantLight && lum > 0.55) return scrDarkenColor(rgbStr, 0.55);
+  return rgbStr;
+}
+function scrApplyLiveSiteTheme(){
+  var root = document.getElementById('scr-root');
+  try{
+    var detected = scrProbeSiteTheme();
+    scrSiteTheme = detected;
+    if(!root) return;
+    var paperLum = detected.paper ? scrLuminance(detected.paper) : null;
+    var isLight = paperLum != null && paperLum > 0.5;
+    root.classList.toggle('scr-light', isLight);
+    var wantLightText = !isLight;
+    if(detected.navy){
+      root.style.setProperty('--navy', detected.navy);
+      root.style.setProperty('--navy-dark', detected.navyDark || scrDarkenColor(detected.navy, 0.35) || detected.navy);
+    }
+    var brass = detected.gold || detected.yellow;
+    if(brass){
+      root.style.setProperty('--brass', brass);
+      root.style.setProperty('--brass-light', brass);
+      root.style.setProperty('--brass-text', scrEnsureContrast(brass, wantLightText));
+      root.style.setProperty('--brass-glow', scrToRgba(brass, 0.1) || 'rgba(192,138,46,0.08)');
+    }
+    if(detected.red){
+      var rustText = scrEnsureContrast(detected.red, wantLightText);
+      root.style.setProperty('--rust', rustText);
+      root.style.setProperty('--rust-bg', scrToRgba(rustText, 0.25) || 'rgba(217,130,102,0.25)');
+    }
+  }catch(e){
+    console.warn('Swim Classification Form: theme detection failed, using built-in defaults:', e);
+  }finally{
+    if(root) root.classList.add('scr-ready');
+  }
+}
+// Runs immediately, not on DOMContentLoaded -- same reasoning as the
+// other custom pages: #scr-root already exists in the DOM by the time
+// this script tag runs, and waiting would only widen the
+// flash-of-wrong-theme window.
+scrApplyLiveSiteTheme();
+/* ================= UNIT LABEL AUTO-DETECT (ported from vCard Export) ================= */
+function discoverUnitLabel(){
+  try{
+    var title = document.title || '';
+    var m = title.match(/\b(Troop|Pack|Crew|Ship|Post)\s*#?\s*\d+[A-Za-z]?\b/i);
+    if(m) return m[0].replace(/\s+/g,' ').replace(/\s*#\s*/,' ').trim();
+  }catch(e){
+    console.warn('Swim Classification Form: unit label auto-detect failed:', e);
+  }
+  return '';
+}
+/* ================= FETCH HELPERS (ported from Campout Rank Gap) ================= */
+function scrFetchRaw(url, opts){
+  var controller = new AbortController();
+  var timer = setTimeout(function(){ controller.abort(); }, SCR_FETCH_TIMEOUT_MS);
+  var fetchOpts = { credentials:'same-origin', signal: controller.signal };
+  if(opts) for(var k in opts) fetchOpts[k] = opts[k];
+  return fetch(url, fetchOpts)
+    .catch(function(e){
+      if(e.name === 'AbortError') throw new Error(url+' timed out after '+(SCR_FETCH_TIMEOUT_MS/1000)+'s.');
+      throw e;
+    })
+    .then(function(res){
+      if(!res.ok) throw new Error(url+' responded HTTP '+res.status+'.');
+      if(res.redirected) throw new Error('REDIRECTED:'+res.url);
+      return res;
+    })
+    .finally(function(){ clearTimeout(timer); });
+}
+function scrFetchDoc(url){
+  return scrFetchRaw(url).then(function(res){ return res.text(); })
+    .then(function(text){ return new DOMParser().parseFromString(text, 'text/html'); });
+}
+function scrFetchReportBuffer(url){
+  return scrFetchRaw(url).then(function(res){
+    var ct = (res.headers.get('content-type')||'').toLowerCase();
+    if(ct.indexOf('html') !== -1) throw new Error(url+' returned a webpage instead of report data.');
+    return res.arrayBuffer();
+  });
+}
+function scrHeaderCells(table){
+  var headRow = table.querySelector('thead tr') || table.querySelector('tr');
+  if(!headRow) return [];
+  var cells = Array.prototype.slice.call(headRow.querySelectorAll('th,td'));
+  return cells.map(function(c){ return c.textContent.replace(/\s+/g,' ').trim(); });
+}
+function scrTableHasHeaders(table, headerWords){
+  var cells = scrHeaderCells(table);
+  var txt = cells.join(' | ').toLowerCase();
+  return headerWords.every(function(w){ return txt.indexOf(w.toLowerCase()) !== -1; });
+}
+function scrFindTable(doc, headerWords){
+  var tables = Array.prototype.slice.call(doc.querySelectorAll('table'));
+  for(var i=0;i<tables.length;i++){
+    if(scrTableHasHeaders(tables[i], headerWords)) return tables[i];
+  }
+  return null;
+}
+function scrColIndex(headerCells, label){
+  var l = label.toLowerCase();
+  for(var i=0;i<headerCells.length;i++){
+    if(headerCells[i].toLowerCase() === l) return i;
+  }
+  for(var i=0;i<headerCells.length;i++){
+    if(headerCells[i].toLowerCase().indexOf(l) !== -1) return i;
+  }
+  return -1;
+}
+function esc(s){ var d=document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
+/* ================= NAME MATCHING (same approach as the other tools' normName) ================= */
+function normName(name){
+  var parts = (name||'').split(',');
+  var last = (parts[0]||'').trim().toLowerCase();
+  var firstPart = (parts[1]||'').trim().toLowerCase();
+  var first = firstPart.split(/\s+/)[0] || '';
+  return last+'|'+first;
+}
+function parseEventDate(s){
+  if(!s) return null;
+  var datePart = String(s).trim().split(' ')[0];
+  var m = datePart.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(!m) return null;
+  var mo = m[1], da = m[2], yr = m[3];
+  yr = yr.length===2 ? (2000+parseInt(yr,10)) : parseInt(yr,10);
+  return new Date(yr, parseInt(mo,10)-1, parseInt(da,10));
+}
+function fmtDateRange(startStr, endStr){
+  return startStr === endStr ? startStr : (startStr+' - '+endStr);
+}
+/* ================= FETCH: upcoming campouts (ported from Campout Rank Gap) ================= */
+function fetchUpcomingCampouts(){
+  return scrFetchDoc(SCR_EVENTS_LIST_URL).then(function(doc){
+    var table = scrFindTable(doc, ['Event Type','Event','Start','End']);
+    if(!table) throw new Error('Upcoming Events list didn\'t have the expected columns -- TroopWebHost may have changed this page\'s layout.');
+    var headers = scrHeaderCells(table);
+    var idxType = scrColIndex(headers, 'Event Type');
+    var idxName = scrColIndex(headers, 'Event');
+    var idxLoc = scrColIndex(headers, 'Location');
+    var idxStart = scrColIndex(headers, 'Start');
+    var idxEnd = scrColIndex(headers, 'End');
+    var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr'));
+    var today = new Date(); today.setHours(0,0,0,0);
+    var out = [];
+    rows.forEach(function(row){
+      var cells = row.cells;
+      if(!cells || cells.length < headers.length) return; // skip TWH's colspan "no data" placeholder row
+      var typeText = (idxType>=0 && cells[idxType]) ? cells[idxType].textContent.replace(/\s+/g,' ').trim() : '';
+      if(typeText.toLowerCase() !== SCR_CAMPOUT_EVENT_TYPE) return;
+      var nameCell = idxName>=0 ? cells[idxName] : null;
+      var nameText = nameCell ? nameCell.textContent.replace(/\s+/g,' ').trim() : '';
+      var link = nameCell ? nameCell.querySelector('a[onclick]') : null;
+      var idMatch = link ? link.getAttribute('onclick').match(/[?&]ID=(\d+)/) : null;
+      if(!idMatch) return;
+      var startText = (idxStart>=0 && cells[idxStart]) ? cells[idxStart].textContent.replace(/\s+/g,' ').trim() : '';
+      var endText = (idxEnd>=0 && cells[idxEnd]) ? cells[idxEnd].textContent.replace(/\s+/g,' ').trim() : '';
+      var startDate = parseEventDate(startText);
+      if(startDate && startDate < today) return;
+      out.push({
+        id: idMatch[1],
+        name: nameText || '(untitled campout)',
+        location: (idxLoc>=0 && cells[idxLoc]) ? cells[idxLoc].textContent.replace(/\s+/g,' ').trim() : '',
+        start: startText, end: endText, startDate: startDate
+      });
+    });
+    out.sort(function(a,b){
+      if(a.startDate && b.startDate) return a.startDate - b.startDate;
+      return 0;
+    });
+    return out;
+  });
+}
+/* ================= FETCH: attendees for one campout (Scouts AND Adults) ================= */
+function fetchCampoutAttendees(eventId){
+  return scrFetchDoc(scrEventDetailUrl(eventId)).then(function(doc){
+    var tables = Array.prototype.slice.call(doc.querySelectorAll('table'));
+    var out = [];
+    tables.forEach(function(table){
+      var headers = scrHeaderCells(table);
+      var idxName = scrColIndex(headers, 'Participant');
+      var idxPatrol = scrColIndex(headers, 'Patrol');
+      var idxSyt = scrColIndex(headers, 'SYT Status');
+      // Require Participant PLUS one of the two type-specific columns --
+      // same pairing Campout Rank-Requirement Gap uses (['Participant',
+      // 'Patrol']). A bare "Participant" column alone also matches other
+      // widgets on this page (e.g. an add-participant picker listing the
+      // whole troop), which was leaking non-attendees in as fake
+      // "Adults" since they lack a Patrol column. Requiring the pairing
+      // is what actually scopes this to the two real attendee tables.
+      if(idxName === -1 || (idxPatrol === -1 && idxSyt === -1)) return; // not an attendee table
+      var type = idxPatrol >= 0 ? 'Scout' : 'Adult';
+      var rows = Array.prototype.slice.call(table.querySelectorAll('tbody tr'));
+      rows.forEach(function(row){
+        var cells = row.cells;
+        if(!cells || cells.length < headers.length) return; // skip TWH's colspan "no data" placeholder row
+        var name = (idxName>=0 && cells[idxName]) ? cells[idxName].textContent.replace(/\s+/g,' ').trim() : '';
+        if(!name) return;
+        out.push({ name:name, type:type, key: type.charAt(0)+'|'+normName(name) });
+      });
+    });
+    // Scouts first (alphabetical), then Adults (alphabetical) -- NOT one
+    // combined alphabetical list, so the generated form reads the way a
+    // test supervisor expects (youth roster, then adult roster).
+    var typeOrder = { 'Scout':0, 'Adult':1 };
+    out.sort(function(a,b){
+      var ta = typeOrder.hasOwnProperty(a.type) ? typeOrder[a.type] : 2;
+      var tb = typeOrder.hasOwnProperty(b.type) ? typeOrder[b.type] : 2;
+      if(ta !== tb) return ta - tb;
+      return a.name.localeCompare(b.name);
+    });
+    return out;
+  });
+}
+/* ================= FETCH: swim classification admin grid (Scout or Adult) =================
+   Reads TroopWebHost's own "Update Swim Test Dates" grid for the given
+   type -- the same page a leader edits directly. Returns everything
+   needed both to display current values AND to save changes later: the
+   parsed Document (kept around, un-mutated except by
+   scrSaveChangesToTwh), its <form id="easyform">, and one record per
+   row holding a direct reference to that row's real date <input> and
+   level <select> DOM nodes.
+   Column IDs baked into TWH's own field names (e.g. "44039") are
+   internal database IDs specific to this troop's install, so this
+   deliberately never hardcodes them -- each row is identified purely by
+   DOM shape (an input[type=text] + a <select> inside a <tr>, with the
+   first <td> holding the read-only display name), the same
+   never-hardcode-site-specific-IDs reasoning as OA Tracker's
+   discoverSelfSectionId(). */
+function fetchSwimGrid(type){
+  return scrFetchDoc(scrSwimAdminUrl(type)).then(function(doc){
+    var formEl = doc.getElementById('easyform');
+    if(!formEl) throw new Error('The '+type+' swim classification admin page didn\'t have the expected editable form -- TroopWebHost may have changed this page, or your login may not have edit rights here.');
+    var table = scrFindTable(doc, ['Name', 'Swim Date', 'Swim Level']);
+    if(!table) throw new Error('The '+type+' swim classification admin page didn\'t have the expected grid columns.');
+    var trs = Array.prototype.slice.call(table.querySelectorAll('tbody tr'));
+    var byNorm = {};
+    var list = [];
+    trs.forEach(function(tr){
+      var dateInput = tr.querySelector('input[type="text"]');
+      var levelSelect = tr.querySelector('select');
+      if(!dateInput || !levelSelect) return; // not a real data row
+      var nameCell = tr.querySelector('td');
+      var name = nameCell ? nameCell.textContent.replace(/\s+/g,' ').trim() : '';
+      if(!name) return;
+      var rec = { name:name, dateInput:dateInput, levelSelect:levelSelect, key:normName(name) };
+      list.push(rec);
+      byNorm[rec.key] = rec;
+    });
+    if(!list.length) throw new Error('The '+type+' swim classification admin page came back with zero rows.');
+    return { type:type, doc:doc, formEl:formEl, rows:list, byNorm:byNorm };
+  });
+}
+var swimGridCache = { Scout:null, Adult:null }; // each becomes a resolved fetchSwimGrid() result, fetched once and reused/refreshed for the rest of the page session
+function getSwimGrid(type, forceRefresh){
+  if(!forceRefresh && swimGridCache[type]) return Promise.resolve(swimGridCache[type]);
+  return fetchSwimGrid(type).then(function(grid){ swimGridCache[type] = grid; return grid; });
+}
+/* ================= SAVE: write Test Date / Swim Level back to TroopWebHost =================
+   Mutates the ALREADY-FETCHED grid Document in place (only the fields
+   that need to change), then serializes that page's own <form> with
+   the real FormData API so every other row's OLD/current pair goes
+   back byte-for-byte identical to what TroopWebHost just sent -- this
+   is what makes it safe to always POST the whole ~50-80 row page just
+   to change one or two people. See note #3 at the top of this file. */
+function scrSubmitSwimGrid(grid){
+  var fd = new FormData(grid.formEl);
+  fd.set('Selected_Action', 'save');
+  fd.set('Hover_Action', 'save');
+  fd.set('Selected_Button_ID', 'BUTTON2'); // BUTTON2 = the plain "Save" button (stays on page); confirmed in easyJSfunctionsV15.js
+  return scrFetchRaw(scrSwimAdminUrl(grid.type), { method:'POST', body:fd }).then(function(){ return true; });
+}
+function scrSaveChangesToTwh(rosterRows){
+  // rosterRows: [{ name, type, date, level }] -- ALL roster rows regardless
+  // of the PDF-inclusion checkbox; save-to-database is independent of
+  // what ends up on the printed form.
+  var byType = { Scout:[], Adult:[] };
+  rosterRows.forEach(function(r){
+    if(!r.name) return;
+    if(byType[r.type]) byType[r.type].push(r);
+  });
+  var types = Object.keys(byType).filter(function(t){ return byType[t].length; });
+  if(!types.length) return Promise.resolve({ saved:[], notFound:[], unchanged:[] });
+  var saved = [], notFound = [], unchanged = [];
+  // Sequential across types AND across the fetch-mutate-post-verify
+  // steps within each type -- never concurrent against TWH.
+  var chain = Promise.resolve();
+  types.forEach(function(type){
+    chain = chain.then(function(){
+      return getSwimGrid(type, true); // always refetch fresh right before editing -- avoids acting on a stale page from earlier in the session
+    }).then(function(grid){
+      var toSave = [];
+      byType[type].forEach(function(r){
+        var rec = grid.byNorm[normName(r.name)];
+        if(!rec){ notFound.push(r.name+' ('+type+')'); return; }
+        var dateChanged = rec.dateInput.value.trim() !== (r.date||'').trim();
+        var levelChanged = rec.levelSelect.value !== (r.level||'');
+        if(!dateChanged && !levelChanged){ unchanged.push(r.name); return; }
+        rec.dateInput.value = (r.date||'').trim();
+        rec.levelSelect.value = SCR_LEVEL_VALUES.indexOf(r.level) !== -1 ? r.level : '';
+        toSave.push({ name:r.name, rec:rec, wantDate:(r.date||'').trim(), wantLevel:r.level||'' });
+      });
+      if(!toSave.length) return;
+      return scrSubmitSwimGrid(grid).then(function(){
+        // Verify: refetch fresh and confirm each intended field actually stuck.
+        return getSwimGrid(type, true).then(function(freshGrid){
+          toSave.forEach(function(item){
+            var freshRec = freshGrid.byNorm[normName(item.name)];
+            var ok = freshRec && freshRec.dateInput.value.trim() === item.wantDate && freshRec.levelSelect.value === item.wantLevel;
+            if(ok) saved.push(item.name); else notFound.push(item.name+' (save did not verify)');
+          });
+        });
+      });
+    });
+  });
+  return chain.then(function(){ return { saved:saved, notFound:notFound, unchanged:unchanged }; });
+}
+
+/* ================= PDF GENERATION (pdf-lib, overlaying the embedded original form) =================
+   The real #19-122 form has no fillable AcroForm fields -- it's a plain
+   Word export. These coordinates were measured directly from the
+   form's own PDF text layer (row-number and header-label positions)
+   and confirmed against a rendered test overlay. See note #5 at the
+   top of this file. PDF coordinates are measured from the BOTTOM of
+   the page (standard PDF space); page height is 792pt (US Letter). */
+var SCR_PAGE_H = 792;
+var SCR_ROW1_TOP = 175.0;   // top border of row 1, measured from TOP of page
+var SCR_ROW_H = 18.02;      // row height, confirmed uniform across all 15 rows
+var SCR_BASELINE_OFF = 13.5; // offset from a row's top border down to a comfortable text baseline
+var SCR_NAME_X = 96;
+var SCR_NAME_MAXW = 210;    // Full Name column is ~92-317pt wide; leaves padding both sides
+var SCR_COL_CENTERS = { 'Non-Swimmer':394.4, 'Beginner':460.5, 'Swimmer':526.7 };
+var SCR_HEADER_Y_TOP = 124.1; // baseline for the Unit Number / Date of Swim Test line
+var SCR_UNIT_X = 152;
+var SCR_DATE_X = 435;
+function scrFitSize(font, text, maxWidth, startSize, minSize){
+  var size = startSize;
+  while(size > minSize && font.widthOfTextAtSize(text, size) > maxWidth) size -= 0.5;
+  return size;
+}
+function scrDrawHeader(page, font, unitText, dateText){
+  var y = SCR_PAGE_H - SCR_HEADER_Y_TOP;
+  if(unitText) page.drawText(unitText, { x:SCR_UNIT_X, y:y, size:10, font:font, color:PDFLib.rgb(0,0,0) });
+  if(dateText) page.drawText(dateText, { x:SCR_DATE_X, y:y, size:10, font:font, color:PDFLib.rgb(0,0,0) });
+}
+function scrDrawRow(page, font, fontBold, i, r){
+  var yTop = SCR_ROW1_TOP + i*SCR_ROW_H + SCR_BASELINE_OFF;
+  var y = SCR_PAGE_H - yTop;
+  var label = r.name || '';
+  if(r.date) label += ' ('+r.date+')';
+  var size = scrFitSize(font, label, SCR_NAME_MAXW, 9, 6);
+  page.drawText(label, { x:SCR_NAME_X, y:y, size:size, font:font, color:PDFLib.rgb(0,0,0) });
+  var cx = SCR_COL_CENTERS[r.level];
+  if(cx){
+    var w = fontBold.widthOfTextAtSize('X', 10);
+    page.drawText('X', { x:cx-w/2, y:y, size:10, font:fontBold, color:PDFLib.rgb(0,0,0) });
+  }
+}
+function scrBuildPdf(rows, unitNumber, headerDate){
+  return scrFetchTemplateBytes().then(function(templateBytes){
+  return PDFLib.PDFDocument.load(templateBytes).then(function(templateDoc){
+    return PDFLib.PDFDocument.create().then(function(outDoc){
+      return outDoc.embedFont(PDFLib.StandardFonts.Helvetica).then(function(font){
+        return outDoc.embedFont(PDFLib.StandardFonts.HelveticaBold).then(function(fontBold){
+          var perPage = 15;
+          var pageCount = Math.max(1, Math.ceil(rows.length/perPage));
+          // Sequential (not Promise.all) on purpose -- pdf-lib copyPages
+          // calls all touch the same in-memory templateDoc/outDoc, and
+          // this repo's convention is to never assume concurrent async
+          // work against shared state is safe.
+          var chain = Promise.resolve();
+          var _loop = function(p){
+            chain = chain.then(function(){
+              return outDoc.copyPages(templateDoc, [0]).then(function(copied){
+                var page = copied[0];
+                outDoc.addPage(page);
+                var chunk = rows.slice(p*perPage, p*perPage+perPage);
+                var unitText = unitNumber || '';
+                if(pageCount>1) unitText = (unitText ? unitText+'  ' : '')+'(page '+(p+1)+' of '+pageCount+')';
+                scrDrawHeader(page, font, unitText, headerDate||'');
+                chunk.forEach(function(r, i){ scrDrawRow(page, font, fontBold, i, r); });
+              });
+            });
+          };
+          for(var p=0; p<pageCount; p++) _loop(p);
+          return chain.then(function(){
+            return outDoc.copyPages(templateDoc, [1]);
+          }).then(function(proceduresCopy){
+            outDoc.addPage(proceduresCopy[0]);
+            return outDoc.save();
+          });
+        });
+      });
+    });
+  });
+  });
+}
+function triggerDownload(blob, filename){
+  var url = URL.createObjectURL(blob);
+  var a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+}
+function sanitizeFilePart(s){
+  return String(s||'').replace(/[\\\/:*?"<>|]/g,'').trim();
+}
+/* ================= RENDER: campout list ================= */
+var elModeCheck = document.getElementById('scr-modeCheck');
+var elRestricted = document.getElementById('scr-restricted');
+var elListSheet = document.getElementById('scr-listSheet');
+var elListSub = document.getElementById('scr-listSub');
+var elEventsTbl = document.getElementById('scr-eventsTbl');
+var elResults = document.getElementById('scr-results');
+var elRosterTitle = document.getElementById('scr-rosterTitle');
+var elRosterMeta = document.getElementById('scr-rosterMeta');
+var elRosterStatus = document.getElementById('scr-rosterStatus');
+var elHeaderFields = document.getElementById('scr-headerFields');
+var elUnitNumber = document.getElementById('scr-unitNumber');
+var elTestDate = document.getElementById('scr-testDate');
+var elRosterTable = document.getElementById('scr-rosterTable');
+var elRosterTbl = document.getElementById('scr-rosterTbl');
+var elToolbar = document.getElementById('scr-toolbar');
+var elAddRowBtn = document.getElementById('scr-addRowBtn');
+var elFootnote = document.getElementById('scr-rosterFootnote');
+var elGenerateBtn = document.getElementById('scr-generateBtn');
+var elSaveBtn = document.getElementById('scr-saveBtn');
+var elSaveReport = document.getElementById('scr-saveReport');
+var elCloseBtn = document.getElementById('scr-closeBtn');
+var currentEvent = null;
+var LEVEL_OPTIONS = ['', 'Non-Swimmer', 'Beginner', 'Swimmer'];
+function renderEventsTable(events){
+  elEventsTbl.innerHTML = '';
+  if(!events.length){
+    var tr = document.createElement('tr');
+    tr.innerHTML = '<td colspan="4" class="scr-empty-row">No upcoming campouts found on the calendar.</td>';
+    elEventsTbl.appendChild(tr);
+    return;
+  }
+  events.forEach(function(ev){
+    var tr = document.createElement('tr');
+    tr.className = 'scr-event-row';
+    tr.innerHTML =
+      '<td class="scr-name">'+esc(ev.name)+'</td>'+
+      '<td>'+esc(fmtDateRange(ev.start, ev.end))+'</td>'+
+      '<td>'+esc(ev.location)+'</td>'+
+      '<td>'+'</td>';
+    tr.addEventListener('click', function(){ selectEvent(ev, tr); });
+    elEventsTbl.appendChild(tr);
+  });
+}
+/* ================= ANNUAL RENEWAL CHECK =================
+   BSA requires swim classification to be renewed annually. A Test Date
+   older than one year from today gets flagged in the roster (not on
+   the generated PDF -- the printed form has no room for a warning
+   note, so this is purely an on-screen heads-up before you generate). */
+function scrIsDateStale(dateStr){
+  var d = parseEventDate(dateStr);
+  if(!d) return false; // blank or unparseable -- not flagged here, that's a separate "never tested" concern
+  var cutoff = new Date();
+  cutoff.setFullYear(cutoff.getFullYear() - 1);
+  return d < cutoff;
+}
+function scrUpdateStaleFlag(tr){
+  var dateInput = tr.querySelector('.scr-dateInput');
+  var badge = tr.querySelector('.scr-stale-badge');
+  var stale = scrIsDateStale(dateInput.value.trim());
+  dateInput.classList.toggle('scr-stale', stale);
+  if(badge) badge.style.display = stale ? '' : 'none';
+}
+function renderRosterRow(person){
+  var tr = document.createElement('tr');
+  var checked = true;
+  tr.innerHTML =
+    '<td><input type="checkbox" class="scr-inc" checked></td>'+
+    '<td><input type="text" class="scr-nameInput" value="'+esc(person.name)+'" style="min-width:200px;"></td>'+
+    '<td><select class="scr-typeSelect"><option value="Scout">Scout</option><option value="Adult">Adult</option></select></td>'+
+    '<td><input type="text" class="scr-dateInput" value="'+esc(person.date||'')+'" style="min-width:100px;" placeholder="m/d/yyyy">'+
+      '<span class="scr-stale-badge" style="display:none;" title="More than a year since this test -- BSA requires annual renewal">expired</span></td>'+
+    '<td><select class="scr-levelSelect"></select></td>';
+  var typeSel = tr.querySelector('.scr-typeSelect');
+  typeSel.value = (person.type === 'Adult') ? 'Adult' : 'Scout';
+  var sel = tr.querySelector('.scr-levelSelect');
+  LEVEL_OPTIONS.forEach(function(opt){
+    var o = document.createElement('option');
+    o.value = opt; o.textContent = opt || '(blank)';
+    if(opt === (person.level||'')) o.selected = true;
+    sel.appendChild(o);
+  });
+  var incBox = tr.querySelector('.scr-inc');
+  incBox.addEventListener('change', function(){
+    tr.classList.toggle('scr-row-excluded', !incBox.checked);
+  });
+  var dateInput = tr.querySelector('.scr-dateInput');
+  dateInput.addEventListener('input', function(){ scrUpdateStaleFlag(tr); });
+  scrUpdateStaleFlag(tr);
+  return tr;
+}
+function addBlankRow(){
+  elRosterTbl.appendChild(renderRosterRow({ name:'', type:'', date:'', level:'' }));
+}
+function selectEvent(ev, rowEl){
+  currentEvent = ev;
+  Array.prototype.slice.call(elEventsTbl.querySelectorAll('tr.scr-selected')).forEach(function(r){ r.classList.remove('scr-selected'); });
+  if(rowEl) rowEl.classList.add('scr-selected');
+  elResults.classList.add('scr-show');
+  elRosterTitle.textContent = 'Roster: '+ev.name;
+  elRosterMeta.textContent = fmtDateRange(ev.start, ev.end)+(ev.location ? ' -- '+ev.location : '');
+  elRosterStatus.style.display = '';
+  elRosterStatus.classList.remove('scr-err');
+  elRosterStatus.textContent = 'Loading attendees...';
+  elHeaderFields.style.display = 'none';
+  elRosterTable.style.display = 'none';
+  elToolbar.style.display = 'none';
+  elFootnote.style.display = 'none';
+  elGenerateBtn.disabled = true;
+  elSaveBtn.disabled = true;
+  elSaveReport.classList.remove('scr-show');
+  elSaveReport.innerHTML = '';
+  elRosterTbl.innerHTML = '';
+  // Sequential throughout: attendees, then whichever swim admin grid(s)
+  // are actually needed for the types present -- never concurrent
+  // against TWH, per this repo's fetch rule.
+  fetchCampoutAttendees(ev.id).then(function(attendees){
+    var needScout = attendees.some(function(p){ return p.type === 'Scout'; });
+    var needAdult = attendees.some(function(p){ return p.type === 'Adult'; });
+    var chain = Promise.resolve({});
+    if(needScout) chain = chain.then(function(grids){ return getSwimGrid('Scout').then(function(g){ grids.Scout = g; return grids; }); });
+    if(needAdult) chain = chain.then(function(grids){ return getSwimGrid('Adult').then(function(g){ grids.Adult = g; return grids; }); });
+    return chain.then(function(grids){ return { attendees:attendees, grids:grids }; });
+  }).then(function(res){
+    elRosterStatus.style.display = 'none';
+    if(!res.attendees.length){
+      elRosterStatus.style.display = '';
+      elRosterStatus.textContent = 'No one is currently signed up for this campout.';
+      return;
+    }
+    res.attendees.forEach(function(person){
+      var grid = res.grids[person.type];
+      var match = grid ? grid.byNorm[normName(person.name)] : null;
+      elRosterTbl.appendChild(renderRosterRow({
+        name: person.name,
+        type: person.type,
+        date: match ? match.dateInput.value.trim() : '',
+        level: match ? match.levelSelect.value : ''
+      }));
+    });
+    elHeaderFields.style.display = '';
+    elRosterTable.style.display = '';
+    elToolbar.style.display = '';
+    elFootnote.style.display = '';
+    elGenerateBtn.disabled = false;
+    elSaveBtn.disabled = false;
+  }).catch(function(err){
+    elRosterStatus.style.display = '';
+    elRosterStatus.classList.add('scr-err');
+    elRosterStatus.textContent = 'Could not load attendees: '+err.message;
+  });
+}
+elAddRowBtn.addEventListener('click', function(){ addBlankRow(); });
+elCloseBtn.addEventListener('click', function(){
+  elResults.classList.remove('scr-show');
+  Array.prototype.slice.call(elEventsTbl.querySelectorAll('tr.scr-selected')).forEach(function(r){ r.classList.remove('scr-selected'); });
+});
+function scrReadRosterRows(onlyIncluded){
+  var rows = [];
+  Array.prototype.slice.call(elRosterTbl.querySelectorAll('tr')).forEach(function(tr){
+    var inc = tr.querySelector('.scr-inc');
+    if(onlyIncluded && (!inc || !inc.checked)) return;
+    var name = tr.querySelector('.scr-nameInput').value.trim();
+    if(!name) return;
+    rows.push({
+      name: name,
+      type: tr.querySelector('.scr-typeSelect').value,
+      date: tr.querySelector('.scr-dateInput').value.trim(),
+      level: tr.querySelector('.scr-levelSelect').value
+    });
+  });
+  return rows;
+}
+elGenerateBtn.addEventListener('click', function(){
+  var rows = scrReadRosterRows(true);
+  if(!rows.length){
+    alert('No one is checked -- check at least one row before generating.');
+    return;
+  }
+  elGenerateBtn.disabled = true;
+  elGenerateBtn.textContent = 'Generating...';
+  var unitNumber = elUnitNumber.value.trim();
+  var headerDate = elTestDate.value.trim();
+  scrBuildPdf(rows, unitNumber, headerDate).then(function(bytes){
+    var blob = new Blob([bytes], { type:'application/pdf' });
+    var namePart = sanitizeFilePart(currentEvent && currentEvent.name) || 'Campout';
+    triggerDownload(blob, 'Swim Classification Record - '+namePart+'.pdf');
+  }).catch(function(err){
+    alert('Could not generate the PDF: '+err.message);
+  }).finally(function(){
+    elGenerateBtn.disabled = false;
+    elGenerateBtn.textContent = 'Generate PDF';
+  });
+});
+elSaveBtn.addEventListener('click', function(){
+  var rows = scrReadRosterRows(false); // ALL rows, regardless of PDF-inclusion checkbox
+  if(!rows.length){
+    alert('The roster is empty -- nothing to save.');
+    return;
+  }
+  var byType = { Scout:0, Adult:0 };
+  rows.forEach(function(r){ if(byType.hasOwnProperty(r.type)) byType[r.type]++; });
+  var confirmMsg = 'Save Test Date / Swim Level to TroopWebHost for '+rows.length+' '+
+    (rows.length===1?'person':'people')+' ('+byType.Scout+' Scout, '+byType.Adult+' Adult)?\n\n'+
+    'This writes directly to TroopWebHost\'s swim classification records -- '+
+    'the same as editing them in TWH\'s own admin grid and clicking Save. '+
+    'Only rows whose date or level actually differs from what\'s currently '+
+    'saved will be touched.';
+  if(!confirm(confirmMsg)) return;
+  elSaveBtn.disabled = true;
+  elSaveBtn.textContent = 'Saving...';
+  elSaveReport.classList.remove('scr-show');
+  elSaveReport.innerHTML = '';
+  scrSaveChangesToTwh(rows).then(function(result){
+    var parts = [];
+    if(result.saved.length) parts.push('<div class="scr-save-ok">Saved: '+esc(result.saved.join(', '))+'</div>');
+    if(result.unchanged.length) parts.push('<div>Already up to date (no changes needed): '+esc(result.unchanged.join(', '))+'</div>');
+    if(result.notFound.length) parts.push('<div class="scr-save-fail">Could not save (see below): '+esc(result.notFound.join(', '))+'</div>');
+    if(!parts.length) parts.push('<div>Nothing to save.</div>');
+    elSaveReport.innerHTML = parts.join('');
+    elSaveReport.classList.add('scr-show');
+  }).catch(function(err){
+    elSaveReport.innerHTML = '<div class="scr-save-fail">Save failed: '+esc(err.message)+'</div>';
+    elSaveReport.classList.add('scr-show');
+  }).finally(function(){
+    elSaveBtn.disabled = false;
+    elSaveBtn.textContent = 'Save to TroopWebHost';
+  });
+});
+/* ================= INIT ================= */
+function init(){
+  elUnitNumber.value = discoverUnitLabel();
+  fetchUpcomingCampouts().then(function(events){
+    elModeCheck.style.display = 'none';
+    elListSheet.style.display = '';
+    elListSub.textContent = events.length
+      ? 'Click a campout to see who\'s signed up and their swim classification.'
+      : 'No upcoming campouts were found on the calendar.';
+    renderEventsTable(events);
+  }).catch(function(err){
+    if(String(err.message||'').indexOf('REDIRECTED:') === 0){
+      elModeCheck.style.display = 'none';
+      elRestricted.style.display = '';
+      return;
+    }
+    elModeCheck.classList.add('scr-err');
+    elModeCheck.textContent = 'Could not load this page: '+err.message;
+  });
+}
+var SCR_TEMPLATE_PDF_URL = "https://raw.githubusercontent.com/gammann/TroopWebHost/main/Swim_Classification/Swim-Classificaiton-record-430-122.pdf";
+var scrTemplateBytesPromise = null; // fetched once per page load, cached
+function scrFetchTemplateBytes(){
+  if(scrTemplateBytesPromise) return scrTemplateBytesPromise;
+  // This is a genuine cross-origin request (raw.githubusercontent.com,
+  // not troopwebhost.org) -- unlike every other fetch in this file it
+  // must NOT use credentials:same-origin semantics for a foreign host,
+  // and TWH session redirects are meaningless here, so this intentionally
+  // does not go through scrFetchRaw. raw.githubusercontent.com sends
+  // Access-Control-Allow-Origin: * on all public files (confirmed by
+  // inspecting its response headers), which is what makes this fetch
+  // legal from a troopwebhost.org page at all -- scouting.org's own PDF
+  // host does not send that header, so fetching the original BSA file
+  // directly from the browser is blocked by CORS; this GitHub copy is
+  // the workaround. If you fork this repo, update the URL above to
+  // point at your own fork, and keep the PDF unmodified so the
+  // coordinates in scrDrawHeader/scrDrawRow stay correct.
+  var controller = new AbortController();
+  var timer = setTimeout(function(){ controller.abort(); }, SCR_FETCH_TIMEOUT_MS);
+  scrTemplateBytesPromise = fetch(SCR_TEMPLATE_PDF_URL, { signal: controller.signal })
+    .catch(function(e){
+      if(e.name === "AbortError") throw new Error("Timed out fetching the template PDF from GitHub.");
+      throw new Error("Could not fetch the template PDF from GitHub (network/CORS error): " + e.message);
+    })
+    .then(function(res){
+      if(!res.ok) throw new Error("GitHub returned HTTP " + res.status + " fetching the template PDF -- check that it has been pushed to " + SCR_TEMPLATE_PDF_URL);
+      return res.arrayBuffer();
+    })
+    .then(function(buf){ return new Uint8Array(buf); })
+    .finally(function(){ clearTimeout(timer); });
+  return scrTemplateBytesPromise;
+}
+init();
+})();
+</script>
