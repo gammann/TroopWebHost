@@ -42,11 +42,10 @@ And the actual generated PDF — the real, unmodified BSA form with names, per-p
 
 ## Installation
 
-1. Push this folder's `Swim-Classificaiton-record-430-122.pdf` to your own fork of this repo (or use this repo directly) — the page fetches it live at runtime rather than embedding it, so it has to actually be present at the path `SCR_TEMPLATE_PDF_URL` points to in the CONFIG section.
-2. Open `swim-classification-form.html`, copy its entire contents.
-3. In TroopWebHost, go to **Manage Custom Pages**.
-4. Create a new Custom Page (or edit an existing one) and paste the whole block into the HTML editor.
-5. Save, then open the page.
+1. Open `swim-classification-form.html`, copy its entire contents. No separate PDF upload needed — the page fetches the official BSA form live from `scouting.org` at runtime, confirmed working from a live TWH site.
+2. In TroopWebHost, go to **Manage Custom Pages**.
+3. Create a new Custom Page (or edit an existing one) and paste the whole block into the HTML editor.
+4. Save, then open the page.
 
 This only works pasted directly into TroopWebHost's own site (same-origin) — it relies on your logged-in session to fetch and save records. It will not work copied into an external site or previewed elsewhere.
 
@@ -88,13 +87,13 @@ These are lessons from real bugs or deliberate design decisions, kept here so th
 - **Medical expiration math is deliberately different from swim's.** Swim uses a rolling 365-day cutoff. Medical clearance is valid through the *last day of the month*, 12 months after the earlier of Part A/B — a real BSA rule, not a rounding shortcut. See `scrMedicalExpirationDate()`.
 - **The Medical Recheck grid is read-only by design, and intentionally left off the printed PDF.** TroopWebHost's Medical Part A/B dates are tracked and flagged on-screen so a leader can catch a lapsed clearance before the trip, but there's no write path for it here (only swim data saves back), and the generated form's "Medical Recheck Parts A-B" column is left blank rather than printed — a deliberate choice, not an oversight, so double check with your own council/unit's paperwork practice if you'd rather it appear on the form.
 - **The real #19-122 PDF has no fillable AcroForm fields** — it's a plain Word export. Text is drawn on top of the unmodified original at coordinates measured directly from the form's own PDF text layer plus a rendered test overlay, using pdf-lib in the browser.
-- **The PDF template is fetched at runtime, not embedded as base64.** `raw.githubusercontent.com` sends `Access-Control-Allow-Origin: *` on public files (confirmed by inspecting its response headers) — `scouting.org`'s own PDF host does not send that header at all, so fetching the original file directly from the browser is blocked by CORS. This repo's own copy of the unmodified form is the workaround, and it also keeps the pasted custom-page HTML around 60KB instead of 240KB+.
+- **The PDF template is fetched at runtime, not embedded as base64.** It's fetched straight from BSA's own official host (`scouting.org`), confirmed working from a live TWH site — despite an earlier version of this file assuming (incorrectly, or based on since-changed hosting) that scouting.org blocked cross-origin fetches and routing around it via a copy of the PDF staged on `raw.githubusercontent.com` instead. That staged copy (`Swim-Classificaiton-record-430-122.pdf` in this folder) is kept as a fallback — if scouting.org ever does start blocking this fetch, point `SCR_TEMPLATE_PDF_URL` at your own fork's raw.githubusercontent.com copy instead. Fetching directly from scouting.org also keeps the pasted custom-page HTML around 60KB instead of 240KB+, same as the GitHub-hosted approach did.
 - **The printed form has only one "Date of Swim Test" field and 15 numbered rows.** Since test dates vary across a real roster, each person's own date is appended after their name in parentheses instead. Rosters over 15 people get additional copies of the blank template page, with the static procedures page attached once at the very end.
 - **Access control here is a redirect, not an HTTP error.** Same as every other tool in this repo: `fetch()` follows redirects transparently, so the tell that a login can't reach a given page is `res.redirected`, not a non-2xx status.
 
 ## Troubleshooting
 
-- **"Could not fetch the template PDF from GitHub"**: confirm `Swim-Classificaiton-record-430-122.pdf` has actually been pushed to the path `SCR_TEMPLATE_PDF_URL` points at in CONFIG, on the branch that URL references.
+- **"Could not fetch the template PDF"**: check that `SCR_TEMPLATE_PDF_URL` in CONFIG is reachable and returns a PDF — the default points at BSA's own official `scouting.org` host, which was confirmed working from a live TWH site, but a firewall, ad-blocker, or a future change on BSA's end could still block it. If so, switch the URL to the `raw.githubusercontent.com` copy of `Swim-Classificaiton-record-430-122.pdf` staged in this folder (see the comment above `SCR_TEMPLATE_PDF_URL` in the file).
 - **"This page is restricted to Adult Leaders"** on a login you believe should have access: the Upcoming Events list, the swim classification admin grids, and the Medical Recheck admin grids all require Adult Leader permission on TroopWebHost itself — this page doesn't add any new restriction, it just detects and reports TroopWebHost's own.
 - **A name on the roster shows blank Test Date/Swim Level/Medical Recheck** even though you know they've tested: check the spelling matches exactly between the campout attendee list and the swim/medical admin grids on your site — matching is exact-name (not fuzzy) since both come from the same underlying TroopWebHost database on this page, unlike the last-name-plus-first-word matching some of this repo's other tools use across *different* reports.
 - **A test date looks fine to me but shows "expired"**: check the campout's own end date, not today's — the cutoff is measured back from the last day of the selected campout, so a test that's still current today can already show expired if it will lapse before the trip is over.

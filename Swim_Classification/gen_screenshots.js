@@ -227,9 +227,10 @@ async function main(){
       const id = params.get('ID');
       return route.fulfill(htmlResponse(campoutDetailHtml(id)));
     }
-    if(url.hostname === 'raw.githubusercontent.com'){
-      // The real, unmodified BSA form ships alongside this script in the
-      // repo -- see Swim_Classification/Swim-Classificaiton-record-430-122.pdf.
+    if(url.hostname === 'www.scouting.org' || url.hostname === 'scouting.org'){
+      // Real live site now confirmed to allow this fetch directly -- serve
+      // the same real template bytes here for the harness, since this
+      // sandbox's own egress proxy blocks scouting.org.
       const bytes = fs.readFileSync(path.join(__dirname, 'Swim-Classificaiton-record-430-122.pdf'));
       return route.fulfill({ status: 200, contentType: 'application/pdf', body: bytes });
     }

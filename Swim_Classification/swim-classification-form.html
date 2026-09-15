@@ -74,19 +74,24 @@ READ BEFORE USING
 4. THE ACTUAL PDF FORM (#19-122, Rev. March 2022) IS A PLAIN WORD EXPORT
    WITH NO FILLABLE ACROFORM FIELDS -- confirmed by inspecting the file.
    Rather than embedding the ~200KB file as base64 in this page, it's
-   fetched fresh at runtime from this repo's own
-   Swim_Classification/Swim-Classificaiton-record-430-122.pdf (unmodified
-   copy of the real BSA form) via raw.githubusercontent.com, which sends
-   Access-Control-Allow-Origin: * on public files -- confirmed by
-   checking its response headers -- unlike scouting.org's own PDF host,
-   which sends no CORS header at all, so fetching the original file
-   directly from the browser is blocked. pdf-lib then draws text on top
-   at coordinates measured directly from the form's own PDF text layer +
-   a rendered test overlay (see README for the calibration numbers). If
-   you fork this repo, update SCR_TEMPLATE_PDF_URL in the CONFIG section
-   below to point at your fork, and don't alter the PDF itself or the
-   coordinates will drift. If BSA ever revises this form's layout, the
-   coordinates will need re-measuring against the new file.
+   fetched fresh at runtime, straight from BSA's own official host
+   (scouting.org) -- confirmed working against a live TWH site. (An
+   earlier version of this comment claimed scouting.org sent no CORS
+   header and worked around that by fetching a copy of the PDF staged in
+   this repo via raw.githubusercontent.com instead; that assumption was
+   wrong, or scouting.org's hosting has changed since -- either way,
+   fetching directly from scouting.org now works and there's no reason
+   to maintain a second copy of the file in this repo just to route
+   around a problem that doesn't exist.) If scouting.org ever does start
+   blocking cross-origin fetches, Swim_Classification/Swim-Classificaiton-
+   record-430-122.pdf is still kept in this repo as a ready fallback --
+   just point SCR_TEMPLATE_PDF_URL at your own fork's raw.githubusercontent.com
+   copy instead. pdf-lib then draws text on top at coordinates measured
+   directly from the form's own PDF text layer + a rendered test overlay
+   (see README for the calibration numbers). Whichever host it comes
+   from, don't alter the PDF itself or the coordinates will drift. If BSA
+   ever revises this form's layout, the coordinates will need
+   re-measuring against the new file.
 5. The printed form has exactly 15 numbered rows and only ONE "Date of
    Swim Test" field at the top -- there's no per-person date column.
    Since test dates vary across your roster, each person's own date is
@@ -95,10 +100,22 @@ READ BEFORE USING
    into it). Rosters longer than 15 people get additional copies of
    page 1 (same blank template, freshly filled), with the static
    2-page-of-2 procedures page appended once at the very end.
-6. Medical Recheck (Parts A-B) is a physical/medical-file item TWH
-   doesn't track anywhere this page has found -- left blank for the
-   test supervisor to fill by hand, same as the signature block at the
-   bottom of page 1.
+6. Medical Recheck (Parts A-B) IS tracked by TroopWebHost -- as two of
+   five date columns (Medical Part A, B, C, Tetanus, Other Med Date) on
+   the same kind of admin grid as the swim data, one grid per Scout/
+   Adult, under Menu_Item_ID=56934 (Form_ID 2065 Scout / 3545 Adult;
+   confirmed from a captured HAR). Only Part A and Part B are read here,
+   per what was asked for. The form's "Medical Recheck Parts A-B" column
+   is filled with whichever of the two is EARLIER, and flagged expired
+   on-screen (same red-highlight treatment as an old swim test, though
+   the actual rule is different: BSA physicals are good through the
+   LAST DAY of the month, 12 months after that date, not a flat
+   365-day rolling window -- see scrIsMedicalExpired()/
+   scrMedicalExpirationDate()). This is READ-ONLY: there's no save path
+   for Medical Part A/B on this page, only for swim data. The
+   supervisor sign-off block at the bottom of page 1 is still left
+   blank for the test supervisor to fill by hand -- TroopWebHost has no
+   record of that.
 -->
 <div id="scr-root">
 <style>
@@ -256,6 +273,13 @@ READ BEFORE USING
 #scr-root input.scr-dateInput.scr-stale{
   border-color:var(--rust); background:var(--rust-bg);
 }
+#scr-root .scr-medical-value{
+  display:inline-block; padding:6px 9px; border:1px solid var(--hair-strong); border-radius:4px;
+  background:var(--surface-4); font-size:13px; color:var(--parchment);
+}
+#scr-root .scr-medical-value.scr-stale{
+  border-color:var(--rust); background:var(--rust-bg);
+}
 #scr-root .scr-stale-badge{
   font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.04em; text-transform:uppercase;
   color:var(--rust); margin-left:6px;
@@ -302,7 +326,7 @@ READ BEFORE USING
 </div>
 </div>
 <table id="scr-rosterTable" style="display:none;">
-<thead><tr><th></th><th>Name</th><th>Type</th><th>Test Date</th><th>Swim Level</th></tr></thead>
+<thead><tr><th></th><th>Name</th><th>Type</th><th>Test Date</th><th>Swim Level</th><th>Medical Recheck</th></tr></thead>
 <tbody id="scr-rosterTbl"></tbody>
 </table>
 <div class="scr-toolbar" id="scr-toolbar" style="display:none;">
@@ -317,7 +341,7 @@ READ BEFORE USING
 <button class="scr-btn-ghost" id="scr-addPickerCancel" type="button">Cancel</button>
 </div>
 </div>
-<p class="scr-footnote" id="scr-rosterFootnote" style="display:none;">Medical Recheck (Parts A-B) and the supervisor sign-off block at the bottom of the form are left blank for the test supervisor to fill by hand -- TroopWebHost doesn't track either of those. Rosters over 15 people generate extra copies of the blank form page, filled 15 at a time, with the procedures page attached once at the end. A red "expired" flag on a Test Date means it's more than a year old -- BSA requires swim classification to be renewed annually; that person likely needs a retest before this trip. "Add Scout"/"Add Adult" pulls from TroopWebHost's own swim classification roster and fills in their current Test Date/Swim Level automatically. "Save to TroopWebHost" writes these Test Date / Swim Level values back to TroopWebHost's own swim classification records for each matched person -- a real database change, applied to everyone listed here regardless of whether their checkbox is ticked (the checkbox only controls who's on the generated PDF).</p>
+<p class="scr-footnote" id="scr-rosterFootnote" style="display:none;">The supervisor sign-off block at the bottom of the form is left blank for the test supervisor to fill by hand -- TroopWebHost has no record of that. Rosters over 15 people generate extra copies of the blank form page, filled 15 at a time, with the procedures page attached once at the end. A red "expired" flag on a Test Date means it will be more than a year old by the last day of this campout -- BSA requires swim classification to be renewed annually; that person likely needs a retest before this trip. Medical Recheck shows the earlier of TroopWebHost's Medical Part A/B dates and is flagged (red, "expired") once the last day of the month, 12 months after that date, will have passed by the last day of this campout, or flagged ("missing") if there's no Part A/B date on file at all -- it's read-only here (nothing is saved back for it). "Add Scout"/"Add Adult" pulls from TroopWebHost's own roster and fills in current Test Date/Swim Level/Medical Recheck automatically. "Save to TroopWebHost" writes Test Date / Swim Level corrections back to TroopWebHost's own swim classification records for each matched person -- a real database change, applied to everyone listed here regardless of whether their checkbox is ticked (the checkbox only controls who's on the generated PDF).</p>
 <div class="scr-save-report" id="scr-saveReport"></div>
 </div>
 </div>
@@ -355,6 +379,17 @@ var SCR_SWIM_ADMIN_MENU_ITEM_ID = '56934';
 var SCR_SWIM_ADMIN_FORM_ID = { Scout:'2052', Adult:'7322' };
 function scrSwimAdminUrl(type){ return 'FormList.aspx?Menu_Item_ID='+SCR_SWIM_ADMIN_MENU_ITEM_ID+'&Form_ID='+SCR_SWIM_ADMIN_FORM_ID[type]+'&Stack=2'; }
 var SCR_LEVEL_VALUES = ['', 'Non-Swimmer', 'Beginner', 'Swimmer'];
+// Medical Recheck grids -- same Menu_Item_ID as the swim admin grids
+// (56934), different Form_ID, confirmed from a captured HAR. Each grid
+// has ONE row per person with FIVE date columns (Medical Part A, Part B,
+// Part C, Tetanus, Other Med Date) -- NOT separate pages per part, as
+// the two nearly-identical URLs on TroopWebHost's own menu might
+// suggest. Only Part A and Part B are used here, per what was asked
+// for; the column is found by its header text ("Medical Part A"/"Medical
+// Part B"), never by position or by the internal column ID, since column
+// IDs are site-specific.
+var SCR_MEDICAL_ADMIN_FORM_ID = { Scout:'2065', Adult:'3545' };
+function scrMedicalAdminUrl(type){ return 'FormList.aspx?Menu_Item_ID='+SCR_SWIM_ADMIN_MENU_ITEM_ID+'&Form_ID='+SCR_MEDICAL_ADMIN_FORM_ID[type]+'&Stack=2'; }
 var SCR_CAMPOUT_EVENT_TYPE = 'campout'; // matched lowercase against the Event Type column
 var SCR_FETCH_TIMEOUT_MS = 15000;
 /* ================= LIVE SITE THEME (ported from Campout Rank Gap / OA Tracker) ================= */
@@ -712,6 +747,77 @@ function getSwimGrid(type, forceRefresh){
   if(!forceRefresh && swimGridCache[type]) return Promise.resolve(swimGridCache[type]);
   return fetchSwimGrid(type).then(function(grid){ swimGridCache[type] = grid; return grid; });
 }
+/* ================= FETCH: Medical Recheck grid (Scout or Adult), READ-ONLY =================
+   Same site (Menu_Item_ID=56934) as the swim grids, different Form_ID.
+   Unlike the swim grid, this one is only ever read -- there's no save
+   path for Medical Part A/B here, only the on-screen expired flag and
+   the PDF's existing Medical Recheck column. Each row has FIVE date
+   columns; only "Medical Part A" and "Medical Part B" are read, found
+   by header text (never by position or internal column ID, which are
+   site-specific) via the same scrHeaderCells/scrColIndex helpers used
+   everywhere else in this file. TroopWebHost foster-parents the row's
+   hidden CHILDCB input out of the <tr> (same HTML-parsing quirk as the
+   swim grid), so tr.children reliably contains only the <td> cells in
+   header order -- that's what makes indexing into tr.children by the
+   discovered header index safe here. */
+function fetchMedicalGrid(type){
+  return scrFetchDoc(scrMedicalAdminUrl(type)).then(function(doc){
+    var table = scrFindTable(doc, ['Name', 'Medical Part A', 'Medical Part B']);
+    if(!table) throw new Error('The '+type+' Medical Recheck admin page didn\'t have the expected columns -- TroopWebHost may have changed this page.');
+    var headers = scrHeaderCells(table);
+    var idxA = scrColIndex(headers, 'Medical Part A');
+    var idxB = scrColIndex(headers, 'Medical Part B');
+    var trs = Array.prototype.slice.call(table.querySelectorAll('tbody tr'));
+    var byNorm = {};
+    trs.forEach(function(tr){
+      var tds = Array.prototype.slice.call(tr.children).filter(function(el){ return el.tagName === 'TD'; });
+      if(tds.length <= Math.max(idxA, idxB)) return; // not a real data row
+      var name = tds[0].textContent.replace(/\s+/g,' ').trim();
+      if(!name) return;
+      var inputA = tds[idxA].querySelector('input[type="text"]');
+      var inputB = tds[idxB].querySelector('input[type="text"]');
+      var dateA = inputA ? inputA.value.trim() : '';
+      var dateB = inputB ? inputB.value.trim() : '';
+      byNorm[normName(name)] = scrEarliestMedicalDate(dateA, dateB);
+    });
+    return { type:type, byNorm:byNorm };
+  });
+}
+var medicalGridCache = { Scout:null, Adult:null };
+function getMedicalGrid(type){
+  if(medicalGridCache[type]) return Promise.resolve(medicalGridCache[type]);
+  return fetchMedicalGrid(type).then(function(grid){ medicalGridCache[type] = grid; return grid; });
+}
+/* ================= MEDICAL RECHECK: earliest-of-A/B + annual-expiration math =================
+   "Good to the last day of the month, 12 months after the date" --
+   e.g. a Part A/B date anywhere in May 2025 stays valid through
+   5/31/2026, expiring the next day. This is a different rule from the
+   swim test's rolling 365-day cutoff, so it gets its own helpers rather
+   than reusing scrIsDateStale(). Like the swim test check, "expired" is
+   measured against the campout's last day (via scrGetExpirationReferenceDate,
+   defined below with the swim check) rather than today -- a medical
+   clearance that's still good today but would lapse mid-trip should
+   already show as expired when the leader reviews the roster. */
+function scrEarliestMedicalDate(dateStrA, dateStrB){
+  var a = parseEventDate(dateStrA);
+  var b = parseEventDate(dateStrB);
+  var text = null, date = null;
+  if(a && b){ if(a <= b){ date=a; text=dateStrA; } else { date=b; text=dateStrB; } }
+  else if(a){ date=a; text=dateStrA; }
+  else if(b){ date=b; text=dateStrB; }
+  return { date:date, text:text }; // both null if neither A nor B is on file
+}
+function scrMedicalExpirationDate(date){
+  // Last day of `date`'s month, one year later: day 0 of (month+1) rolls
+  // back to the last day of `month`.
+  return new Date(date.getFullYear()+1, date.getMonth()+1, 0);
+}
+function scrIsMedicalExpired(date){
+  if(!date) return false;
+  var exp = scrMedicalExpirationDate(date);
+  exp.setHours(23,59,59,999);
+  return scrGetExpirationReferenceDate() > exp;
+}
 /* ================= SAVE: write Test Date / Swim Level back to TroopWebHost =================
    Mutates the ALREADY-FETCHED grid Document in place (only the fields
    that need to change), then serializes that page's own <form> with
@@ -786,6 +892,8 @@ var SCR_BASELINE_OFF = 13.5; // offset from a row's top border down to a comfort
 var SCR_NAME_X = 96;
 var SCR_NAME_MAXW = 210;    // Full Name column is ~92-317pt wide; leaves padding both sides
 var SCR_COL_CENTERS = { 'Non-Swimmer':394.4, 'Beginner':460.5, 'Swimmer':526.7 };
+var SCR_MEDICAL_COL_CENTER = 339.3; // center of the "Medical Recheck Parts A-B" column (317.1-361.5)
+var SCR_MEDICAL_COL_MAXW = 40;      // narrow column by the form's own design -- text shrinks to fit, see scrFitSize
 var SCR_HEADER_Y_TOP = 124.1; // baseline for the Unit Number / Date of Swim Test line
 var SCR_UNIT_X = 152;
 var SCR_DATE_X = 435;
@@ -811,6 +919,11 @@ function scrDrawRow(page, font, fontBold, i, r){
     var w = fontBold.widthOfTextAtSize('X', 10);
     page.drawText('X', { x:cx-w/2, y:y, size:10, font:fontBold, color:PDFLib.rgb(0,0,0) });
   }
+  // Medical Recheck Parts A-B column is intentionally left blank on the
+  // printed form -- TroopWebHost's medical dates are tracked and flagged
+  // on-screen (see r.medicalDate / scr-rosterFootnote) but not written to
+  // the PDF, per explicit instruction. Do not re-add a drawText call here
+  // without checking with the maintainer first.
 }
 function scrBuildPdf(rows, unitNumber, headerDate){
   return scrFetchTemplateBytes().then(function(templateBytes){
@@ -908,14 +1021,29 @@ function renderEventsTable(events){
 }
 /* ================= ANNUAL RENEWAL CHECK =================
    BSA requires swim classification to be renewed annually. A Test Date
-   older than one year from today gets flagged in the roster (not on
-   the generated PDF -- the printed form has no room for a warning
-   note, so this is purely an on-screen heads-up before you generate). */
+   older than one year gets flagged in the roster (not on the generated
+   PDF -- the printed form has no room for a warning note, so this is
+   purely an on-screen heads-up before you generate). The one-year
+   window is measured back from the LAST DAY OF THE CAMPOUT, not
+   today's date -- what matters is whether the classification will
+   still be valid while the troop is on the trip, and a test that's
+   fine today but would lapse mid-trip should already show as expired
+   when the leader is reviewing the roster beforehand. Falls back to
+   today only if the campout's end date can't be parsed (e.g. this ever
+   runs with no campout selected). Shared with the Medical Recheck
+   expiration check below, which uses the same campout-end reference
+   date for the same reason. */
+function scrGetExpirationReferenceDate(){
+  var end = currentEvent ? parseEventDate(currentEvent.end) : null;
+  if(end) return end;
+  var today = new Date(); today.setHours(0,0,0,0);
+  return today;
+}
 function scrIsDateStale(dateStr){
   var d = parseEventDate(dateStr);
   if(!d) return false; // blank or unparseable -- not flagged here, that's a separate "never tested" concern
-  var cutoff = new Date();
-  cutoff.setFullYear(cutoff.getFullYear() - 1);
+  var ref = scrGetExpirationReferenceDate();
+  var cutoff = new Date(ref.getFullYear() - 1, ref.getMonth(), ref.getDate());
   return d < cutoff;
 }
 function scrUpdateStaleFlag(tr){
@@ -929,13 +1057,28 @@ function renderRosterRow(person){
   var tr = document.createElement('tr');
   var type = (person.type === 'Adult') ? 'Adult' : 'Scout';
   tr.dataset.type = type; // fixed at creation time -- Type is not user-editable (see note below)
+  var medical = person.medical || { date:null, text:null };
+  tr.dataset.medicalDate = medical.text || ''; // read-only -- carried through to the generated PDF, never saved back to TWH
+  // Flagged if either actually expired, OR there's no Part A/B date on
+  // file at all -- no record on file means no proof of clearance, which
+  // is just as much a problem before a trip as an expired one.
+  var medicalMissing = !medical.date;
+  var medicalExpiredPast = !medicalMissing && scrIsMedicalExpired(medical.date);
+  var medicalFlagged = medicalMissing || medicalExpiredPast;
+  var medicalBadgeText = medicalMissing ? 'missing' : 'expired';
+  var medicalBadgeTitle = medicalMissing
+    ? 'No Medical Part A or Part B date on file in TroopWebHost'
+    : 'Good through the last day of the month, 12 months after the earlier of Medical Part A/B -- that date will have passed by the last day of this campout';
   tr.innerHTML =
     '<td><input type="checkbox" class="scr-inc" checked></td>'+
     '<td><input type="text" class="scr-nameInput" value="'+esc(person.name)+'" style="min-width:200px;"></td>'+
     '<td><span class="scr-type-tag">'+esc(type)+'</span></td>'+
     '<td><input type="text" class="scr-dateInput" value="'+esc(person.date||'')+'" style="min-width:100px;" placeholder="m/d/yyyy">'+
-      '<span class="scr-stale-badge" style="display:none;" title="More than a year since this test -- BSA requires annual renewal">expired</span></td>'+
-    '<td><select class="scr-levelSelect"></select></td>';
+      '<span class="scr-stale-badge" style="display:none;" title="More than a year before the last day of this campout -- BSA requires annual renewal">expired</span></td>'+
+    '<td><select class="scr-levelSelect"></select></td>'+
+    '<td><span class="scr-medical-value'+(medicalFlagged?' scr-stale':'')+'">'+esc(medical.text || '(none on file)')+'</span>'+
+      (medicalFlagged?'<span class="scr-stale-badge" title="'+esc(medicalBadgeTitle)+'">'+medicalBadgeText+'</span>':'')+
+      '</td>';
   // Type is fixed once a row is created (from the campout attendee list,
   // or from the Add Scout/Add Adult roster picker) -- it determines which
   // TWH swim admin grid a save is routed to, and letting a leader flip it
@@ -982,10 +1125,12 @@ function selectEvent(ev, rowEl){
   fetchCampoutAttendees(ev.id).then(function(attendees){
     var needScout = attendees.some(function(p){ return p.type === 'Scout'; });
     var needAdult = attendees.some(function(p){ return p.type === 'Adult'; });
-    var chain = Promise.resolve({});
-    if(needScout) chain = chain.then(function(grids){ return getSwimGrid('Scout').then(function(g){ grids.Scout = g; return grids; }); });
-    if(needAdult) chain = chain.then(function(grids){ return getSwimGrid('Adult').then(function(g){ grids.Adult = g; return grids; }); });
-    return chain.then(function(grids){ return { attendees:attendees, grids:grids }; });
+    var chain = Promise.resolve({ swim:{}, medical:{} });
+    if(needScout) chain = chain.then(function(g){ return getSwimGrid('Scout').then(function(x){ g.swim.Scout = x; return g; }); });
+    if(needAdult) chain = chain.then(function(g){ return getSwimGrid('Adult').then(function(x){ g.swim.Adult = x; return g; }); });
+    if(needScout) chain = chain.then(function(g){ return getMedicalGrid('Scout').then(function(x){ g.medical.Scout = x; return g; }); });
+    if(needAdult) chain = chain.then(function(g){ return getMedicalGrid('Adult').then(function(x){ g.medical.Adult = x; return g; }); });
+    return chain.then(function(g){ return { attendees:attendees, swim:g.swim, medical:g.medical }; });
   }).then(function(res){
     elRosterStatus.style.display = 'none';
     if(!res.attendees.length){
@@ -994,13 +1139,16 @@ function selectEvent(ev, rowEl){
       return;
     }
     res.attendees.forEach(function(person){
-      var grid = res.grids[person.type];
-      var match = grid ? grid.byNorm[normName(person.name)] : null;
+      var swimGrid = res.swim[person.type];
+      var swimMatch = swimGrid ? swimGrid.byNorm[normName(person.name)] : null;
+      var medGrid = res.medical[person.type];
+      var medMatch = medGrid ? medGrid.byNorm[normName(person.name)] : null;
       elRosterTbl.appendChild(renderRosterRow({
         name: person.name,
         type: person.type,
-        date: match ? match.dateInput.value.trim() : '',
-        level: match ? match.levelSelect.value : ''
+        date: swimMatch ? swimMatch.dateInput.value.trim() : '',
+        level: swimMatch ? swimMatch.levelSelect.value : '',
+        medical: medMatch || { date:null, text:null }
       }));
     });
     elHeaderFields.style.display = '';
@@ -1022,7 +1170,8 @@ var elAddPickerLabel = document.getElementById('scr-addPickerLabel');
 var elAddPickerSelect = document.getElementById('scr-addPickerSelect');
 var elAddPickerConfirm = document.getElementById('scr-addPickerConfirm');
 var elAddPickerCancel = document.getElementById('scr-addPickerCancel');
-var addPickerGrid = null; // the grid currently backing the open picker
+var addPickerGrid = null; // the swim grid currently backing the open picker
+var addPickerMedicalGrid = null; // the medical grid currently backing the open picker
 function scrRosterHasPerson(type, name){
   var key = type.charAt(0)+'|'+normName(name);
   return Array.prototype.slice.call(elRosterTbl.querySelectorAll('tr')).some(function(tr){
@@ -1036,11 +1185,16 @@ function openAddPicker(type){
   elAddPickerLabel.textContent = 'Add ' + type + ':';
   elAddPickerConfirm.disabled = true;
   elAddPickerSelect.innerHTML = '<option>Loading roster...</option>';
-  // Reuses the same cached-per-session grid fetch as the initial roster
+  // Reuses the same cached-per-session grid fetches as the initial roster
   // join -- if this campout had no Scouts (or no Adults) signed up, the
-  // relevant grid was never fetched yet, so this fetches it on demand.
+  // relevant grids were never fetched yet, so this fetches them on demand,
+  // sequentially (swim grid, then medical grid).
   getSwimGrid(type).then(function(grid){
     addPickerGrid = grid;
+    return getMedicalGrid(type);
+  }).then(function(medGrid){
+    addPickerMedicalGrid = medGrid;
+    var grid = addPickerGrid;
     var available = grid.rows
       .map(function(rec, idx){ return { idx:idx, name:rec.name }; })
       .filter(function(r){ return !scrRosterHasPerson(type, r.name); })
@@ -1070,6 +1224,7 @@ function closeAddPicker(){
   elAddScoutBtn.disabled = false;
   elAddAdultBtn.disabled = false;
   addPickerGrid = null;
+  addPickerMedicalGrid = null;
 }
 elAddScoutBtn.addEventListener('click', function(){ openAddPicker('Scout'); });
 elAddAdultBtn.addEventListener('click', function(){ openAddPicker('Adult'); });
@@ -1079,11 +1234,13 @@ elAddPickerConfirm.addEventListener('click', function(){
   var rec = addPickerGrid.rows[parseInt(elAddPickerSelect.value, 10)];
   if(!rec) return;
   var type = addPickerGrid.type;
+  var medMatch = addPickerMedicalGrid ? addPickerMedicalGrid.byNorm[normName(rec.name)] : null;
   elRosterTbl.appendChild(renderRosterRow({
     name: rec.name,
     type: type,
     date: rec.dateInput.value.trim(),
-    level: rec.levelSelect.value
+    level: rec.levelSelect.value,
+    medical: medMatch || { date:null, text:null }
   }));
   closeAddPicker();
 });
@@ -1102,7 +1259,8 @@ function scrReadRosterRows(onlyIncluded){
       name: name,
       type: tr.dataset.type,
       date: tr.querySelector('.scr-dateInput').value.trim(),
-      level: tr.querySelector('.scr-levelSelect').value
+      level: tr.querySelector('.scr-levelSelect').value,
+      medicalDate: tr.dataset.medicalDate || ''
     });
   });
   return rows;
@@ -1183,32 +1341,34 @@ function init(){
     elModeCheck.textContent = 'Could not load this page: '+err.message;
   });
 }
-var SCR_TEMPLATE_PDF_URL = "https://raw.githubusercontent.com/gammann/TroopWebHost/main/Swim_Classification/Swim-Classificaiton-record-430-122.pdf";
+var SCR_TEMPLATE_PDF_URL = "https://www.scouting.org/wp-content/uploads/2022/03/Swim-Classificaiton-record-430-122.pdf";
 var scrTemplateBytesPromise = null; // fetched once per page load, cached
 function scrFetchTemplateBytes(){
   if(scrTemplateBytesPromise) return scrTemplateBytesPromise;
-  // This is a genuine cross-origin request (raw.githubusercontent.com,
-  // not troopwebhost.org) -- unlike every other fetch in this file it
-  // must NOT use credentials:same-origin semantics for a foreign host,
-  // and TWH session redirects are meaningless here, so this intentionally
-  // does not go through scrFetchRaw. raw.githubusercontent.com sends
-  // Access-Control-Allow-Origin: * on all public files (confirmed by
-  // inspecting its response headers), which is what makes this fetch
-  // legal from a troopwebhost.org page at all -- scouting.org's own PDF
-  // host does not send that header, so fetching the original BSA file
-  // directly from the browser is blocked by CORS; this GitHub copy is
-  // the workaround. If you fork this repo, update the URL above to
-  // point at your own fork, and keep the PDF unmodified so the
-  // coordinates in scrDrawHeader/scrDrawRow stay correct.
+  // This is a genuine cross-origin request (scouting.org, not
+  // troopwebhost.org) -- unlike every other fetch in this file it must
+  // NOT use credentials:same-origin semantics for a foreign host, and TWH
+  // session redirects are meaningless here, so this intentionally does
+  // not go through scrFetchRaw. Fetching straight from BSA's own official
+  // host confirmed working against a live TWH site -- scouting.org sends
+  // a permissive-enough CORS response for this to succeed from the
+  // browser, at least as of this writing. (An earlier version of this
+  // file assumed the opposite and routed through a copy of the PDF
+  // staged in this repo on raw.githubusercontent.com instead; that
+  // workaround is no longer needed but the staged copy is left in the
+  // repo as a fallback -- if scouting.org ever starts blocking this
+  // fetch, point the URL above at your own fork's raw.githubusercontent.com
+  // copy instead, and keep the PDF unmodified either way so the
+  // coordinates in scrDrawHeader/scrDrawRow stay correct.)
   var controller = new AbortController();
   var timer = setTimeout(function(){ controller.abort(); }, SCR_FETCH_TIMEOUT_MS);
   scrTemplateBytesPromise = fetch(SCR_TEMPLATE_PDF_URL, { signal: controller.signal })
     .catch(function(e){
-      if(e.name === "AbortError") throw new Error("Timed out fetching the template PDF from GitHub.");
-      throw new Error("Could not fetch the template PDF from GitHub (network/CORS error): " + e.message);
+      if(e.name === "AbortError") throw new Error("Timed out fetching the template PDF.");
+      throw new Error("Could not fetch the template PDF (network/CORS error): " + e.message + " -- if scouting.org is blocking this, switch SCR_TEMPLATE_PDF_URL to a raw.githubusercontent.com copy instead (see comment above).");
     })
     .then(function(res){
-      if(!res.ok) throw new Error("GitHub returned HTTP " + res.status + " fetching the template PDF -- check that it has been pushed to " + SCR_TEMPLATE_PDF_URL);
+      if(!res.ok) throw new Error("Fetching the template PDF returned HTTP " + res.status + " from " + SCR_TEMPLATE_PDF_URL);
       return res.arrayBuffer();
     })
     .then(function(buf){ return new Uint8Array(buf); })
