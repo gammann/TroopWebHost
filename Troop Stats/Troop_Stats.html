@@ -1109,7 +1109,7 @@ function buildDashboard(){
 
   // Active scouts (% of eligible events attended) + Service hours (both from the single Event Participation file)
   let activeCount = null, activeUnmatched = [], totalQualifyingEvents = null;
-  let serviceTotal = null, serviceByScout = null, serviceUnmatched = [];
+  let serviceTotal = null, serviceByScout = null, serviceScouts = null, serviceUnmatched = [];
   const qualifyingEvents = new Map(); // eventKey -> Date, filled in below when participation loads
   const eventPatrolMatrix = new Map(); // eventKey -> { name, date, byPatrol: {patrol: Set(scoutKey)} }
   const rosterPatrolByScout = {};
@@ -1197,7 +1197,7 @@ function buildDashboard(){
     });
 
     if (m.eventType) totalQualifyingEvents = qualifyingEvents.size;
-    if (m.serviceHours || m.conservationHours){ serviceTotal = total; serviceByScout = byScout; }
+    if (m.serviceHours || m.conservationHours){ serviceTotal = total; serviceByScout = byScout; serviceScouts = Object.keys(byScout).length; }
   }
 
   // Rank advancement
@@ -1466,7 +1466,7 @@ function buildDashboard(){
     troopName: document.getElementById('troopName').value.trim(),
     asOf, totalScouts, patrolCounts,
     activeCount, rankCount, mbCount, mbScouts,
-    serviceTotal, rosterDisplayName: displayName,
+    serviceTotal, serviceScouts, rosterDisplayName: displayName,
     unmatchedReport, includeDeparted, totalQualifyingEvents, activeThreshold,
     scoutTable, campoutPatrolTable, patrolColumns, yoy
   });
@@ -1500,7 +1500,7 @@ function renderResults(d){
     ? statCard(d.mbCount, 'Merit Badges Earned', `by ${d.mbScouts} scouts \u00B7 last 12 mo${depNote}`, y.mbCount)
     : statCard('\u2014', 'Merit Badges Earned', 'Pull live data above');
   stats += d.serviceTotal!==null
-    ? statCard(Math.round(d.serviceTotal*10)/10, 'Service Hours', `last 12 mo${depNote}`, y.serviceTotal)
+    ? statCard(Math.round(d.serviceTotal*10)/10, 'Service Hours', `by ${d.serviceScouts} scout${d.serviceScouts===1?'':'s'} \u00B7 last 12 mo${depNote}`, y.serviceTotal)
     : statCard('\u2014', 'Service Hours', 'Pull live data above');
 
   document.getElementById('statGrid').innerHTML = stats;
