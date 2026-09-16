@@ -1,103 +1,137 @@
-# Patrol Rank-Requirement Gap
+# Rank-Requirement Gap
 
-A single-file custom page for TroopWebHost that pulls the full Roster and
-the Uncompleted Requirements report, groups active Scouts by Patrol, and
-shows exactly which Scout, Tenderfoot, Second Class, and First Class
-requirements each Scout still needs -- one Patrol at a time, or all of
-them at once as an Excel workbook.
+A single-file custom page for TroopWebHost that shows exactly which Scout,
+Tenderfoot, Second Class, and First Class requirements are still open --
+by Campout, by Patrol, or across every active Scout on the Roster at
+once. This merges what used to be two separate tools
+(`Campout_Rank_Req/campout-rank-gap.html` and
+`Patrol_Rank_Req/patrol-rank-gap.html`) into one page with a tab
+switcher, so a troop only needs to paste one Custom Page instead of two.
+Both standalone files are left in the repo for reference, but this one
+supersedes them.
 
-Leader-only: both the Roster export and the Uncompleted Requirements
-report require Adult Leader access on TroopWebHost. A Scout or parent
-login is detected automatically (the same redirect-based check the other
-tools in this repo use) and shown a plain "restricted" message rather
-than a guessed-at scoped view.
+Leader-only: the Upcoming Events list, the Roster export, and the
+Uncompleted Requirements report all require Adult Leader access on
+TroopWebHost. A Scout or parent login is detected automatically (the
+same redirect-based check the other tools in this repo use) and shown a
+plain "restricted" message rather than a guessed-at scoped view.
 
-All screenshots below use synthetic, fake Scout/Patrol data -- generated
-with real headless Chromium (`gen_screenshots.js`, `puppeteer-core` +
-`@sparticuz/chromium`) running the actual shipped `patrol-rank-gap.html`,
-with only the Roster and Uncompleted Requirements network fetches swapped
-for canned CSV text. No real troop data appears anywhere in this repo.
+All screenshots below use synthetic, fake Scout/Patrol/Campout data --
+generated with real headless Chromium (`gen_screenshots.js`,
+`puppeteer-core` + `@sparticuz/chromium`) running the actual shipped
+`rank-requirement-gap.html`, with only the three network sources (Roster,
+Uncompleted Requirements, Upcoming Events + attendees) swapped for canned
+CSV/HTML. No real troop data appears anywhere in this repo.
 
 ## Screenshots
 
-**Patrol list** -- every Patrol on the Roster, with a headcount and how
-many Scouts in it have at least one outstanding requirement, plus the
-"Export All Patrols to Excel" button:
+**Campouts tab** (the default landing view) -- every upcoming campout on
+the calendar:
 
-![Patrol list](screenshots/01-patrol-list.png)
+![Campouts list](screenshots/01-campouts-list.png)
 
-**Gap overview** -- clicking a Patrol shows summary chips, two collapsible
-group-level sections, and one collapsible card per Scout:
+**Campout gap** -- clicking a campout shows who's signed up (pooled from
+multiple Patrols, so each Scout's card is tagged with their Patrol),
+summary chips, two collapsible group-level sections, and a per-selection
+**Export to Excel** button:
 
-![Gap overview, collapsed](screenshots/02-gap-overview-collapsed.png)
+![Campout gap](screenshots/02-campout-gap.png)
 
-**Requirements Needed By This Patrol** -- every outstanding requirement
-across the Patrol, sorted by how many Scouts still need it, for planning
-a group instruction session:
+**Patrols tab** -- every Patrol on the Roster, with a headcount, a gap
+count, and the bulk **Export All Patrols to Excel** button:
 
-![Requirements needed by this Patrol, expanded](screenshots/03-by-requirement-expanded.png)
+![Patrols list](screenshots/03-patrols-list.png)
 
-**Requirements Needed By Category** -- the same requirements grouped by
-the official rank-requirement category and combined across ranks; note
-"Fitness" here pulls together one Scout's Tenderfoot, Second Class, and
-First Class Fitness requirements into a single group, each line tagged
-with which rank it's for:
+**Patrol gap, Requirements Needed By Category expanded** -- note
+"Fitness" here merges one Scout's Tenderfoot, Second Class, and First
+Class Fitness requirements into a single group, each line tagged with
+which rank it's for; individual Scout cards in this view have no Patrol
+tag since everyone shown is already in the same one:
 
-![Requirements needed by category, expanded](screenshots/04-by-category-expanded.png)
+![Patrol gap, by category](screenshots/04-patrol-gap-by-category.png)
 
-**Individual Scout Checklists** -- each Scout's own card expands to their
-full requirement list by rank; a Scout with nothing outstanding is shown
-as such rather than an empty card:
+**All Scouts tab** -- a one-button prompt to see every active Scout on
+the Roster at once, regardless of Patrol:
 
-![Individual Scout checklist, expanded](screenshots/05-individual-checklist-expanded.png)
+![All Scouts tab](screenshots/05-all-scouts-tab.png)
 
-**All clear** -- a Patrol where every Scout is caught up through First
-Class:
+**All Scouts gap** -- the same drill-down as a Campout or a Patrol, but
+troop-wide; Patrol tags are back since Scouts are pooled from every
+Patrol:
 
-![Patrol with no outstanding requirements](screenshots/06-patrol-all-clear.png)
+![All Scouts gap](screenshots/06-all-scouts-gap.png)
 
-**Excel export** -- one tab per Patrol, laid out like Campout
-Rank-Requirement Gap's "By Requirement" tab but with a column per Scout
-in that Patrol -- an "X" marks that the row's requirement is still
-outstanding for that Scout, sorted by rank then by how many Scouts still
-need each row:
+**Export to Excel** (the shared, per-selection export -- works the same
+for a Campout, a Patrol, or All Scouts) -- Summary, Roster/Attendees, By
+Scout, By Requirement, and By Category tabs; shown here is the By
+Category tab for an All Scouts export:
 
-![Excel export, Hawk Patrol tab](screenshots/07-excel-export-preview.png)
+![Export to Excel, By Category tab](screenshots/07-excel-export-gap.png)
+
+**Export All Patrols to Excel** (the separate bulk export, Patrols tab
+only) -- one tab per Patrol laid out as a Rank/Code/Requirement grid with
+one column per Scout in that Patrol, marked "X" wherever that Scout still
+needs the row's requirement:
+
+![Export All Patrols to Excel, Hawk Patrol tab](screenshots/08-excel-export-patrols-matrix.png)
 
 ## What it shows
 
-1. **Patrols** -- every Patrol found on the current Roster, with a headcount
-   and how many of those Scouts have at least one outstanding requirement.
-   Adults and departed members are excluded automatically. A Scout with no
-   Patrol on the Roster lands in an "Unassigned" bucket rather than being
+**Campouts tab**
+1. Every upcoming campout from the "Upcoming Events" widget (the same one
+   on the TroopWebHost home page), filtered to the "Campout" event type.
+2. Selecting one fetches (and caches) that campout's attendee list, then
+   shows each attending Scout's outstanding requirements, tagged with
+   their Patrol since attendees are pooled from across the troop.
+
+**Patrols tab**
+1. Every Patrol found on the Roster, with a headcount and how many of
+   those Scouts have at least one outstanding requirement. Adults and
+   departed members are excluded automatically. A Scout with no Patrol
+   on the Roster lands in an "Unassigned" bucket rather than being
    silently dropped.
-2. **Individual Scout Checklists** -- click a Patrol to see, per Scout, their
-   outstanding Scout/Tenderfoot/Second Class/First Class requirements,
-   grouped by rank, in a collapsible card. A Scout with nothing outstanding
-   through First Class is shown as such rather than an empty card.
-3. **Requirements Needed By This Patrol** -- the same requirements inverted:
-   one row per requirement, sorted by how many Scouts in that Patrol still
-   need it, for planning a group session instead of tracking one Scout at
-   a time.
-4. **Requirements Needed By Category** -- the same requirements grouped into
-   the official rank-requirement categories, combined across ranks when the
-   category name is identical (e.g. one "Fitness" group covering
-   Tenderfoot/Second Class/First Class together, each line tagged with
-   which rank it's for).
-5. **Export All Patrols to Excel** -- downloads one workbook covering every
-   Patrol at once: a Summary tab (headcount + gap count per Patrol) plus
-   one tab per Patrol laid out like Campout Rank-Requirement Gap's "By
-   Requirement" tab -- one row per distinct outstanding requirement
-   (Rank, Code, Requirement text), sorted by rank then by how many
-   Scouts in that Patrol still need it -- but with one column per Scout
-   in the Patrol instead of a single names column, marked "X" wherever
-   that Scout still needs that row's requirement. Unlike the per-Patrol
-   screen view, this doesn't require selecting a Patrol first -- both
-   reports are already loaded for the whole troop.
+2. Selecting a Patrol needs no extra fetch -- the Roster and Uncompleted
+   Requirements report are already loaded for the whole troop, so this
+   is a local re-render.
+3. **Export All Patrols to Excel** -- a bulk export, independent of
+   whatever's currently selected: a Summary tab (headcount + gap count
+   per Patrol) plus one tab per Patrol laid out as a
+   Rank/Code/Requirement grid with one column per Scout in that Patrol,
+   marked "X" wherever they still need that row.
+
+**All Scouts tab**
+- The same drill-down as selecting one Campout or Patrol, but built from
+  every active Scout on the Roster at once, flattened across every
+  Patrol (sorted alphabetically). No extra fetch either -- purely a local
+  re-render of already-loaded data.
+
+**Shared across all three tabs, once something is selected**
+- **Individual Scout Checklists** -- each Scout's own card expands to
+  their outstanding Scout/Tenderfoot/Second Class/First Class
+  requirements, grouped by rank. A Scout with nothing outstanding through
+  First Class is shown as such rather than an empty card.
+- **Requirements Needed By This Group** -- the same requirements
+  inverted: one row per requirement, sorted by how many Scouts in the
+  current selection still need it, for planning a group session instead
+  of tracking one Scout at a time. (Labeled "Requirements Needed
+  Troop-Wide" in the All Scouts view.)
+- **Requirements Needed By Category** -- the same requirements grouped
+  into the official rank-requirement categories, combined across ranks
+  when the category name is identical (e.g. one "Fitness" group covering
+  Tenderfoot/Second Class/First Class together).
+- **Export to Excel** -- a per-selection workbook (Summary,
+  Attendees/Roster, By Scout, By Requirement, By Category tabs) for
+  whatever's currently displayed, whether that's one Campout, one
+  Patrol, or All Scouts.
+
+The bulk Patrol-matrix export stays separate from the shared per-selection
+export on purpose: a troop-wide matrix sheet would just be the union of
+the per-Patrol ones with an extra column, so it wasn't added as a fourth
+export path.
 
 ## Installation
 
-1. Open `patrol-rank-gap.html` and copy its entire contents.
+1. Open `rank-requirement-gap.html` and copy its entire contents.
 2. In TroopWebHost, go to **Manage Custom Pages**.
 3. Create a new Custom Page (or edit an existing one) and paste the whole
    block into the HTML editor.
@@ -109,18 +143,22 @@ copied into an external site or previewed elsewhere.
 
 ## How to use it
 
-1. The page loads the Roster and the Uncompleted Requirements report
-   automatically -- nothing to click to get started.
-2. Click a Patrol row (or its **View Gap** button) to see each Scout's
-   requirement gaps. No extra fetch happens on click -- both reports were
-   already pulled once for the whole troop.
-3. Click **Requirements Needed By This Patrol** or **Requirements Needed
-   By Category** to expand those sections; click a Scout's card to expand
-   their individual checklist. **Expand All** / **Collapse All** apply to
-   the Scout cards only.
-4. Click **Export All Patrols to Excel** at any time (it's enabled as soon
-   as the page finishes loading) to download the full multi-tab workbook.
-5. Click **Close** to collapse the results and pick a different Patrol.
+1. The page loads Upcoming Campouts, the Roster, and the Uncompleted
+   Requirements report automatically -- nothing to click to get started.
+2. Use the **Campouts / Patrols / All Scouts** tabs to switch views. Only
+   selecting a Campout triggers a network fetch (for that campout's
+   attendee list, cached after the first click); switching tabs or
+   selecting a Patrol is instant.
+3. Click a row's **View Gap** button (or **View Gap for All Scouts**) to
+   drill in. Click **Requirements Needed By This Group** /
+   **Requirements Needed By Category** to expand those sections; click a
+   Scout's card to expand their individual checklist. **Expand All** /
+   **Collapse All** apply to the Scout cards only.
+4. Click **Export to Excel** in the results panel at any time to download
+   a workbook for whatever's currently displayed, or, from the Patrols
+   tab, **Export All Patrols to Excel** for the bulk multi-tab matrix
+   regardless of selection.
+5. Click **Close** to collapse the results and pick something else.
 
 Everything this page does is read-only report fetches -- no TroopWebHost
 data is ever modified.
@@ -132,55 +170,64 @@ from official documentation, since TroopWebHost has no public API.
 
 | Report | Menu_Item_ID |
 |---|---|
+| Upcoming Events widget | 56931, Form_ID 163 -- the same "Upcoming Events" list shown on the TroopWebHost home page |
+| Campout attendee detail | 56931, Form_ID 259, keyed by event ID -- linked from the row above |
 | Roster (current + departed) | 45897 -- the same report Troop Stats already uses for its own Patrols table |
-| Uncompleted Requirements for Rank Advancement | 46046 -- the same report OA Tracker's and Campout Rank-Requirement Gap's advancement sections already use |
+| Uncompleted Requirements for Rank Advancement | 46046 -- the same report OA Tracker's advancement section already uses |
 
 Roster column names (Name, Patrol, Adult?, Left Unit) are auto-detected by
 keyword, the same fuzzy-match approach `Troop Stats/Troop_Stats.html`
-already uses (`PRG_GUESS` near the top of the `<script>` block), rather
+already uses (`RG_GUESS` near the top of the `<script>` block), rather
 than hardcoded -- only Name and Patrol are required for the page to work;
 Adult? and Left Unit are used defensively to exclude adults and departed
-members when present. The category-to-code mapping (`PRG_CATEGORIES`) is
-identical to the one already cross-checked in
-`Campout_Rank_Req/campout-rank-gap.html` against a real Uncompleted
-Requirements export.
+members when present. A campout's attendee list instead gets each
+Scout's Patrol directly from that campout's own attendee table -- it
+doesn't touch the Roster export at all for that. The category-to-code
+mapping (`RG_CATEGORIES`) was cross-checked against a real Uncompleted
+Requirements export when this was first built as two separate tools.
 
 ## Implementation notes
 
-- **Name matching between the Roster and the Requirements report** uses
-  the same last-name + first-word-of-first-name approach as every other
-  tool in this repo, with one addition: it also tolerates a plain
-  "First Last" value (no comma) defensively, in case a given troop's
-  Roster export doesn't follow TroopWebHost's usual "Last, First"
-  convention. Worth a spot-check against a real Roster export the first
-  time this runs.
-- **Excel sheet names** are sanitized and de-duplicated (`sanitizeSheetName()`)
-  since Excel forbids `\ / ? * [ ] :` in a sheet name and caps names at 31
-  characters -- a Patrol named something longer, or two Patrols that
-  collide after truncation, still produce a valid, unique workbook.
-- **Per-Patrol export sheets use `aoa_to_sheet()`, not `json_to_sheet()`**
-  (`buildPatrolSheetAoa()`), since the column set is dynamic -- one column
-  per Scout in that specific Patrol -- rather than a fixed set of object
-  keys. The requirement-to-scout matrix itself is built by
-  `buildPatrolRequirementMatrix()`, which keys "who needs this" by Scout
-  *key* (the same normalized last+first key used everywhere else in this
-  file) rather than display name, so two Scouts who happen to share a
-  printed name still get distinct columns and correct marks.
-- **No per-Patrol network request.** Unlike Campout Rank-Requirement Gap
-  (which has to fetch a separate attendee list per campout), both reports
-  here cover the whole troop up front, so selecting a Patrol or exporting
-  everything is purely a local re-render of already-loaded data.
-- Verified against synthetic fake data in a jsdom harness (`test_harness.js`,
-  not needed to use the page -- kept for future edits) covering: adults
-  excluded, departed members excluded, a Scout with zero outstanding
-  requirements, an unmapped requirement code falling into "Other /
-  Uncategorized", and the Unassigned-Patrol bucket. The README screenshots
-  are generated the same way, against real headless Chromium instead of
+- **This file is a merge, not a rewrite.** It started from
+  `patrol-rank-gap.html` with every `prg`/`PRG` identifier mechanically
+  renamed to `rg`/`RG` (a plain, safe find-and-replace, since the prefix
+  never appeared as a substring of anything else in that file), then had
+  Campout Rank-Requirement Gap's event-list/attendee-fetch/HTML-table-parsing
+  code layered in. The shared rendering functions
+  (`buildRequirementGroups`, `buildCombinedCategoryGroups`, `renderGap`,
+  etc.) were already written generically enough in the Patrol tool (via a
+  `scope` parameter) to serve all three tabs without a rewrite.
+- **Two different exports, on purpose.** The results panel's **Export to
+  Excel** button reads from `currentGapExport`, a snapshot `renderGap()`
+  refreshes on every selection -- the same shape regardless of whether
+  the selection came from a Campout, a Patrol, or All Scouts, so one
+  `buildGapExportWorkbook()` (ported from Campout Rank-Requirement Gap's
+  original `buildExportWorkbook()`) covers all three. The bulk **Export
+  All Patrols to Excel** button is unrelated to any selection --
+  `buildPatrolsMatrixWorkbook()` reads straight from `rosterByPatrol`.
+- **Name matching** uses the same last-name + first-word-of-first-name
+  approach as every other tool in this repo, with one addition: it also
+  tolerates a plain "First Last" value (no comma) defensively, in case a
+  given troop's Roster export doesn't follow TroopWebHost's usual
+  "Last, First" convention.
+- **Excel sheet names** are sanitized and de-duplicated
+  (`sanitizeSheetName()`) since Excel forbids `\ / ? * [ ] :` in a sheet
+  name and caps names at 31 characters.
+- **Patrol tags on Scout cards are conditional** (`scope.showPatrolTag`):
+  shown for Campout and All Scouts selections, where Scouts are pooled
+  from multiple Patrols, but suppressed for a single-Patrol selection
+  where every Scout shown already shares the same one.
+- Verified against synthetic fake data in a jsdom harness
+  (`test_harness.js`, not needed to use the page -- kept for future
+  edits) covering all three tabs: campout attendee fetch and its empty
+  state, adults/departed exclusion, the Patrol tag showing/hiding
+  correctly, and both export shapes. The README screenshots are
+  generated the same way, against real headless Chromium instead of
   jsdom (`gen_screenshots.js`, also not needed to use the page).
 - Same WebForms/theming conventions as every other page in this repo:
   every `<button>` has explicit `type="button"`, the file is pure ASCII,
-  and the live-site color probe/adapt logic is ported unchanged from
-  Campout Rank-Requirement Gap.
+  and the live-site color probe/adapt logic is unchanged from the two
+  source tools.
 
 ## Troubleshooting
 
@@ -189,14 +236,18 @@ Requirements export.
   may return a PDF instead of data, which SheetJS can't read.
 - **"Roster export didn't have a recognizable Patrol column"**: your
   troop's Roster export uses a header that doesn't contain "patrol" in
-  any form -- add it to the `patrol` list in `PRG_GUESS` near the top of
+  any form -- add it to the `patrol` list in `RG_GUESS` near the top of
   the `<script>` block.
-- **A Scout's name doesn't match between the Roster and the Uncompleted
-  Requirements report**: matching is deliberately loose (see "Name
-  matching" above) -- a Scout listed under meaningfully different names
-  in the two exports (e.g. a nickname vs. a legal name) won't match.
-  Worth a spot-check the first time this runs against real data.
+- **A Scout's name doesn't match between two sources**: matching is
+  deliberately loose (see "Name matching" above) -- a Scout listed under
+  meaningfully different names in two exports (e.g. a nickname vs. a
+  legal name) won't match. Worth a spot-check the first time this runs
+  against real data.
 - **Export to Excel doesn't trigger a download**: if TroopWebHost's page
   environment has a restrictive Content-Security-Policy or iframe
   sandboxing, it could block the client-side download `XLSX.writeFile()`
   normally triggers. Check the browser console for a CSP error.
+- **A campout's attendee list won't load**: check the campout's ID is
+  still valid on the "Upcoming Events" widget -- if the event's Menu/Form
+  IDs ever change on your installation, update `RG_EVENT_MENU_ITEM_ID`
+  / `RG_EVENT_DETAIL_FORM_ID` near the top of the `<script>` block.
