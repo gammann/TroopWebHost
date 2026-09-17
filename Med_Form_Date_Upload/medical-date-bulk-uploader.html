@@ -1,0 +1,1334 @@
+<!--
+Medical Form Date Bulk Uploader
+-------------------------------
+Paste this WHOLE block into TroopWebHost: Manage Custom Pages -> (new or
+existing Custom Page) -> HTML editor. It must run ON troopwebhost.org
+(same-origin) so the requests below inherit your logged-in session. It
+will NOT work pasted into an external site or previewed elsewhere -- the
+fetch calls will be blocked without your session cookie.
+
+WHAT THIS DOES
+--------------
+Upload a TroopWebHost Roster Report export (the CSV with "ADULT MEMBERS"
+and "YOUTH MEMBERS" sections, and a "Health Form A/B - Health Form C"
+column in each section). This page reads the medical form date(s) out
+of that column for everyone in the file, compares them against
+TroopWebHost's own live "Update Medical Recheck Dates" admin grids
+(Scout and Adult), shows you exactly what would change, and -- only
+after you review and confirm -- writes the updated dates back to those
+grids, exactly as if you'd typed them in by hand and clicked Save.
+
+READ BEFORE USING
+------------------
+1. THIS PAGE WRITES TO THE DATABASE once you click "Apply Selected
+   Changes" (after a review screen and a confirmation prompt). It
+   reports success/failure per field it touched, verified by refetching
+   the grid afterward -- but there is no undo beyond editing the value
+   again by hand or re-running this tool with older data.
+2. LEADER-ONLY: the Medical Recheck admin grids require Adult Leader
+   access on TroopWebHost. A Scout or parent login gets redirected
+   elsewhere, which this page detects (the same res.redirected
+   technique used by the other custom pages in this repo) and shows a
+   plain "restricted" message instead of guessing at a scoped view.
+3. CONFIRMED ENDPOINT (from a captured HAR of TroopWebHost's own
+   "Update Medical Recheck Dates" screen):
+     GET  FormList.aspx?Menu_Item_ID=56934&Form_ID=9224&Stack=2
+   This is a SINGLE combined grid covering every Scout AND Adult in the
+   troop together (an earlier version of this page used two separate
+   grids, Form_ID 2065/3545 -- TroopWebHost's own admin menu has since
+   consolidated this into one page with an "Adult" Yes/No column
+   instead). Same URL for saving -- POST the page's own <form
+   id="easyform"> (multipart/form-data) back to FormList.aspx with
+   Selected_Action=save, Hover_Action=save, and Selected_Button_ID set
+   to the id of the in-page "Save" button (name="save", value="Save" --
+   NOT the "Save & Exit" button, which redirects away and would prevent
+   the on-page verification step below). The exact id (e.g. "BUTTON53")
+   is looked up at runtime via input[name="save"], never hardcoded,
+   since it can differ by installation. This Menu_Item_ID is the same
+   one the Swim Classification Record Generator tool in this repo
+   already reads (read-only, the older two-grid Medical Part A/B only)
+   -- this page is the first in the suite to WRITE to it, and reads all
+   three of Part A, Part B, and Part C.
+   IMPORTANT: this is NOT a standard ASP.NET postback -- there is no
+   __VIEWSTATE or __EVENTVALIDATION anywhere on this page. It's
+   TroopWebHost's own "easyform" mechanism (easyJSfunctionsV15.js): a
+   single plain <form id="easyform"> holding an OLD-value hidden input
+   and a live input for every editable cell across every row on the
+   page, plus a handful of state fields the Save button sets right
+   before submitting. The server compares each field's OLD value
+   against the submitted value to decide what changed, so the correct
+   and only-sane way to save is: fetch the WHOLE grid page fresh, edit
+   just the changed people's inputs in that fetched DOM, then build a
+   real FormData from that page's own <form> element and POST the
+   entire thing back unchanged except for the edits -- never hand-build
+   the field list. That's exactly what mfuFetchGrid()/mfuApplySelected()
+   below do. Column IDs baked into TroopWebHost's own field names (like
+   "44322") are internal database IDs specific to this troop's install,
+   so they are never hardcoded here -- each row's three date inputs are
+   found by column POSITION relative to header text ("Medical Part A" /
+   "Medical Part B" / "Medical Part C"), the same never-hardcode
+   convention as the other tools in this repo. Each person's Scout vs.
+   Adult type is likewise never hardcoded or inferred from which URL
+   was fetched -- it's read straight off that same row's own "Adult"
+   column ("Yes"/"No"), confirmed against a captured example of both.
+   After a save, this page refetches the grid fresh and checks each
+   changed field actually reflects the new value before reporting
+   success -- a real database write deserves that confirmation rather
+   than assuming the POST worked because the server returned 200.
+3a. PAGINATION -- CONFIRMED FROM easyJSfunctionsV15.js: this grid pages
+   at a default of 100 rows (a troop with more than 100 combined
+   members spans multiple pages, confirmed against a captured example
+   showing page 1 of 2). Clicking a page number doesn't navigate to a
+   new URL -- GoToSectionPageNumber() sets a hidden NextSectionPageNumber
+   field and resubmits the WHOLE form, and the "Rows Per Page" dropdown
+   works the same way via a NewRowsPerPage hidden field (both read
+   straight out of easyJSfunctionsV15.js, not guessed). Rather than
+   walk every page and stitch rows together, mfuFetchGrid() takes the
+   simpler and more robust option already built into the page itself:
+   if the freshly-fetched grid isn't already showing "ALL" rows per
+   page, it submits that same fresh, byte-for-byte UNMODIFIED form once
+   more with NewRowsPerPage="ALL" and Selected_Action=save (exactly what
+   choosing "ALL" from the dropdown does) and uses THAT response as the
+   real grid from then on -- one extra round trip, zero pagination
+   bookkeeping, and it keeps working unchanged no matter how large the
+   troop grows. Since nothing on the form was edited before that
+   resubmit, it's exactly as safe as loading the page and immediately
+   choosing "ALL" from the dropdown by hand.
+4. WHAT GETS WRITTEN, AND WHAT DOESN'T: the Roster Report's "Health Form
+   A/B - Health Form C" column gives only TWO dates per person -- one
+   combined "AB" date and one "C" date (e.g.
+   "04/22/2026(AB) | 04/22/2026(C)") -- not separate Part A and Part B
+   dates. This tool writes the "AB" date into BOTH Medical Part A and
+   Medical Part B on the admin grid, and the "C" date into Medical Part
+   C. If your troop ever records different dates for Part A and Part B
+   specifically, this report can't distinguish them and this tool will
+   make them equal to whichever "AB" date the report gives. The
+   Tetanus and Other Med Date columns on the admin grid are NEVER
+   touched -- the Roster Report doesn't carry that data at all, and
+   whatever is already on file is left exactly as-is (fetched fresh and
+   only the two/three date fields that need to change are edited before
+   the whole form is posted back, so unrelated columns round-trip
+   unchanged). A person with a blank Health Form column in the CSV is
+   skipped entirely for that column -- this tool only ever fills dates
+   IN, it never clears an existing date on TroopWebHost just because the
+   uploaded file has that cell blank.
+5. MATCHING, IN ORDER OF PREFERENCE:
+   a) BY BSA NUMBER (preferred, confirmed working): TroopWebHost has two
+      more admin grids -- "Scout BSA ID" and "Adult BSA ID" (same
+      Menu_Item_ID=56934, Form_ID 3547 / 3548) -- that show each
+      person's Name, BSA ID, and TroopWebHost's own internal person ID
+      (the same internal ID that also appears, unlabeled, as a hidden
+      field on every row of the Medical Recheck grid). Confirmed
+      against a captured example: a person shown as "Ammann, Jerry" on
+      both the BSA ID grid and the Medical Recheck grid has BSA ID
+      132656233 -- the EXACT SAME number as "Ammann, Gerald" in the
+      Roster Report's BSA Number column. So: fetch both BSA ID grids
+      once, build a BSA-Number -> internal-person-ID lookup, resolve
+      each CSV row's own BSA Number (also in the Roster Report) through
+      that lookup, and then match straight to the Medical Recheck
+      grid's internal person ID -- name never even enters into it for
+      anyone whose BSA Number resolves. This is immune to Preferred
+      Name / nickname differences entirely, not just patched around
+      them.
+   b) BY NAME (fallback, for anyone with no BSA Number on file in
+      either place, or if the BSA ID grids can't be reached for some
+      reason -- e.g. a lapsed registration with a blank BSA ID): the
+      admin grid shows only a "Last, First Middle" display name, so CSV
+      rows are joined to grid rows by name (last name + first WORD of
+      first name, lowercased -- same approach as normName in this
+      repo's other tools). Since Scouts and Adults share one combined
+      Medical Recheck grid, this fallback key also includes each row's
+      own Scout/Adult type (read off the grid's "Adult" column, not
+      guessed) so a same-named parent and child can never cross-match.
+      If more than one person of the SAME type normalizes to the same
+      key, or nobody matches at all, that person is listed separately
+      as "ambiguous" or "not matched" and is never auto-applied --
+      silently updating the wrong person's medical dates is far worse
+      than leaving one row for a leader to handle by hand.
+   c) MANUAL NAME ALIAS (last resort, kept from an earlier version of
+      this page): for anyone the name fallback still can't resolve
+      (typically because the CSV's First Name and TroopWebHost's
+      Preferred Name diverge AND that person has no BSA Number on file
+      anywhere to use path (a) instead), the "not matched" list has an
+      inline "Fix name & recheck" box -- type the name exactly as
+      TroopWebHost shows it, once, and it's remembered in this
+      browser's localStorage (mfuLoadAliases/mfuSaveAliases) for every
+      future upload. This should rarely be needed now that (a) exists,
+      but is kept as a safety net.
+   Fetching the BSA ID grids is READ-ONLY -- nothing is ever written
+   there, only the Medical Recheck grid's Part A/B/C fields.
+6. PAGE SIZE: handled automatically -- see note #3a above. If the grid
+   still isn't showing "ALL" after that automatic step (some
+   server-side cap on a very large troop, never observed but not
+   provably impossible), this page shows a warning rather than silently
+   working from a partial roster.
+7. PRIVACY: the uploaded Roster Report contains sensitive personal
+   information well beyond medical dates (address, phone, BSA Number,
+   training history, etc.). This page only ever reads names and the
+   Health Form column out of it -- the rest of each row is ignored --
+   and nothing from the file is sent anywhere except back to
+   TroopWebHost's own medical date fields. The file itself is parsed
+   entirely in your browser and is never uploaded anywhere by this page.
+   You are still responsible for handling the file itself (and this
+   page, once pasted with real data flowing through it) appropriately.
+8. Sequential fetches only, never concurrent -- TroopWebHost's
+   server-side session state can silently produce empty/wrong results
+   under concurrent requests, per this repo's established convention.
+-->
+<div id="mfu-root">
+<style>
+#mfu-root, #mfu-root *{ box-sizing:border-box; }
+#mfu-root{
+  /* THEME -- same probe-and-adapt approach as the other custom pages in
+     this repo (see OA_Tracker/OA_tracker.html for the full rationale).
+     --brass / --brass-light : RAW probed fill color, paired with the
+       fixed --accent-ink text color (buttons).
+     --brass-text            : the SAME accent, contrast-adjusted for
+       bare text/links/borders directly on the canvas.
+     Canvas/text tokens (--woods-*, --parchment*) swap between light and
+     dark via the .mfu-light class below, following the live site's own
+     detected background luminance. */
+  --woods-950:#122016; --woods-900:#182b1e; --woods-800:#203a28;
+  --parchment:#eee7d2; --parchment-dim:#cdc4a5;
+  --brass:#c08a2e; --brass-light:#e0b464; --brass-text:#e0b464; --brass-glow:rgba(192,138,46,0.08);
+  --sage:#a9c397; --rust:#d98266; --rust-bg:rgba(217,130,102,0.25);
+  --hair:rgba(238,231,210,0.14); --hair-strong:rgba(238,231,210,0.28);
+  --accent-ink:#241a08;
+  --navy:#1e3626; --navy-dark:#101f17;
+  --surface-1:rgba(255,255,255,0.025); --surface-2:rgba(0,0,0,0.25);
+  --surface-3:rgba(0,0,0,0.3); --surface-4:rgba(255,255,255,0.08);
+  background:linear-gradient(180deg, var(--woods-950), var(--woods-900) 40%, var(--woods-950));
+  color:var(--parchment);
+  font-family:'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  padding:28px 24px 60px;
+  border-radius:6px;
+  max-width:1100px;
+  margin:20px auto;
+  visibility:hidden;
+}
+#mfu-root.mfu-ready{ visibility:visible; }
+#mfu-root.mfu-light{
+  --woods-950:#f6f1e2; --woods-900:#fbf8ee; --woods-800:#efe8d1;
+  --parchment:#20301f; --parchment-dim:#51624c;
+  --sage:#2f6b2f;
+  --hair:rgba(32,48,31,0.12); --hair-strong:rgba(32,48,31,0.24);
+  --surface-1:rgba(0,0,0,0.025); --surface-2:rgba(0,0,0,0.06);
+  --surface-3:rgba(0,0,0,0.08); --surface-4:rgba(0,0,0,0.06);
+}
+#mfu-root a{ color:var(--brass-text); }
+#mfu-root header.mfu-masthead{
+  border:1px solid var(--hair-strong);
+  border-bottom:6px solid var(--brass);
+  border-radius:4px;
+  padding:24px 26px 20px; margin-bottom:24px;
+  background-image:linear-gradient(160deg, var(--navy) 0%, var(--navy-dark) 100%);
+  color:#fff;
+}
+#mfu-root .mfu-eyebrow{
+  font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.16em;
+  text-transform:uppercase; color:rgba(255,255,255,0.82); margin:0 0 10px;
+}
+#mfu-root h1{
+  font-family:'Roboto Slab', Georgia, serif; font-weight:700;
+  font-size:clamp(24px,3.4vw,32px); margin:0 0 8px; line-height:1.1;
+}
+#mfu-root header.mfu-masthead p.mfu-sub{
+  margin:0; max-width:74ch; color:rgba(255,255,255,0.82); font-size:14px; line-height:1.55;
+}
+#mfu-root .mfu-status{ font-size:12px; color:var(--parchment-dim); margin:8px 0; }
+#mfu-root .mfu-status.mfu-err{ color:var(--rust); }
+#mfu-root .mfu-status.mfu-ok{ color:var(--sage); }
+#mfu-root .mfu-restricted{
+  border:1px solid var(--hair-strong); border-radius:4px; padding:18px 20px;
+  background:var(--surface-1); font-size:13.5px; line-height:1.6;
+}
+#mfu-root .mfu-restricted strong{ color:var(--brass-text); }
+#mfu-root .mfu-sheet{
+  border:1px solid var(--hair-strong); border-radius:4px;
+  background:var(--surface-1); padding:22px 24px 24px; margin-bottom:24px;
+}
+#mfu-root .mfu-sheet.mfu-disabled{ opacity:0.5; pointer-events:none; }
+#mfu-root .mfu-sheet h2{ font-family:'Roboto Slab',Georgia,serif; font-size:17px; margin:0 0 4px; display:flex; align-items:baseline; gap:8px; }
+#mfu-root .mfu-step-num{
+  display:inline-flex; align-items:center; justify-content:center;
+  width:22px; height:22px; border-radius:50%; background:var(--brass-light);
+  color:var(--accent-ink); font-family:'JetBrains Mono',monospace; font-size:12px; font-weight:700;
+}
+#mfu-root .mfu-sheet-sub{ font-size:12.5px; color:var(--parchment-dim); margin:0 0 16px; }
+#mfu-root table{ width:100%; border-collapse:collapse; font-size:13px; }
+#mfu-root thead th{
+  text-align:left; font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--parchment-dim); font-weight:600;
+  padding:0 8px 7px; border-bottom:1px solid var(--hair-strong);
+}
+#mfu-root tbody td{ padding:8px 8px; border-bottom:1px solid var(--hair); vertical-align:middle; color:var(--parchment); }
+#mfu-root tbody tr:last-child td{ border-bottom:none; }
+#mfu-root td.mfu-name{ font-weight:600; }
+#mfu-root .mfu-empty-row{ padding:18px 10px; color:var(--parchment-dim); font-size:12.5px; font-style:italic; }
+#mfu-root .mfu-btn{
+  -webkit-appearance:none; appearance:none;
+  font-family:'Roboto Slab',Georgia,serif; font-weight:700; font-size:13px; letter-spacing:.01em;
+  color:var(--accent-ink); background:var(--brass-light);
+  border:none; border-radius:5px; padding:8px 16px; cursor:pointer;
+}
+#mfu-root .mfu-btn:hover:not(:disabled){ background:var(--brass); }
+#mfu-root .mfu-btn:disabled{ opacity:0.4; cursor:not-allowed; }
+#mfu-root .mfu-btn-ghost{
+  -webkit-appearance:none; appearance:none;
+  font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.04em; text-transform:uppercase;
+  color:var(--brass-text); background:transparent; border:1px solid var(--hair-strong);
+  border-radius:4px; padding:6px 12px; cursor:pointer;
+}
+#mfu-root .mfu-btn-ghost:hover:not(:disabled){ border-color:var(--brass); }
+#mfu-root .mfu-btn-ghost:disabled{ opacity:0.4; cursor:not-allowed; }
+#mfu-root .mfu-btn-save{
+  -webkit-appearance:none; appearance:none;
+  font-family:'Roboto Slab',Georgia,serif; font-weight:700; font-size:13px; letter-spacing:.01em;
+  color:#fff; background:var(--sage);
+  border:none; border-radius:5px; padding:8px 16px; cursor:pointer;
+}
+#mfu-root .mfu-btn-save:hover:not(:disabled){ filter:brightness(1.08); }
+#mfu-root .mfu-btn-save:disabled{ opacity:0.4; cursor:not-allowed; }
+#mfu-root .mfu-file-row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:6px; }
+#mfu-root input[type="file"]{
+  font-family:inherit; font-size:13px; color:var(--parchment);
+}
+#mfu-root .mfu-summary{ font-size:13px; line-height:1.6; margin:12px 0 0; }
+#mfu-root .mfu-summary b{ color:var(--brass-text); }
+#mfu-root .mfu-warn-banner{
+  border:1px solid var(--rust); background:var(--rust-bg); border-radius:4px;
+  padding:10px 12px; font-size:12.5px; line-height:1.55; margin:12px 0 0; color:var(--parchment);
+}
+#mfu-root .mfu-head-row{
+  display:flex; align-items:baseline; justify-content:space-between; gap:14px; flex-wrap:wrap;
+  margin-bottom:4px;
+}
+#mfu-root .mfu-actions{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+#mfu-root .mfu-meta{ font-size:12.5px; color:var(--parchment-dim); margin:0 0 16px; }
+#mfu-root input[type="checkbox"]{ width:16px; height:16px; }
+#mfu-root .mfu-type-tag{
+  font-family:'JetBrains Mono',monospace; font-size:10px; padding:2px 7px;
+  border-radius:3px; background:var(--surface-4); color:var(--parchment-dim);
+}
+#mfu-root .mfu-old-val{ color:var(--parchment-dim); text-decoration:line-through; }
+#mfu-root .mfu-new-val{ color:var(--brass-text); font-weight:600; }
+#mfu-root .mfu-arrow{ color:var(--parchment-dim); margin:0 6px; }
+#mfu-root .mfu-toolbar{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:0 0 14px; }
+#mfu-root .mfu-footnote{ font-size:11.5px; color:var(--parchment-dim); margin-top:14px; line-height:1.5; }
+#mfu-root .mfu-side-list{ font-size:12.5px; line-height:1.7; margin:0; padding-left:18px; color:var(--parchment-dim); }
+#mfu-root .mfu-side-list li{ margin-bottom:6px; }
+#mfu-root .mfu-alias-row{ display:flex; gap:8px; align-items:center; margin:4px 0 2px; flex-wrap:wrap; }
+#mfu-root .mfu-alias-input{
+  font-family:inherit; font-size:12.5px; color:var(--parchment);
+  background:var(--surface-4); border:1px solid var(--hair-strong); border-radius:4px;
+  padding:5px 8px; min-width:260px; flex:1 1 260px;
+}
+#mfu-root .mfu-alias-status{ font-size:11.5px; margin-left:2px; }
+#mfu-root .mfu-alias-status.mfu-ok{ color:var(--sage); }
+#mfu-root .mfu-alias-status.mfu-err{ color:var(--rust); }
+#mfu-root .mfu-results{ display:none; }
+#mfu-root .mfu-results.mfu-show{ display:block; }
+#mfu-root .mfu-save-report{
+  font-size:12.5px; line-height:1.7; margin:10px 0 0; padding:10px 12px;
+  border-radius:4px; background:var(--surface-2);
+}
+#mfu-root .mfu-save-report .mfu-save-ok{ color:var(--sage); }
+#mfu-root .mfu-save-report .mfu-save-fail{ color:var(--rust); }
+#mfu-root .mfu-collapsible{ display:none; }
+#mfu-root .mfu-collapsible.mfu-show{ display:block; }
+</style>
+<header class="mfu-masthead">
+<p class="mfu-eyebrow">Troop Health Records</p>
+<h1>Medical Form Date Bulk Uploader</h1>
+<p class="mfu-sub">Upload a Roster Report export, and this page will find everyone's Medical Part A / Part B / Part C dates in it, compare them against TroopWebHost's own live combined Medical Recheck admin grid (Scouts and Adults together), and let you review and apply any updates in one batch -- instead of typing each date in by hand.</p>
+</header>
+
+<div class="mfu-sheet" id="mfu-uploadSheet">
+<h2><span class="mfu-step-num">1</span> Upload roster file</h2>
+<p class="mfu-sheet-sub">TroopWebHost report with "ADULT MEMBERS" / "YOUTH MEMBERS" sections and a "Health Form A/B - Health Form C" column in each. Parsed entirely in your browser -- the file itself is never sent anywhere.</p>
+<div class="mfu-file-row">
+<input type="file" id="mfu-fileInput" accept=".csv,text/csv">
+<button class="mfu-btn-ghost" type="button" id="mfu-clearFileBtn" disabled>Clear</button>
+</div>
+<div class="mfu-status" id="mfu-fileStatus"></div>
+<div class="mfu-summary" id="mfu-fileSummary" style="display:none;"></div>
+</div>
+
+<div class="mfu-sheet" id="mfu-compareSheet">
+<div class="mfu-head-row">
+<h2><span class="mfu-step-num">2</span> Compare against TroopWebHost</h2>
+<div class="mfu-actions">
+<button class="mfu-btn" type="button" id="mfu-compareBtn" disabled>Compare Against TroopWebHost</button>
+</div>
+</div>
+<p class="mfu-sheet-sub">Fetches the live Medical Recheck admin grid (read-only at this step -- nothing is written yet) and shows exactly what would change.</p>
+<div class="mfu-status" id="mfu-compareStatus"></div>
+<div class="mfu-restricted" id="mfu-restricted" style="display:none;">
+<strong>This page is restricted to Adult Leaders.</strong>
+<p style="margin:8px 0 0;">Your TroopWebHost login doesn't have permission to open the Medical Recheck admin grid -- that screen is leader-only on this site. If you believe this is a mistake, contact your Troop's TroopWebHost administrator.</p>
+</div>
+</div>
+
+<div class="mfu-results" id="mfu-results">
+<div class="mfu-sheet" id="mfu-diffSheet">
+<div class="mfu-head-row">
+<h2><span class="mfu-step-num">3</span> Review &amp; apply</h2>
+<div class="mfu-actions">
+<button class="mfu-btn-save" type="button" id="mfu-applyBtn" disabled>Apply Selected Changes</button>
+</div>
+</div>
+<p class="mfu-meta" id="mfu-diffMeta"></p>
+<div id="mfu-warnBanners"></div>
+<div class="mfu-toolbar" id="mfu-diffToolbar" style="display:none;">
+<button class="mfu-btn-ghost" type="button" id="mfu-selectAllBtn">Select All</button>
+<button class="mfu-btn-ghost" type="button" id="mfu-selectNoneBtn">Select None</button>
+<span class="mfu-status" id="mfu-selectedCount" style="margin:0;"></span>
+</div>
+<table id="mfu-diffTable" style="display:none;">
+<thead><tr><th></th><th>Name</th><th>Type</th><th>Field</th><th>Current</th><th></th><th>New</th></tr></thead>
+<tbody id="mfu-diffTbl"></tbody>
+</table>
+<div id="mfu-noChanges" class="mfu-empty-row" style="display:none;">Everything in the file already matches TroopWebHost -- nothing to update.</div>
+
+<div class="mfu-collapsible" id="mfu-notFoundBlock">
+<p class="mfu-sheet-sub" style="margin-top:18px;">In the file, but not found on the matching TroopWebHost grid (name didn't match anyone -- check spelling/nicknames, or update manually):</p>
+<ul class="mfu-side-list" id="mfu-notFoundList"></ul>
+</div>
+<div class="mfu-collapsible" id="mfu-ambiguousBlock">
+<p class="mfu-sheet-sub" style="margin-top:18px;">Skipped -- more than one person on the grid matched this name (update manually to avoid changing the wrong person):</p>
+<ul class="mfu-side-list" id="mfu-ambiguousList"></ul>
+</div>
+<div class="mfu-collapsible" id="mfu-aliasesBlock">
+<p class="mfu-sheet-sub" style="margin-top:18px;">Saved name fixes (remembered in this browser for future uploads):</p>
+<ul class="mfu-side-list" id="mfu-aliasesList"></ul>
+</div>
+
+<div class="mfu-save-report" id="mfu-saveReport" style="display:none;"></div>
+<p class="mfu-footnote">Only Medical Part A, Part B, and Part C are ever written by this tool. The Roster Report's "Health Form A/B" date is written to BOTH Part A and Part B (the report doesn't distinguish them); the "Health Form C" date is written to Part C. Tetanus and Other Med Date are never touched. A blank Health Form cell in the file leaves that person's existing TroopWebHost dates alone -- this tool only fills dates in, it never clears one. If someone shows up under "not found," it's usually because TroopWebHost is displaying a Preferred Name that differs from the file's First Name (the grid has no BSA Number or other shared ID to fall back on) -- type the name exactly as it appears on the grid and click "Fix name & recheck" once; that fix is remembered in this browser for every future upload.</p>
+</div>
+</div>
+
+</div><!-- /#mfu-root -->
+<script>
+(function(){
+/* ============ CONFIG -- verify these against your own site ============
+   Medical Recheck admin grid -- confirmed from a captured HAR of this
+   troop's own leader "Update Medical Recheck Dates" screen, a single
+   combined grid covering Scouts and Adults together:
+     GET FormList.aspx?Menu_Item_ID=56934&Form_ID=9224&Stack=2
+   Same URL for saving -- see note #3 at the top of this file for the
+   full explanation of the easyform POST mechanism, and #3a for how
+   pagination (rows beyond the default 100/page) is handled.
+   ========================================================================= */
+var MFU_MENU_ITEM_ID = '56934';
+var MFU_FORM_ID = '9224';
+var MFU_GRID_URL = 'FormList.aspx?Menu_Item_ID='+MFU_MENU_ITEM_ID+'&Form_ID='+MFU_FORM_ID+'&Stack=2';
+var MFU_BSAID_FORM_ID = { Scout:'3547', Adult:'3548' };
+function mfuBsaIdUrl(type){ return 'FormList.aspx?Menu_Item_ID='+MFU_MENU_ITEM_ID+'&Form_ID='+MFU_BSAID_FORM_ID[type]+'&Stack=2'; }
+var MFU_FETCH_TIMEOUT_MS = 15000;
+
+/* ================= LIVE SITE THEME (ported from Swim Classification / OA Tracker) ================= */
+var mfuSiteTheme = null;
+function mfuSafeColor(v){
+  if(!v) return null;
+  if(/rgba?\(\s*0,\s*0,\s*0,\s*0\s*\)/.test(v) || v === 'transparent') return null;
+  return v;
+}
+function mfuDarkenColor(rgbStr, amt){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  var r = Math.round(parseInt(m[1],10) * (1-amt));
+  var g = Math.round(parseInt(m[2],10) * (1-amt));
+  var b = Math.round(parseInt(m[3],10) * (1-amt));
+  return 'rgb('+r+', '+g+', '+b+')';
+}
+function mfuToRgba(rgbStr, alpha){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  return 'rgba('+m[1]+','+m[2]+','+m[3]+','+alpha+')';
+}
+function mfuProbeSiteTheme(){
+  var SENTINEL = 'rgb(1, 2, 3)';
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:absolute; left:-9999px; top:-9999px; visibility:hidden; pointer-events:none; color:'+SENTINEL+'; border-color:'+SENTINEL+';';
+  wrap.innerHTML =
+    '<div class="navtable" id="__mfu_probe_navtable">'+
+      '<span class="navicon" id="__mfu_probe_navicon"></span>'+
+      '<span class="navlink" id="__mfu_probe_navlink"><a href="#" id="__mfu_probe_navlink_a">x</a></span>'+
+    '</div>'+
+    '<div class="banner-div" id="__mfu_probe_banner"></div>'+
+    '<ul class="nav-tabs"><li><a href="#" id="__mfu_probe_tab">x</a></li></ul>'+
+    '<table class="table-striped"><thead><tr id="__mfu_probe_gridhead"><th>x</th></tr></thead></table>'+
+    '<table class="table-curved"><tbody><tr><td id="__mfu_probe_border">x</td></tr></tbody></table>'+
+    '<input class="form-control" id="__mfu_probe_input">'+
+    '<span class="RequiredIndicator" id="__mfu_probe_required">*</span>'+
+    '<a href="#" id="__mfu_probe_control_a">x</a>';
+  document.body.appendChild(wrap);
+  function byId(id){ return document.getElementById(id); }
+  function cs(el){ return el ? getComputedStyle(el) : null; }
+  var bg = function(v){ return mfuSafeColor(v); };
+  var inherited = function(v){ return (v && v !== SENTINEL) ? v : null; };
+  var navtableCs = cs(byId('__mfu_probe_navtable'));
+  var bannerCs = cs(byId('__mfu_probe_banner'));
+  var navlinkACs = cs(byId('__mfu_probe_navlink_a'));
+  var controlACs = cs(byId('__mfu_probe_control_a'));
+  var tabCs = cs(byId('__mfu_probe_tab'));
+  var gridheadCs = cs(byId('__mfu_probe_gridhead'));
+  var borderCs = cs(byId('__mfu_probe_border'));
+  var inputCs = cs(byId('__mfu_probe_input'));
+  var requiredCs = cs(byId('__mfu_probe_required'));
+  var result = {
+    navy: bg(navtableCs && navtableCs.backgroundColor),
+    navyDark: bg(bannerCs && bannerCs.backgroundColor),
+    yellow: (navlinkACs && controlACs && navlinkACs.color !== controlACs.color) ? navlinkACs.color : null,
+    gold: bg(tabCs && tabCs.backgroundColor),
+    gridHead: bg(gridheadCs && gridheadCs.backgroundColor),
+    line: inherited(borderCs && borderCs.borderLeftColor),
+    card: bg(inputCs && inputCs.backgroundColor),
+    red: inherited(requiredCs && requiredCs.color),
+    paper: bg(getComputedStyle(document.body).backgroundColor)
+  };
+  wrap.remove();
+  if(!result.navyDark && result.navy) result.navyDark = mfuDarkenColor(result.navy, 0.35);
+  return result;
+}
+function mfuLuminance(rgbStr){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  function lin(c){ c = c/255; return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); }
+  return 0.2126*lin(+m[1]) + 0.7152*lin(+m[2]) + 0.0722*lin(+m[3]);
+}
+function mfuMixWithWhite(rgbStr, amount){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  function clamp(v){ return Math.max(0, Math.min(255, Math.round(v))); }
+  var r = clamp(parseInt(m[1],10)*(1-amount) + 255*amount);
+  var g = clamp(parseInt(m[2],10)*(1-amount) + 255*amount);
+  var b = clamp(parseInt(m[3],10)*(1-amount) + 255*amount);
+  return 'rgb('+r+', '+g+', '+b+')';
+}
+function mfuEnsureContrast(rgbStr, wantLight){
+  if(!rgbStr) return rgbStr;
+  var lum = mfuLuminance(rgbStr);
+  if(lum == null) return rgbStr;
+  if(wantLight && lum < 0.45) return mfuMixWithWhite(rgbStr, 0.55);
+  if(!wantLight && lum > 0.55) return mfuDarkenColor(rgbStr, 0.55);
+  return rgbStr;
+}
+function mfuApplyLiveSiteTheme(){
+  var root = document.getElementById('mfu-root');
+  try{
+    var detected = mfuProbeSiteTheme();
+    mfuSiteTheme = detected;
+    if(!root) return;
+    var paperLum = detected.paper ? mfuLuminance(detected.paper) : null;
+    var isLight = paperLum != null && paperLum > 0.5;
+    root.classList.toggle('mfu-light', isLight);
+    var wantLightText = !isLight;
+    if(detected.navy){
+      root.style.setProperty('--navy', detected.navy);
+      root.style.setProperty('--navy-dark', detected.navyDark || mfuDarkenColor(detected.navy, 0.35) || detected.navy);
+    }
+    var brass = detected.gold || detected.yellow;
+    if(brass){
+      root.style.setProperty('--brass', brass);
+      root.style.setProperty('--brass-light', brass);
+      root.style.setProperty('--brass-text', mfuEnsureContrast(brass, wantLightText));
+      root.style.setProperty('--brass-glow', mfuToRgba(brass, 0.1) || 'rgba(192,138,46,0.08)');
+    }
+    if(detected.red){
+      var rustText = mfuEnsureContrast(detected.red, wantLightText);
+      root.style.setProperty('--rust', rustText);
+      root.style.setProperty('--rust-bg', mfuToRgba(rustText, 0.25) || 'rgba(217,130,102,0.25)');
+    }
+  }catch(e){
+    console.warn('Medical Form Date Bulk Uploader: theme detection failed, using built-in defaults:', e);
+  }finally{
+    if(root) root.classList.add('mfu-ready');
+  }
+}
+// Runs immediately, not on DOMContentLoaded -- same reasoning as the
+// other custom pages: #mfu-root already exists in the DOM by the time
+// this script tag runs, and waiting would only widen the
+// flash-of-wrong-theme window.
+mfuApplyLiveSiteTheme();
+
+/* ================= FETCH HELPERS (ported from Swim Classification / Campout Rank Gap) ================= */
+function mfuFetchRaw(url, opts){
+  var controller = new AbortController();
+  var timer = setTimeout(function(){ controller.abort(); }, MFU_FETCH_TIMEOUT_MS);
+  var fetchOpts = { credentials:'same-origin', signal: controller.signal };
+  if(opts) for(var k in opts) fetchOpts[k] = opts[k];
+  return fetch(url, fetchOpts)
+    .catch(function(e){
+      if(e.name === 'AbortError') throw new Error(url+' timed out after '+(MFU_FETCH_TIMEOUT_MS/1000)+'s.');
+      throw e;
+    })
+    .then(function(res){
+      if(!res.ok) throw new Error(url+' responded HTTP '+res.status+'.');
+      if(res.redirected) throw new Error('REDIRECTED:'+res.url);
+      return res;
+    })
+    .finally(function(){ clearTimeout(timer); });
+}
+function mfuFetchDoc(url){
+  return mfuFetchRaw(url).then(function(res){ return res.text(); })
+    .then(function(text){ return new DOMParser().parseFromString(text, 'text/html'); });
+}
+function mfuHeaderCells(table){
+  var headRow = table.querySelector('thead tr') || table.querySelector('tr');
+  if(!headRow) return [];
+  var cells = Array.prototype.slice.call(headRow.querySelectorAll('th,td'));
+  return cells.map(function(c){ return c.textContent.replace(/\s+/g,' ').trim(); });
+}
+function mfuTableHasHeaders(table, headerWords){
+  var cells = mfuHeaderCells(table);
+  var txt = cells.join(' | ').toLowerCase();
+  return headerWords.every(function(w){ return txt.indexOf(w.toLowerCase()) !== -1; });
+}
+function mfuFindTable(doc, headerWords){
+  var tables = Array.prototype.slice.call(doc.querySelectorAll('table'));
+  for(var i=0;i<tables.length;i++){
+    if(mfuTableHasHeaders(tables[i], headerWords)) return tables[i];
+  }
+  return null;
+}
+function mfuColIndex(headerCells, label){
+  var l = label.toLowerCase();
+  for(var i=0;i<headerCells.length;i++){
+    if(headerCells[i].toLowerCase() === l) return i;
+  }
+  for(var i=0;i<headerCells.length;i++){
+    if(headerCells[i].toLowerCase().indexOf(l) !== -1) return i;
+  }
+  return -1;
+}
+function esc(s){ var d=document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
+
+/* ================= NAME MATCHING (same approach as this repo's other normName functions) =================
+   Type is folded into the key itself (not just the name) because
+   Scouts and Adults now share ONE combined grid -- without this, a
+   same-named parent and child (or any name collision across the two
+   groups) could silently match the wrong person's record. Each
+   person's type comes from the grid's own "Adult" column (Yes/No) on
+   the TroopWebHost side, and from which Roster Report section (ADULT
+   MEMBERS / YOUTH MEMBERS) they were read from on the CSV side --
+   never guessed or inferred any other way. */
+function mfuNormName(last, first){
+  var l = String(last||'').trim().toLowerCase().replace(/[^a-z]/g,'');
+  var firstTok = String(first||'').trim().toLowerCase().split(/\s+/)[0] || '';
+  firstTok = firstTok.replace(/[^a-z-]/g,'');
+  return l+'|'+firstTok;
+}
+function mfuMatchKey(type, name){ return type+'|'+name; }
+function mfuNormGridName(name){
+  var parts = String(name||'').split(',');
+  var last = (parts[0]||'').trim();
+  var rest = (parts[1]||'').trim();
+  var first = rest.split(/\s+/)[0] || '';
+  return mfuNormName(last, first);
+}
+
+/* ================= NAME ALIASES (manual override for Preferred Name mismatches) =================
+   TroopWebHost's Medical Recheck grid displays whatever name TWH is
+   configured to show for that person -- which can be a Preferred Name
+   rather than the CSV's First Name (e.g. "Jerry" on the grid vs.
+   "Gerald" in the Roster Report). Neither this page nor the grid has
+   access to a shared numeric ID that would sidestep this (the grid
+   carries no BSA Number anywhere -- confirmed by inspection -- only
+   TroopWebHost's own internal person ID, which isn't in the Roster
+   Report either), so name matching is the only option available, and
+   a manual, persisted override is the practical fix for the cases it
+   can't resolve on its own. Aliases are keyed by the LITERAL CSV
+   last/first name (not the fuzzy match key) so setting one is
+   unambiguous, and are stored in this browser's localStorage --
+   ordinary browser storage, not one of the sandboxed Artifact preview
+   APIs, since this page runs as a normal script on troopwebhost.org. */
+var MFU_ALIAS_STORAGE_KEY = 'mfu_medical_upload_name_aliases_v1';
+function mfuCsvAliasKey(type, lastName, firstName){
+  return type+'|'+String(lastName||'').trim().toLowerCase()+'|'+String(firstName||'').trim().toLowerCase();
+}
+function mfuLoadAliases(){
+  try{ return JSON.parse(window.localStorage.getItem(MFU_ALIAS_STORAGE_KEY) || '{}') || {}; }
+  catch(e){ return {}; }
+}
+function mfuSaveAliases(map){
+  try{ window.localStorage.setItem(MFU_ALIAS_STORAGE_KEY, JSON.stringify(map)); }
+  catch(e){ console.warn('Medical Form Date Bulk Uploader: could not save name aliases (localStorage unavailable):', e); }
+}
+/* Mutates each roster row's .key in place using any saved alias for
+   that exact CSV name, so a fix made once keeps applying to every
+   future upload without needing to be re-entered. */
+function mfuApplyAliasesToRows(rows){
+  var aliases = mfuLoadAliases();
+  rows.forEach(function(r){
+    if(r.defaultKey === undefined) r.defaultKey = r.key; // captured once, so re-applying (e.g. after removing an alias) can revert cleanly
+    var aliasKey = mfuCsvAliasKey(r.type, r.lastName, r.firstName);
+    var aliasName = aliases[aliasKey];
+    r.key = aliasName ? mfuMatchKey(r.type, mfuNormGridName(aliasName)) : r.defaultKey;
+  });
+  return rows;
+}
+
+/* ================= CSV PARSING (uploaded file, parsed entirely client-side) =================
+   A small RFC4180-style parser rather than a dependency -- the file is
+   double-quoted throughout (confirmed from a real export), including
+   fields with embedded commas (addresses) and embedded double quotes
+   (escaped as ""), which this handles. Returns an array of rows, each
+   row an array of raw string fields. */
+function mfuParseCSV(text){
+  var rows = [];
+  var row = [];
+  var field = '';
+  var inQuotes = false;
+  for(var i=0;i<text.length;i++){
+    var c = text.charAt(i);
+    if(inQuotes){
+      if(c === '"'){
+        if(text.charAt(i+1) === '"'){ field += '"'; i++; }
+        else { inQuotes = false; }
+      } else {
+        field += c;
+      }
+    } else {
+      if(c === '"'){ inQuotes = true; }
+      else if(c === ','){ row.push(field); field = ''; }
+      else if(c === '\r'){ /* skip -- \n (if present) closes the row below */ }
+      else if(c === '\n'){ row.push(field); field = ''; rows.push(row); row = []; }
+      else { field += c; }
+    }
+  }
+  if(field.length || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+function mfuIsBlankRow(row){
+  return !row || row.length === 0 || row.every(function(v){ return String(v||'').trim() === ''; });
+}
+function mfuFindSectionRow(rows, marker){
+  for(var i=0;i<rows.length;i++){
+    if(rows[i] && rows[i].length >= 2 && String(rows[i][1]||'').trim().toUpperCase() === marker) return i;
+  }
+  return -1;
+}
+/* Parses "MM/DD/YYYY(AB) | MM/DD/YYYY(C)" (either half may be missing)
+   into zero-padded MM/DD/YYYY strings matching TroopWebHost's own date
+   input format, or null if that half isn't present. */
+function mfuNormalizeDate(s){
+  var m = String(s||'').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if(!m) return null;
+  var mm = ('0'+m[1]).slice(-2);
+  var dd = ('0'+m[2]).slice(-2);
+  var yyyy = m[3].length === 2 ? ('20'+m[3]) : m[3];
+  return mm+'/'+dd+'/'+yyyy;
+}
+function mfuParseHealthField(raw){
+  var s = String(raw||'');
+  var mAB = s.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})\s*\(\s*AB\s*\)/i);
+  var mC = s.match(/(\d{1,2}\/\d{1,2}\/\d{2,4})\s*\(\s*C\s*\)/i);
+  return { ab: mAB ? mfuNormalizeDate(mAB[1]) : null, c: mC ? mfuNormalizeDate(mC[1]) : null };
+}
+/* Strips everything but digits; TroopWebHost's own BSA ID field only
+   accepts digits (confirmed via its input's own validation regex,
+   /^[+]?\d\d*$/), so this keeps CSV/grid comparisons exact regardless
+   of incidental formatting differences. Returns null if nothing usable
+   is left, so a blank cell never accidentally matches another blank. */
+function mfuNormalizeBsaNumber(s){
+  var digits = String(s||'').replace(/[^0-9]/g, '');
+  return digits.length ? digits : null;
+}
+/* rows: [{type, firstName, lastName, displayName, key, bsaNumber, ab, c}], warnings: [string] */
+function mfuParseRosterCsv(text){
+  var rows = mfuParseCSV(text);
+  var out = { adults: [], scouts: [], warnings: [] };
+  var sections = [ ['ADULT MEMBERS','Adult'], ['YOUTH MEMBERS','Scout'] ];
+  sections.forEach(function(pair){
+    var marker = pair[0], type = pair[1];
+    var idx = mfuFindSectionRow(rows, marker);
+    if(idx === -1){ out.warnings.push('Could not find a "'+marker+'" section in this file.'); return; }
+    var headerRow = rows[idx+1] || [];
+    var idxFirst = mfuColIndex(headerRow, 'First Name');
+    var idxLast = mfuColIndex(headerRow, 'Last Name');
+    var idxBsa = mfuColIndex(headerRow, 'BSA Number');
+    var idxHealth = mfuColIndex(headerRow, 'Health Form A/B - Health Form C');
+    if(idxHealth === -1) idxHealth = mfuColIndex(headerRow, 'Health Form');
+    if(idxFirst === -1 || idxLast === -1){ out.warnings.push('Could not find First Name / Last Name columns in the "'+marker+'" section.'); return; }
+    if(idxBsa === -1) out.warnings.push('Could not find a BSA Number column in the "'+marker+'" section -- matching will rely on name only for '+(type==='Adult'?'Adults':'Scouts')+'.');
+    if(idxHealth === -1){ out.warnings.push('Could not find a Health Form column in the "'+marker+'" section -- nothing to update for '+(type==='Adult'?'Adults':'Scouts')+'.'); return; }
+    var i = idx+2;
+    var list = type === 'Adult' ? out.adults : out.scouts;
+    while(i < rows.length && !mfuIsBlankRow(rows[i])){
+      var r = rows[i];
+      var first = (r[idxFirst]||'').trim();
+      var last = (r[idxLast]||'').trim();
+      if(first || last){
+        var health = mfuParseHealthField(r[idxHealth]);
+        list.push({
+          type: type, firstName: first, lastName: last,
+          displayName: (last+', '+first).trim(),
+          key: mfuMatchKey(type, mfuNormName(last, first)),
+          bsaNumber: idxBsa === -1 ? null : mfuNormalizeBsaNumber(r[idxBsa]),
+          ab: health.ab, c: health.c
+        });
+      }
+      i++;
+    }
+  });
+  return out;
+}
+
+/* ================= SHARED: expand any TroopWebHost easyform grid to show every row =================
+   See note #3a at the top of this file. Works identically for the
+   Medical Recheck grid and the BSA ID grids below -- all three are the
+   same easyform pattern, just different Form_IDs. */
+function mfuFetchExpandedDoc(url){
+  return mfuFetchDoc(url).then(function(doc){
+    var formEl = doc.getElementById('easyform');
+    if(!formEl) return doc; // let the caller's own parsing raise a clear, page-specific error
+    var pageSizeEl = doc.getElementById('SelectRowsPerPage');
+    var pageSizeVal = pageSizeEl ? pageSizeEl.value : null;
+    var isPaginated = !!doc.querySelector('[onclick*="GoToSectionPageNumber"], a[href*="GoToSectionPageNumber"]');
+    if(pageSizeVal === 'ALL' && !isPaginated) return doc; // already showing everyone
+    var fd = new FormData(formEl);
+    fd.set('NewRowsPerPage', 'ALL');
+    fd.set('Selected_Action', 'save');
+    return mfuFetchRaw(url, { method:'POST', body:fd })
+      .then(function(res){ return res.text(); })
+      .then(function(text){ return new DOMParser().parseFromString(text, 'text/html'); });
+  });
+}
+/* TroopWebHost's hidden CHILDCB<gridId>ROW<n> input is a direct child
+   of the <tr> (not inside a <td>), carrying that row's internal
+   database person ID -- the same ID shared across every admin grid for
+   that person (Medical Recheck, BSA ID, etc.), confirmed by inspecting
+   a real person on both. Found by attribute prefix, never by the
+   numeric grid ID itself (site-specific), so this works on any grid. */
+function mfuRowInternalId(tr){
+  var el = tr.querySelector('input[type="hidden"][id^="CHILDCB"]');
+  return el ? el.value : null;
+}
+
+/* ================= FETCH: Medical Recheck admin grid (combined Scout+Adult), READ+WRITE =================
+   Same table-discovery approach as this repo's other grid readers:
+   found by header text, never by position or by TroopWebHost's own
+   internal column IDs (site-specific). Unlike a read-only reader, this
+   keeps a direct reference to each row's three date <input> elements
+   so they can be edited in place later and the whole <form> serialized
+   for saving -- see the top-of-file notes for why that's the only safe
+   way to write back to this kind of TroopWebHost page. */
+function mfuParseGridDoc(doc){
+  var formEl = doc.getElementById('easyform');
+  if(!formEl) throw new Error('The Medical Recheck admin page did not have the expected editable form -- TroopWebHost may have changed this page, or your login may not have edit rights here.');
+  var table = mfuFindTable(doc, ['Name', 'Adult', 'Medical Part A', 'Medical Part B', 'Medical Part C']);
+  if(!table) throw new Error('The Medical Recheck admin page did not have the expected columns -- TroopWebHost may have changed this page.');
+  var headers = mfuHeaderCells(table);
+  var idxAdult = mfuColIndex(headers, 'Adult');
+  var idxA = mfuColIndex(headers, 'Medical Part A');
+  var idxB = mfuColIndex(headers, 'Medical Part B');
+  var idxC = mfuColIndex(headers, 'Medical Part C');
+  if(idxAdult === -1 || idxA === -1 || idxB === -1 || idxC === -1) throw new Error('Could not find the Adult / Medical Part A / B / C columns on the Medical Recheck admin grid.');
+  var saveBtn = formEl.querySelector('input[name="save"]');
+  if(!saveBtn || !saveBtn.id) throw new Error('Could not find the plain "Save" button on the Medical Recheck admin grid -- TroopWebHost may have changed this page.');
+  var trs = Array.prototype.slice.call(table.querySelectorAll('tbody tr'));
+  var byKey = {};
+  var byInternalId = {};
+  var list = [];
+  var unknownTypeCount = 0;
+  trs.forEach(function(tr){
+    // TroopWebHost's hidden CHILDCB input sits as a direct <tr> child
+    // alongside the <td> cells (not inside one), so filtering to TD
+    // elements here reliably lines up with the header order above --
+    // same quirk this repo's Swim Classification tool already relies on.
+    var tds = Array.prototype.slice.call(tr.children).filter(function(el){ return el.tagName === 'TD'; });
+    if(tds.length <= Math.max(idxAdult, idxA, idxB, idxC)) return;
+    var name = tds[0].textContent.replace(/\s+/g,' ').trim();
+    if(!name) return;
+    var adultText = tds[idxAdult].textContent.replace(/\s+/g,' ').trim().toLowerCase();
+    var type = adultText === 'yes' ? 'Adult' : (adultText === 'no' ? 'Scout' : null);
+    if(!type){ unknownTypeCount++; return; } // unexpected "Adult" column value -- skip rather than guess
+    var inputA = tds[idxA].querySelector('input[type="text"]');
+    var inputB = tds[idxB].querySelector('input[type="text"]');
+    var inputC = tds[idxC].querySelector('input[type="text"]');
+    if(!inputA || !inputB || !inputC) return;
+    var internalId = mfuRowInternalId(tr);
+    var rec = { name:name, type:type, internalId:internalId, key:mfuMatchKey(type, mfuNormGridName(name)), inputA:inputA, inputB:inputB, inputC:inputC };
+    list.push(rec);
+    if(!byKey[rec.key]) byKey[rec.key] = [];
+    byKey[rec.key].push(rec);
+    if(internalId) byInternalId[internalId] = rec;
+  });
+  if(!list.length) throw new Error('The Medical Recheck admin page came back with zero usable rows.');
+  var isPaginated = !!doc.querySelector('[onclick*="GoToSectionPageNumber"], a[href*="GoToSectionPageNumber"]');
+  return { doc:doc, formEl:formEl, saveButtonId:saveBtn.id, rows:list, byKey:byKey, byInternalId:byInternalId, isPaginated:isPaginated, unknownTypeCount:unknownTypeCount };
+}
+function mfuFetchGrid(){
+  return mfuFetchExpandedDoc(MFU_GRID_URL).then(function(doc){
+    var parsed = mfuParseGridDoc(doc);
+    if(parsed.isPaginated) console.warn('Medical Form Date Bulk Uploader: the grid still shows pagination controls after requesting ALL rows -- some members past the first page may be missing. Proceeding with what was returned ('+parsed.rows.length+' rows).');
+    return parsed;
+  });
+}
+var mfuGridCache = null;
+function mfuGetGrid(forceRefresh){
+  if(!forceRefresh && mfuGridCache) return Promise.resolve(mfuGridCache);
+  return mfuFetchGrid().then(function(grid){ mfuGridCache = grid; return grid; });
+}
+
+/* ================= FETCH: BSA ID admin grids (Scout or Adult), READ-ONLY =================
+   Purely a lookup source for matching -- BSA Number -> internal person
+   ID -- never written to. See note #5a at the top of this file for the
+   confirmed evidence that this internal ID is the same one that shows
+   up (unlabeled) on the Medical Recheck grid's own rows. */
+function mfuParseBsaIdDoc(doc, type){
+  var table = mfuFindTable(doc, ['Name', 'BSA ID']);
+  if(!table) throw new Error('The '+type+' BSA ID admin page did not have the expected columns -- TroopWebHost may have changed this page.');
+  var headers = mfuHeaderCells(table);
+  var idxBsa = mfuColIndex(headers, 'BSA ID');
+  if(idxBsa === -1) throw new Error('Could not find the BSA ID column on the '+type+' BSA ID admin page.');
+  var trs = Array.prototype.slice.call(table.querySelectorAll('tbody tr'));
+  var byBsaNumber = {};
+  trs.forEach(function(tr){
+    var internalId = mfuRowInternalId(tr);
+    if(!internalId) return;
+    var tds = Array.prototype.slice.call(tr.children).filter(function(el){ return el.tagName === 'TD'; });
+    if(tds.length <= idxBsa) return;
+    var name = tds[0].textContent.replace(/\s+/g,' ').trim();
+    var bsaInput = tds[idxBsa].querySelector('input[type="text"]');
+    var bsaNumber = mfuNormalizeBsaNumber(bsaInput ? bsaInput.value : '');
+    if(!bsaNumber) return; // no BSA Number on file for this person -- can't use for matching
+    byBsaNumber[bsaNumber] = { internalId:internalId, name:name, type:type };
+  });
+  var isPaginated = !!doc.querySelector('[onclick*="GoToSectionPageNumber"], a[href*="GoToSectionPageNumber"]');
+  return { type:type, byBsaNumber:byBsaNumber, isPaginated:isPaginated };
+}
+function mfuFetchBsaIdGrid(type){
+  return mfuFetchExpandedDoc(mfuBsaIdUrl(type)).then(function(doc){ return mfuParseBsaIdDoc(doc, type); });
+}
+var mfuBsaIdCache = { Scout:null, Adult:null };
+function mfuGetBsaIdGrid(type, forceRefresh){
+  if(!forceRefresh && mfuBsaIdCache[type]) return Promise.resolve(mfuBsaIdCache[type]);
+  return mfuFetchBsaIdGrid(type).then(function(g){ mfuBsaIdCache[type] = g; return g; });
+}
+/* Combines both BSA ID grids into one lookup keyed by type+BSA Number.
+   Deliberately NEVER throws -- this is an enhancement over name
+   matching, not a requirement, so if these two pages can't be reached
+   (a different install's Form_IDs, a permissions quirk, etc.) the tool
+   should still work via name matching rather than fail outright. The
+   returned object's "error" field (if set) is surfaced as a
+   non-fatal warning in the UI. */
+function mfuGetBsaIdLookup(forceRefresh){
+  return mfuGetBsaIdGrid('Scout', forceRefresh).then(function(scoutGrid){
+    return mfuGetBsaIdGrid('Adult', forceRefresh).then(function(adultGrid){
+      var combined = {};
+      [scoutGrid, adultGrid].forEach(function(g){
+        Object.keys(g.byBsaNumber).forEach(function(bsa){ combined[g.type+'|'+bsa] = g.byBsaNumber[bsa]; });
+      });
+      return { combined:combined, scout:scoutGrid, adult:adultGrid };
+    });
+  }).catch(function(err){
+    console.warn('Medical Form Date Bulk Uploader: could not load the BSA ID lookup, falling back to name matching only:', err);
+    return { combined:{}, error: err.message };
+  });
+}
+
+/* ================= SAVE: write Part A/B/C back to TroopWebHost =================
+   Mutates the ALREADY-FETCHED grid Document in place (only the fields
+   that need to change), then serializes that page's own <form> with
+   the real FormData API so every other row's OLD/current pair goes
+   back byte-for-byte identical to what TroopWebHost just sent -- see
+   the top-of-file notes for the full explanation. */
+function mfuSubmitGrid(grid){
+  var fd = new FormData(grid.formEl);
+  fd.set('Selected_Action', 'save');
+  fd.set('Hover_Action', 'save');
+  fd.set('Selected_Button_ID', grid.saveButtonId); // the plain "Save" button (stays on page) -- looked up at runtime, see mfuParseGridDoc()
+  return mfuFetchRaw(MFU_GRID_URL, { method:'POST', body:fd }).then(function(){ return true; });
+}
+/* changes: [{type, name, key, field, fieldKey:'A'|'B'|'C', oldVal, newVal}] --
+   already filtered to just what the user selected. One fetch-mutate-
+   post-verify pass covers everyone, Scout and Adult alike, since
+   they're all on the same grid/form now. */
+function mfuApplySelected(changes){
+  if(!changes.length) return Promise.resolve({ saved:[], failed:[] });
+  var saved = [], failed = [];
+  return mfuGetGrid(true).then(function(grid){ // always refetch fresh right before editing -- avoids acting on a stale page
+    var toVerify = [];
+    changes.forEach(function(ch){
+      var rec = (ch.internalId && grid.byInternalId[ch.internalId]) || null;
+      if(!rec){
+        var matches = grid.byKey[ch.key] || [];
+        if(matches.length !== 1){ failed.push(ch.name+' ('+ch.type+') -- '+ch.field+' (person no longer uniquely found on the grid; re-run Compare)'); return; }
+        rec = matches[0];
+      }
+      var input = ch.fieldKey === 'A' ? rec.inputA : (ch.fieldKey === 'B' ? rec.inputB : rec.inputC);
+      input.value = ch.newVal;
+      toVerify.push(ch);
+    });
+    if(!toVerify.length) return;
+    return mfuSubmitGrid(grid).then(function(){
+      return mfuGetGrid(true).then(function(freshGrid){
+        toVerify.forEach(function(item){
+          var rec = (item.internalId && freshGrid.byInternalId[item.internalId]) || null;
+          if(!rec){
+            var matches = freshGrid.byKey[item.key] || [];
+            rec = matches.length === 1 ? matches[0] : null;
+          }
+          var input = rec ? (item.fieldKey === 'A' ? rec.inputA : (item.fieldKey === 'B' ? rec.inputB : rec.inputC)) : null;
+          var ok = input && input.value.trim() === item.newVal;
+          if(ok) saved.push(item.name+' ('+item.type+') -- '+item.field+' set to '+item.newVal);
+          else failed.push(item.name+' ('+item.type+') -- '+item.field+' (save did not verify)');
+        });
+      });
+    });
+  }).then(function(){ return { saved:saved, failed:failed }; });
+}
+
+/* ================= DIFF: roster rows (from file) vs grid rows (live) =================
+   Matching preference per row: internal person ID (resolved through
+   the BSA Number lookup, r.internalId) first, then the name+type key
+   (r.key, alias-aware) as a fallback -- see note #5 at the top of this
+   file for why. */
+function mfuBuildDiff(rosterRows, grid){
+  var changes = [], notFound = [], ambiguous = [];
+  var matchedById = 0, matchedByName = 0;
+  rosterRows.forEach(function(r){
+    if(!r.ab && !r.c) return; // nothing in the file to apply for this person
+    var rec = null;
+    if(r.internalId && grid.byInternalId[r.internalId]){
+      rec = grid.byInternalId[r.internalId];
+      matchedById++;
+    } else {
+      var matches = grid.byKey[r.key] || [];
+      if(matches.length === 0){ notFound.push(r); return; }
+      if(matches.length > 1){ ambiguous.push(r); return; }
+      rec = matches[0];
+      matchedByName++;
+    }
+    if(r.ab){
+      var curA = rec.inputA.value.trim();
+      var curB = rec.inputB.value.trim();
+      if(curA !== r.ab) changes.push({ type:r.type, name:rec.name, key:rec.key, internalId:rec.internalId, field:'Medical Part A', fieldKey:'A', oldVal:curA, newVal:r.ab });
+      if(curB !== r.ab) changes.push({ type:r.type, name:rec.name, key:rec.key, internalId:rec.internalId, field:'Medical Part B', fieldKey:'B', oldVal:curB, newVal:r.ab });
+    }
+    if(r.c){
+      var curC = rec.inputC.value.trim();
+      if(curC !== r.c) changes.push({ type:r.type, name:rec.name, key:rec.key, internalId:rec.internalId, field:'Medical Part C', fieldKey:'C', oldVal:curC, newVal:r.c });
+    }
+  });
+  changes.sort(function(a,b){ return a.name.localeCompare(b.name) || a.field.localeCompare(b.field); });
+  return { changes:changes, notFound:notFound, ambiguous:ambiguous, matchedById:matchedById, matchedByName:matchedByName };
+}
+
+/* ================= UI WIRING ================= */
+var elFileInput = document.getElementById('mfu-fileInput');
+var elClearFileBtn = document.getElementById('mfu-clearFileBtn');
+var elFileStatus = document.getElementById('mfu-fileStatus');
+var elFileSummary = document.getElementById('mfu-fileSummary');
+var elCompareBtn = document.getElementById('mfu-compareBtn');
+var elCompareStatus = document.getElementById('mfu-compareStatus');
+var elRestricted = document.getElementById('mfu-restricted');
+var elResults = document.getElementById('mfu-results');
+var elDiffMeta = document.getElementById('mfu-diffMeta');
+var elWarnBanners = document.getElementById('mfu-warnBanners');
+var elDiffToolbar = document.getElementById('mfu-diffToolbar');
+var elSelectAllBtn = document.getElementById('mfu-selectAllBtn');
+var elSelectNoneBtn = document.getElementById('mfu-selectNoneBtn');
+var elSelectedCount = document.getElementById('mfu-selectedCount');
+var elDiffTable = document.getElementById('mfu-diffTable');
+var elDiffTbl = document.getElementById('mfu-diffTbl');
+var elNoChanges = document.getElementById('mfu-noChanges');
+var elNotFoundBlock = document.getElementById('mfu-notFoundBlock');
+var elNotFoundList = document.getElementById('mfu-notFoundList');
+var elAmbiguousBlock = document.getElementById('mfu-ambiguousBlock');
+var elAmbiguousList = document.getElementById('mfu-ambiguousList');
+var elAliasesBlock = document.getElementById('mfu-aliasesBlock');
+var elAliasesList = document.getElementById('mfu-aliasesList');
+var elApplyBtn = document.getElementById('mfu-applyBtn');
+var elSaveReport = document.getElementById('mfu-saveReport');
+
+function renderAliasesList(){
+  var aliases = mfuLoadAliases();
+  var keys = Object.keys(aliases);
+  if(!keys.length){ elAliasesBlock.classList.remove('mfu-show'); elAliasesList.innerHTML = ''; return; }
+  elAliasesBlock.classList.add('mfu-show');
+  elAliasesList.innerHTML = keys.map(function(k){
+    var parts = k.split('|');
+    var type = parts[0], last = parts[1], first = parts[2];
+    return '<li>('+esc(type)+') "'+esc(last)+', '+esc(first)+'" from the file &rarr; "'+esc(aliases[k])+'" on the grid'+
+      ' <button type="button" class="mfu-btn-ghost mfu-alias-remove" data-alias-key="'+esc(k)+'" style="margin-left:8px;padding:2px 8px;">Remove</button></li>';
+  }).join('');
+}
+elAliasesList.addEventListener('click', function(e){
+  var btn = e.target.closest && e.target.closest('.mfu-alias-remove');
+  if(!btn) return;
+  var aliases = mfuLoadAliases();
+  delete aliases[btn.getAttribute('data-alias-key')];
+  mfuSaveAliases(aliases);
+  renderAliasesList();
+  if(rosterRows){
+    mfuApplyAliasesToRows(rosterRows);
+    if(currentGrid){
+      var diff = mfuBuildDiff(rosterRows, currentGrid);
+      currentDiff = diff;
+      renderDiff(diff, currentGrid);
+    }
+  }
+});
+renderAliasesList();
+
+var rosterRows = null;   // combined adults+scouts, parsed from the uploaded file
+var currentDiff = null;  // { changes, notFound, ambiguous }
+var currentGrid = null;  // the single combined Medical Recheck grid
+
+function resetCompareAndBelow(){
+  currentDiff = null;
+  currentGrid = null;
+  elResults.classList.remove('mfu-show');
+  elCompareStatus.textContent = '';
+  elCompareStatus.className = 'mfu-status';
+  elRestricted.style.display = 'none';
+  elApplyBtn.disabled = true;
+  elSaveReport.style.display = 'none';
+}
+
+elFileInput.addEventListener('change', function(){
+  var file = elFileInput.files && elFileInput.files[0];
+  resetCompareAndBelow();
+  elCompareBtn.disabled = true;
+  elFileSummary.style.display = 'none';
+  if(!file){ elClearFileBtn.disabled = true; elFileStatus.textContent = ''; return; }
+  elClearFileBtn.disabled = false;
+  elFileStatus.className = 'mfu-status';
+  elFileStatus.textContent = 'Reading '+file.name+'\u2026';
+  var reader = new FileReader();
+  reader.onerror = function(){
+    elFileStatus.className = 'mfu-status mfu-err';
+    elFileStatus.textContent = 'Could not read that file.';
+  };
+  reader.onload = function(){
+    var parsed;
+    try{
+      parsed = mfuParseRosterCsv(String(reader.result||''));
+    }catch(e){
+      elFileStatus.className = 'mfu-status mfu-err';
+      elFileStatus.textContent = 'Could not parse this file: '+e.message;
+      return;
+    }
+    rosterRows = mfuApplyAliasesToRows(parsed.adults.concat(parsed.scouts));
+    var withDates = rosterRows.filter(function(r){ return r.ab || r.c; });
+    if(!parsed.adults.length && !parsed.scouts.length){
+      elFileStatus.className = 'mfu-status mfu-err';
+      elFileStatus.textContent = 'No Adult or Youth member rows were found in this file. ' + (parsed.warnings[0]||'');
+      return;
+    }
+    elFileStatus.className = 'mfu-status mfu-ok';
+    elFileStatus.textContent = 'Parsed successfully.';
+    var lines = [];
+    lines.push('Found <b>'+parsed.adults.length+'</b> adult row(s) and <b>'+parsed.scouts.length+'</b> scout row(s) in the file.');
+    lines.push('<b>'+withDates.length+'</b> of those have at least one Health Form date to check.');
+    if(parsed.warnings.length) lines.push(parsed.warnings.map(esc).join('<br>'));
+    elFileSummary.innerHTML = lines.join('<br>');
+    elFileSummary.style.display = '';
+    elCompareBtn.disabled = withDates.length === 0;
+    if(withDates.length === 0){
+      elFileStatus.className = 'mfu-status mfu-err';
+      elFileStatus.textContent = 'Parsed, but no rows had a Health Form date to check -- nothing to compare.';
+    }
+  };
+  reader.readAsText(file);
+});
+
+elClearFileBtn.addEventListener('click', function(){
+  elFileInput.value = '';
+  rosterRows = null;
+  elFileStatus.textContent = '';
+  elFileSummary.style.display = 'none';
+  elClearFileBtn.disabled = true;
+  elCompareBtn.disabled = true;
+  resetCompareAndBelow();
+});
+
+elCompareBtn.addEventListener('click', function(){
+  if(!rosterRows) return;
+  resetCompareAndBelow();
+  elCompareBtn.disabled = true;
+  elCompareStatus.textContent = 'Fetching the Medical Recheck grid\u2026';
+  var bsaLookupResult = null;
+  mfuGetGrid(true).then(function(grid){
+    elCompareStatus.textContent = 'Fetching the BSA ID lookup (Scout + Adult)\u2026';
+    return mfuGetBsaIdLookup(true).then(function(lookup){
+      bsaLookupResult = lookup;
+      rosterRows.forEach(function(r){
+        var hit = r.bsaNumber ? lookup.combined[r.type+'|'+r.bsaNumber] : null;
+        r.internalId = hit ? hit.internalId : null;
+      });
+      return grid;
+    });
+  }).then(function(grid){
+    currentGrid = grid;
+    var diff = mfuBuildDiff(rosterRows, grid);
+    currentDiff = diff;
+    elCompareStatus.className = 'mfu-status mfu-ok';
+    elCompareStatus.textContent = 'Compared against TroopWebHost ('+grid.rows.length+' people on the grid).';
+    renderDiff(diff, grid, bsaLookupResult);
+    elCompareBtn.disabled = false;
+  }).catch(function(err){
+    elCompareBtn.disabled = false;
+    if(String(err.message||'').indexOf('REDIRECTED:') === 0){
+      elCompareStatus.textContent = '';
+      elRestricted.style.display = '';
+      return;
+    }
+    elCompareStatus.className = 'mfu-status mfu-err';
+    elCompareStatus.textContent = 'Could not compare: '+err.message;
+  });
+});
+
+function renderDiff(diff, grid, bsaLookupResult){
+  elResults.classList.add('mfu-show');
+  elWarnBanners.innerHTML = '';
+  if(grid.isPaginated){
+    var div = document.createElement('div');
+    div.className = 'mfu-warn-banner';
+    div.textContent = 'Warning: the Medical Recheck grid still shows page controls even after requesting "ALL" rows per page -- some members may be missing from this comparison. Open the real "Update Medical Recheck Dates" admin page in TroopWebHost directly to check, then click Compare again here before applying changes.';
+    elWarnBanners.appendChild(div);
+  }
+  if(grid.unknownTypeCount){
+    var div2 = document.createElement('div');
+    div2.className = 'mfu-warn-banner';
+    div2.textContent = grid.unknownTypeCount+' row(s) on the grid had an unrecognized value in the "Adult" column (expected "Yes" or "No") and were skipped entirely -- TroopWebHost may have changed this page.';
+    elWarnBanners.appendChild(div2);
+  }
+  if(bsaLookupResult && bsaLookupResult.error){
+    var div3 = document.createElement('div');
+    div3.className = 'mfu-warn-banner';
+    div3.textContent = 'Could not load the BSA ID lookup ('+bsaLookupResult.error+') -- matching fell back to name only for everyone this time. BSA Number matching (immune to Preferred Name differences) will resume automatically once that page is reachable again.';
+    elWarnBanners.appendChild(div3);
+  }
+  var byPerson = {};
+  diff.changes.forEach(function(ch){ byPerson[ch.type+'|'+ch.name] = true; });
+  var peopleCount = Object.keys(byPerson).length;
+  var metaParts = [];
+  if(diff.changes.length) metaParts.push(diff.changes.length+' field change(s) across '+peopleCount+' people.');
+  if(diff.matchedById || diff.matchedByName) metaParts.push('Matched '+(diff.matchedById||0)+' by BSA Number, '+(diff.matchedByName||0)+' by name.');
+  elDiffMeta.textContent = metaParts.join(' ');
+  elDiffTbl.innerHTML = '';
+  if(!diff.changes.length){
+    elDiffTable.style.display = 'none';
+    elDiffToolbar.style.display = 'none';
+    elNoChanges.style.display = '';
+  } else {
+    elNoChanges.style.display = 'none';
+    elDiffTable.style.display = '';
+    elDiffToolbar.style.display = '';
+    diff.changes.forEach(function(ch, idx){
+      var tr = document.createElement('tr');
+      tr.innerHTML =
+        '<td><input type="checkbox" class="mfu-diff-check" data-idx="'+idx+'" checked></td>'+
+        '<td class="mfu-name">'+esc(ch.name)+'</td>'+
+        '<td><span class="mfu-type-tag">'+esc(ch.type)+'</span></td>'+
+        '<td>'+esc(ch.field)+'</td>'+
+        '<td><span class="mfu-old-val">'+esc(ch.oldVal || '(blank)')+'</span></td>'+
+        '<td><span class="mfu-arrow">&rarr;</span></td>'+
+        '<td><span class="mfu-new-val">'+esc(ch.newVal)+'</span></td>';
+      elDiffTbl.appendChild(tr);
+    });
+  }
+  if(diff.notFound.length){
+    elNotFoundBlock.classList.add('mfu-show');
+    elNotFoundList.innerHTML = diff.notFound.map(function(r, i){
+      return '<li>'+esc(r.displayName)+' ('+esc(r.type)+')'+
+        '<div class="mfu-alias-row">'+
+        '<input type="text" class="mfu-alias-input" data-notfound-idx="'+i+'" placeholder="Name as shown on the TroopWebHost grid, e.g. Ammann, Jerry">'+
+        '<button type="button" class="mfu-btn-ghost mfu-alias-save" data-notfound-idx="'+i+'">Fix name &amp; recheck</button>'+
+        '</div></li>';
+    }).join('');
+  } else {
+    elNotFoundBlock.classList.remove('mfu-show');
+    elNotFoundList.innerHTML = '';
+  }
+  if(diff.ambiguous.length){
+    elAmbiguousBlock.classList.add('mfu-show');
+    elAmbiguousList.innerHTML = diff.ambiguous.map(function(r){
+      return '<li>'+esc(r.displayName)+' ('+esc(r.type)+')</li>';
+    }).join('');
+  } else {
+    elAmbiguousBlock.classList.remove('mfu-show');
+    elAmbiguousList.innerHTML = '';
+  }
+  updateSelectedCount();
+}
+function updateSelectedCount(){
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('.mfu-diff-check'));
+  var checked = boxes.filter(function(b){ return b.checked; }).length;
+  elSelectedCount.textContent = boxes.length ? (checked+' of '+boxes.length+' selected') : '';
+  elApplyBtn.disabled = checked === 0;
+}
+elDiffTbl.addEventListener('change', function(e){
+  if(e.target && e.target.classList.contains('mfu-diff-check')) updateSelectedCount();
+});
+elNotFoundList.addEventListener('click', function(e){
+  var btn = e.target.closest && e.target.closest('.mfu-alias-save');
+  if(!btn) return;
+  var idx = parseInt(btn.getAttribute('data-notfound-idx'), 10);
+  var row = currentDiff && currentDiff.notFound[idx];
+  if(!row) return;
+  var input = elNotFoundList.querySelector('.mfu-alias-input[data-notfound-idx="'+idx+'"]');
+  var gridName = input && input.value.trim();
+  if(!gridName){ input && input.focus(); return; }
+  var aliases = mfuLoadAliases();
+  aliases[mfuCsvAliasKey(row.type, row.lastName, row.firstName)] = gridName;
+  mfuSaveAliases(aliases);
+  mfuApplyAliasesToRows(rosterRows);
+  renderAliasesList();
+  var diff = mfuBuildDiff(rosterRows, currentGrid);
+  currentDiff = diff;
+  renderDiff(diff, currentGrid);
+});
+elSelectAllBtn.addEventListener('click', function(){
+  Array.prototype.slice.call(document.querySelectorAll('.mfu-diff-check')).forEach(function(b){ b.checked = true; });
+  updateSelectedCount();
+});
+elSelectNoneBtn.addEventListener('click', function(){
+  Array.prototype.slice.call(document.querySelectorAll('.mfu-diff-check')).forEach(function(b){ b.checked = false; });
+  updateSelectedCount();
+});
+
+elApplyBtn.addEventListener('click', function(){
+  if(!currentDiff) return;
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('.mfu-diff-check'));
+  var selected = boxes.filter(function(b){ return b.checked; }).map(function(b){ return currentDiff.changes[parseInt(b.getAttribute('data-idx'),10)]; });
+  if(!selected.length) return;
+  var byPerson = {};
+  selected.forEach(function(ch){ byPerson[ch.type+'|'+ch.name] = true; });
+  var msg = 'Write '+selected.length+' field change(s) across '+Object.keys(byPerson).length+' people back to TroopWebHost now?\n\nThis updates the live Medical Recheck admin grid(s), exactly as if you typed these dates in and clicked Save.';
+  if(!window.confirm(msg)) return;
+  elApplyBtn.disabled = true;
+  elApplyBtn.textContent = 'Applying\u2026';
+  mfuApplySelected(selected).then(function(result){
+    elApplyBtn.textContent = 'Apply Selected Changes';
+    var parts = [];
+    if(result.saved.length){
+      parts.push('<div class="mfu-save-ok"><b>Saved and verified ('+result.saved.length+'):</b><br>'+result.saved.map(esc).join('<br>')+'</div>');
+    }
+    if(result.failed.length){
+      parts.push('<div class="mfu-save-fail" style="margin-top:8px;"><b>Did not save ('+result.failed.length+'):</b><br>'+result.failed.map(esc).join('<br>')+'</div>');
+    }
+    elSaveReport.innerHTML = parts.join('') || 'Nothing was applied.';
+    elSaveReport.style.display = '';
+    // Re-compare from the now-fresh grid so the review table reflects
+    // what's actually on TroopWebHost after the save.
+    currentGrid = mfuGridCache;
+    var diff = mfuBuildDiff(rosterRows, mfuGridCache);
+    currentDiff = diff;
+    renderDiff(diff, mfuGridCache);
+  }).catch(function(err){
+    elApplyBtn.disabled = false;
+    elApplyBtn.textContent = 'Apply Selected Changes';
+    elSaveReport.className = 'mfu-save-report';
+    elSaveReport.innerHTML = '<div class="mfu-save-fail">Could not apply changes: '+esc(err.message)+'</div>';
+    elSaveReport.style.display = '';
+  });
+});
+
+})();
+</script>
