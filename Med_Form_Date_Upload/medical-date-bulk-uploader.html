@@ -119,10 +119,12 @@ READ BEFORE USING
       person's Name, BSA ID, and TroopWebHost's own internal person ID
       (the same internal ID that also appears, unlabeled, as a hidden
       field on every row of the Medical Recheck grid). Confirmed
-      against a captured example: a person shown as "Ammann, Jerry" on
-      both the BSA ID grid and the Medical Recheck grid has BSA ID
-      132656233 -- the EXACT SAME number as "Ammann, Gerald" in the
-      Roster Report's BSA Number column. So: fetch both BSA ID grids
+      against a captured example (redacted here, but real at the time):
+      a person on the BSA ID grid and the Medical Recheck grid had the
+      exact same BSA ID as the same person's row in the Roster Report,
+      even though the two pages displayed different names for them (a
+      Preferred Name on TroopWebHost vs. the Roster Report's legal
+      First Name). So: fetch both BSA ID grids
       once, build a BSA-Number -> internal-person-ID lookup, resolve
       each CSV row's own BSA Number (also in the Roster Report) through
       that lookup, and then match straight to the Medical Recheck
@@ -632,8 +634,8 @@ function mfuNormGridName(name){
 /* ================= NAME ALIASES (manual override for Preferred Name mismatches) =================
    TroopWebHost's Medical Recheck grid displays whatever name TWH is
    configured to show for that person -- which can be a Preferred Name
-   rather than the CSV's First Name (e.g. "Jerry" on the grid vs.
-   "Gerald" in the Roster Report). Neither this page nor the grid has
+   rather than the CSV's First Name (e.g. "Bobby" on the grid vs.
+   "Robert" in the Roster Report). Neither this page nor the grid has
    access to a shared numeric ID that would sidestep this (the grid
    carries no BSA Number anywhere -- confirmed by inspection -- only
    TroopWebHost's own internal person ID, which isn't in the Roster
@@ -1238,7 +1240,7 @@ function renderDiff(diff, grid, bsaLookupResult){
     elNotFoundList.innerHTML = diff.notFound.map(function(r, i){
       return '<li>'+esc(r.displayName)+' ('+esc(r.type)+')'+
         '<div class="mfu-alias-row">'+
-        '<input type="text" class="mfu-alias-input" data-notfound-idx="'+i+'" placeholder="Name as shown on the TroopWebHost grid, e.g. Ammann, Jerry">'+
+        '<input type="text" class="mfu-alias-input" data-notfound-idx="'+i+'" placeholder="Name as shown on the TroopWebHost grid, e.g. Smith, Bobby">'+
         '<button type="button" class="mfu-btn-ghost mfu-alias-save" data-notfound-idx="'+i+'">Fix name &amp; recheck</button>'+
         '</div></li>';
     }).join('');
