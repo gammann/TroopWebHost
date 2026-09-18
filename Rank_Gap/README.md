@@ -228,6 +228,38 @@ Requirements export when this was first built as two separate tools.
   every `<button>` has explicit `type="button"`, the file is pure ASCII,
   and the live-site color probe/adapt logic is unchanged from the two
   source tools.
+- **Switching tabs clears the results panel.** `setMode()` tracks the
+  currently active tab and, when the tab actually changes, calls the
+  same `closeGapResults()` helper the results panel's own Close button
+  uses -- hiding the results panel, dropping any selected-row
+  highlighting in the Campouts/Patrols tables, and resetting the shared
+  Export to Excel button (`currentGapExport = null`, disabled). Clicking
+  a tab that's already active is a no-op for the results panel, so a
+  fresh selection isn't wiped out by re-clicking the same tab.
+- **Tab switching doesn't change the page width.** TWH's old WebForms
+  table chrome has no fixed width for the area a custom page renders
+  into -- it shrink-wraps to whatever's currently visible inside it, so
+  swapping in a narrower or wider panel visibly resizes the whole page.
+  Two things could each trigger that on their own, and both needed the
+  same fix: (1) the Campouts/Patrols/All Scouts panels naturally differ
+  in width, and merely toggling them with `display:none` removes the
+  inactive ones from layout entirely, so the page is only ever as wide
+  as whichever one is currently active; (2) the results panel is often
+  the widest thing on the page (requirement grids, wrapping chips, mono
+  req codes), so closing it the same way -- via the Close button or via
+  `closeGapResults()` on a tab switch -- has the same effect in reverse.
+  The fix in both cases is to never remove the element from layout:
+  the three mode panels live in `#rg-modeStack` (`display:grid`, all
+  three panels pinned to the same cell via `grid-area:1 / 1`), which
+  sizes that shared cell to the union of all three panels' natural
+  sizes regardless of which is active, and the inactive ones are
+  hidden with `visibility:hidden` rather than `display:none` so they
+  still count toward that sizing. `#rg-results` uses the same
+  `visibility:hidden` swap for the same reason -- once it's rendered
+  content, its last-rendered box stays in flow (just invisible) so
+  closing it never shrinks the page either. Trade-off, in both cases:
+  the container is permanently as tall as its tallest state, so a
+  shorter tab (or no results shown yet) leaves blank space below.
 
 ## Troubleshooting
 

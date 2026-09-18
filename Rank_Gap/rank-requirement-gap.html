@@ -148,7 +148,24 @@ READ BEFORE USING
 #rg-root .rg-mode-tab.rg-mode-tab-active{
   background:var(--gold-glow); border-color:var(--gold); color:var(--gold-text); font-weight:600;
 }
-#rg-root .rg-mode-panel.rg-mode-panel-hidden{ display:none; }
+#rg-root .rg-mode-panel.rg-mode-panel-hidden{ visibility:hidden; }
+#rg-root .rg-mode-stack{
+  /* Stack all three panels in the SAME grid cell instead of one-at-a-time
+     in normal flow. CSS Grid sizes a track to the union of every item
+     placed in it, whether or not that item is currently visible (as
+     long as it isn't display:none) -- so this cell is permanently as
+     wide/tall as the widest/tallest of Campouts/Patrols/All Scouts,
+     regardless of which one is the active tab. Combined with
+     visibility:hidden (not display:none) on the inactive panels below,
+     switching tabs never changes the container's width, which is what
+     was causing TWH's old WebForms table chrome (shrink-wraps to
+     whatever's currently visible) to jump on every tab switch. Same
+     technique applied to .rg-results below, for the same reason.
+     Trade-off: the stack is always as tall as the tallest tab, so
+     shorter tabs show blank space below their content. */
+  display:grid;
+}
+#rg-root .rg-mode-stack > .rg-mode-panel{ grid-area:1 / 1; min-width:0; }
 #rg-root .rg-all-scouts-cta{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; }
 #rg-root table{ width:100%; border-collapse:collapse; font-size:13px; }
 #rg-root thead th{
@@ -180,8 +197,21 @@ READ BEFORE USING
 #rg-root .rg-btn-ghost:disabled{ opacity:0.4; cursor:not-allowed; }
 #rg-root .rg-btn-ghost:disabled:hover{ border-color:var(--hair-strong); }
 #rg-root .rg-empty-row{ padding:18px 10px; color:var(--parchment-dim); font-size:12.5px; font-style:italic; }
-#rg-root .rg-results{ display:none; }
-#rg-root .rg-results.rg-show{ display:block; }
+#rg-root .rg-results{
+  /* visibility, not display: none -- closing the results panel (Close
+     button, or a tab switch clearing it) must not remove its rendered
+     box from the layout. This is often the widest thing on the page
+     (requirement grids, wrapping chips, mono req codes), so yanking it
+     out via display:none shrinks TWH's old WebForms table chrome,
+     which shrink-wraps to whatever's currently visible -- same root
+     cause as the mode-tab width jump. Keeping the last-rendered box in
+     flow (just invisible) means closing it never changes the page
+     width. Trade-off: after the first selection, closing results
+     leaves blank space where it was instead of collapsing -- same
+     trade-off already accepted for the shorter mode tabs above. */
+  visibility:hidden;
+}
+#rg-root .rg-results.rg-show{ visibility:visible; }
 #rg-root .rg-gap-head{
   display:flex; align-items:baseline; justify-content:space-between; gap:14px; flex-wrap:wrap;
   margin-bottom:4px;
@@ -309,6 +339,7 @@ READ BEFORE USING
 <button class="rg-mode-tab" data-mode="patrol" type="button">Patrols</button>
 <button class="rg-mode-tab" data-mode="all" type="button">All Scouts</button>
 </div>
+<div class="rg-mode-stack" id="rg-modeStack">
 <div class="rg-mode-panel" id="rg-panel-campout">
 <div class="rg-sheet-head"><h2>Upcoming Campouts</h2></div>
 <p class="rg-sheet-sub" id="rg-campoutSub">Loading&hellip;</p>
@@ -333,6 +364,7 @@ READ BEFORE USING
 <p class="rg-sheet-sub" id="rg-allSub">Loading&hellip;</p>
 <div class="rg-all-scouts-cta">
 <button class="rg-btn" id="rg-viewAllScouts" type="button" disabled>View Gap for All Scouts</button>
+</div>
 </div>
 </div>
 </div>
@@ -1392,15 +1424,21 @@ elExportGapXlsx.addEventListener('click', function(){
     alert('Could not build the Excel export: '+e.message);
   }
 });
-elCloseGap.addEventListener('click', function(){
+function closeGapResults(){
   elResults.classList.remove('rg-show');
   Array.prototype.slice.call(elPatrolsTbl.querySelectorAll('tr.rg-selected')).forEach(function(r){ r.classList.remove('rg-selected'); });
   Array.prototype.slice.call(elEventsTbl.querySelectorAll('tr.rg-selected')).forEach(function(r){ r.classList.remove('rg-selected'); });
-});
+  elExportGapXlsx.disabled = true;
+  currentGapExport = null;
+}
+elCloseGap.addEventListener('click', function(){ closeGapResults(); });
 elViewAllScouts.addEventListener('click', function(){ selectAllScouts(); });
 /* ================= MODE TABS ================= */
 var RG_MODES = ['campout','patrol','all'];
+var rgCurrentMode = 'campout';
 function setMode(mode){
+  if(mode !== rgCurrentMode) closeGapResults();
+  rgCurrentMode = mode;
   RG_MODES.forEach(function(m){
     document.getElementById('rg-panel-'+m).classList.toggle('rg-mode-panel-hidden', m !== mode);
   });
