@@ -164,7 +164,16 @@ READ BEFORE USING
    server-side cap on a very large troop, never observed but not
    provably impossible), this page shows a warning rather than silently
    working from a partial roster.
-7. PRIVACY: the uploaded Roster Report contains sensitive personal
+7. OLDER-DATE SAFEGUARD: a field change whose file date is OLDER than
+   what's already on TroopWebHost (compared as calendar dates, not
+   string equality) is still shown in the review table -- so nothing is
+   ever silently hidden -- but its checkbox starts UNCHECKED and it's
+   labeled "older -- unchecked" (mfuIsOlder()/mfuDateSortKey()). An
+   older date in an upload almost always means a stale export, not a
+   real correction, so the safer default is to leave TroopWebHost's
+   newer date alone unless a leader deliberately opts back in by
+   checking the box themselves.
+8. PRIVACY: the uploaded Roster Report contains sensitive personal
    information well beyond medical dates (address, phone, BSA Number,
    training history, etc.). This page only ever reads names and the
    Health Form column out of it -- the rest of each row is ignored --
@@ -173,7 +182,7 @@ READ BEFORE USING
    entirely in your browser and is never uploaded anywhere by this page.
    You are still responsible for handling the file itself (and this
    page, once pasted with real data flowing through it) appropriately.
-8. Sequential fetches only, never concurrent -- TroopWebHost's
+9. Sequential fetches only, never concurrent -- TroopWebHost's
    server-side session state can silently produce empty/wrong results
    under concurrent requests, per this repo's established convention.
 -->
@@ -314,6 +323,10 @@ READ BEFORE USING
 }
 #mfu-root .mfu-old-val{ color:var(--parchment-dim); text-decoration:line-through; }
 #mfu-root .mfu-new-val{ color:var(--brass-text); font-weight:600; }
+#mfu-root .mfu-older-flag{
+  font-family:'JetBrains Mono',monospace; font-size:10px; letter-spacing:.03em; text-transform:uppercase;
+  color:var(--rust); background:var(--rust-bg); border-radius:3px; padding:2px 6px; margin-left:6px;
+}
 #mfu-root .mfu-arrow{ color:var(--parchment-dim); margin:0 6px; }
 #mfu-root .mfu-toolbar{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin:0 0 14px; }
 #mfu-root .mfu-footnote{ font-size:11.5px; color:var(--parchment-dim); margin-top:14px; line-height:1.5; }
@@ -406,7 +419,7 @@ READ BEFORE USING
 </div>
 
 <div class="mfu-save-report" id="mfu-saveReport" style="display:none;"></div>
-<p class="mfu-footnote">Only Medical Part A, Part B, and Part C are ever written by this tool. The Roster Report's "Health Form A/B" date is written to BOTH Part A and Part B (the report doesn't distinguish them); the "Health Form C" date is written to Part C. Tetanus and Other Med Date are never touched. A blank Health Form cell in the file leaves that person's existing TroopWebHost dates alone -- this tool only fills dates in, it never clears one. If someone shows up under "not found," it's usually because TroopWebHost is displaying a Preferred Name that differs from the file's First Name (the grid has no BSA Number or other shared ID to fall back on) -- type the name exactly as it appears on the grid and click "Fix name & recheck" once; that fix is remembered in this browser for every future upload.</p>
+<p class="mfu-footnote">Only Medical Part A, Part B, and Part C are ever written by this tool. The Roster Report's "Health Form A/B" date is written to BOTH Part A and Part B (the report doesn't distinguish them); the "Health Form C" date is written to Part C. Tetanus and Other Med Date are never touched. A blank Health Form cell in the file leaves that person's existing TroopWebHost dates alone -- this tool only fills dates in, it never clears one. If a file's date for a field is OLDER than what's already on TroopWebHost, that row is shown but left unchecked by default (marked "older -- unchecked") -- check it yourself if you're intentionally correcting a bad date, since an older file date usually means a stale export rather than something to apply. If someone shows up under "not found," it's usually because TroopWebHost is displaying a Preferred Name that differs from the file's First Name (the grid has no BSA Number or other shared ID to fall back on) -- type the name exactly as it appears on the grid and click "Fix name & recheck" once; that fix is remembered in this browser for every future upload.</p>
 </div>
 </div>
 
@@ -989,6 +1002,17 @@ function mfuApplySelected(changes){
    the BSA Number lookup, r.internalId) first, then the name+type key
    (r.key, alias-aware) as a fallback -- see note #5 at the top of this
    file for why. */
+/* MM/DD/YYYY -> a plain YYYYMMDD integer for comparison, or null if it
+   doesn't parse (a blank/missing date is never "older," it's just new
+   information -- only an actual older date on file should be flagged). */
+function mfuDateSortKey(mmddyyyy){
+  var m = String(mmddyyyy||'').trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  return m ? parseInt(m[3]+m[1]+m[2], 10) : null;
+}
+function mfuIsOlder(oldVal, newVal){
+  var o = mfuDateSortKey(oldVal), n = mfuDateSortKey(newVal);
+  return o != null && n != null && n < o;
+}
 function mfuBuildDiff(rosterRows, grid){
   var changes = [], notFound = [], ambiguous = [];
   var matchedById = 0, matchedByName = 0;
@@ -1008,12 +1032,12 @@ function mfuBuildDiff(rosterRows, grid){
     if(r.ab){
       var curA = rec.inputA.value.trim();
       var curB = rec.inputB.value.trim();
-      if(curA !== r.ab) changes.push({ type:r.type, name:rec.name, key:rec.key, internalId:rec.internalId, field:'Medical Part A', fieldKey:'A', oldVal:curA, newVal:r.ab });
-      if(curB !== r.ab) changes.push({ type:r.type, name:rec.name, key:rec.key, internalId:rec.internalId, field:'Medical Part B', fieldKey:'B', oldVal:curB, newVal:r.ab });
+      if(curA !== r.ab) changes.push({ type:r.type, name:rec.name, key:rec.key, internalId:rec.internalId, field:'Medical Part A', fieldKey:'A', oldVal:curA, newVal:r.ab, older:mfuIsOlder(curA, r.ab) });
+      if(curB !== r.ab) changes.push({ type:r.type, name:rec.name, key:rec.key, internalId:rec.internalId, field:'Medical Part B', fieldKey:'B', oldVal:curB, newVal:r.ab, older:mfuIsOlder(curB, r.ab) });
     }
     if(r.c){
       var curC = rec.inputC.value.trim();
-      if(curC !== r.c) changes.push({ type:r.type, name:rec.name, key:rec.key, internalId:rec.internalId, field:'Medical Part C', fieldKey:'C', oldVal:curC, newVal:r.c });
+      if(curC !== r.c) changes.push({ type:r.type, name:rec.name, key:rec.key, internalId:rec.internalId, field:'Medical Part C', fieldKey:'C', oldVal:curC, newVal:r.c, older:mfuIsOlder(curC, r.c) });
     }
   });
   changes.sort(function(a,b){ return a.name.localeCompare(b.name) || a.field.localeCompare(b.field); });
@@ -1209,9 +1233,11 @@ function renderDiff(diff, grid, bsaLookupResult){
   var byPerson = {};
   diff.changes.forEach(function(ch){ byPerson[ch.type+'|'+ch.name] = true; });
   var peopleCount = Object.keys(byPerson).length;
+  var olderCount = diff.changes.filter(function(ch){ return ch.older; }).length;
   var metaParts = [];
   if(diff.changes.length) metaParts.push(diff.changes.length+' field change(s) across '+peopleCount+' people.');
   if(diff.matchedById || diff.matchedByName) metaParts.push('Matched '+(diff.matchedById||0)+' by BSA Number, '+(diff.matchedByName||0)+' by name.');
+  if(olderCount) metaParts.push(olderCount+' file date(s) are older than what TroopWebHost already has and are left unchecked.');
   elDiffMeta.textContent = metaParts.join(' ');
   elDiffTbl.innerHTML = '';
   if(!diff.changes.length){
@@ -1225,13 +1251,13 @@ function renderDiff(diff, grid, bsaLookupResult){
     diff.changes.forEach(function(ch, idx){
       var tr = document.createElement('tr');
       tr.innerHTML =
-        '<td><input type="checkbox" class="mfu-diff-check" data-idx="'+idx+'" checked></td>'+
+        '<td><input type="checkbox" class="mfu-diff-check" data-idx="'+idx+'"'+(ch.older ? '' : ' checked')+'></td>'+
         '<td class="mfu-name">'+esc(ch.name)+'</td>'+
         '<td><span class="mfu-type-tag">'+esc(ch.type)+'</span></td>'+
         '<td>'+esc(ch.field)+'</td>'+
         '<td><span class="mfu-old-val">'+esc(ch.oldVal || '(blank)')+'</span></td>'+
         '<td><span class="mfu-arrow">&rarr;</span></td>'+
-        '<td><span class="mfu-new-val">'+esc(ch.newVal)+'</span></td>';
+        '<td><span class="mfu-new-val">'+esc(ch.newVal)+'</span>'+(ch.older ? ' <span class="mfu-older-flag">older -- unchecked</span>' : '')+'</td>';
       elDiffTbl.appendChild(tr);
     });
   }

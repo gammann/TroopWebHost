@@ -1,6 +1,6 @@
 # Medical Form Date Bulk Uploader
 
-A single-file custom page for TroopWebHost that reads a ScoutBook Plus Roster Report export, compares everyone's Medical Part A / Part B / Part C dates in it against TroopWebHost's own live combined Medical Recheck admin grid (Scouts and Adults together), and lets a leader review and apply any updates in one batch instead of typing each date in by hand.
+A single-file custom page for TroopWebHost that reads a Roster Report export, compares everyone's Medical Part A / Part B / Part C dates in it against TroopWebHost's own live combined Medical Recheck admin grid (Scouts and Adults together), and lets a leader review and apply any updates in one batch instead of typing each date in by hand.
 
 Leader-only: the Medical Recheck admin grid requires Adult Leader access on TroopWebHost. A Scout or parent login is detected automatically (the same redirect-based check the other tools in this repo use) and shown a plain "restricted" message rather than a guessed-at scoped view.
 
@@ -11,7 +11,7 @@ Leader-only: the Medical Recheck admin grid requires Adult Leader access on Troo
    - **By BSA Number** (primary): cross-references TroopWebHost's own BSA ID admin grids to resolve each person's internal database ID directly, immune to nickname or Preferred Name differences entirely.
    - **By name** (fallback): last name + first word of first name, type-aware so a same-named parent and child can never cross-match.
    - **By a manual name fix** (last resort): for the rare person neither of the above can resolve.
-3. **Review & apply** — every field that would change, with a checkbox per field, grouped so a whole person's changes are easy to scan. Anyone the file couldn't match is listed separately as "not found" or "ambiguous" and is never auto-applied.
+3. **Review & apply** — every field that would change, with a checkbox per field, grouped so a whole person's changes are easy to scan. A field whose file date is older than what's already on TroopWebHost is shown but left unchecked by default (a stale export usually means the file is wrong, not TroopWebHost). Anyone the file couldn't match is listed separately as "not found" or "ambiguous" and is never auto-applied.
 4. **Save to TroopWebHost** — writes the selected changes back to the real Medical Recheck grid, asks for confirmation first, and refetches afterward to confirm each change actually stuck before reporting success.
 
 ![Roster file uploaded and parsed](screenshots/01-upload-summary.png)
@@ -22,7 +22,7 @@ Comparing against TroopWebHost shows exactly what would change, matched by BSA N
 
 ![Comparison results, showing matched changes and two unmatched cases](screenshots/02-diff-review.png)
 
-Jessup, Robin's three changes matched even though the uploaded file's First Name for that row is "Morgan" — TroopWebHost is displaying a Preferred Name, and the BSA Number match resolved it automatically without needing a name fix at all. Delgado, Skylar (spelled differently on the grid than in the file, with no BSA Number recorded either place) landed in "not found," with an inline box to fix it once. Fennimore, Tate has two people on the grid sharing that exact name and no BSA Number to disambiguate them, so it's skipped rather than risk changing the wrong one.
+Jessup, Robin's three changes matched even though the uploaded file's First Name for that row is "Morgan" — TroopWebHost is displaying a Preferred Name, and the BSA Number match resolved it automatically without needing a name fix at all. Castellano, Ren's Part A and Part B are shown too, but left unchecked and marked "older — unchecked": the uploaded file's date for those fields is older than what TroopWebHost already has, which almost always means a stale export rather than an intentional correction, so this tool defaults to leaving the newer date on TroopWebHost alone unless a leader deliberately checks the box. Delgado, Skylar (spelled differently on the grid than in the file, with no BSA Number recorded either place) landed in "not found," with an inline box to fix it once. Fennimore, Tate has two people on the grid sharing that exact name and no BSA Number to disambiguate them, so it's skipped rather than risk changing the wrong one.
 
 Typing the name exactly as TroopWebHost shows it resolves the match immediately and is remembered for every future upload:
 
@@ -53,7 +53,7 @@ This only works pasted directly into TroopWebHost's own site (same-origin) — i
 
 ## How to use it
 
-1. Export a Custom Report from ScoutBook Plus following the TroopWebHost instructions [here](https://www.troopwebhost.org/Help.aspx?ID=558#gsc.tab=0) and use the **Choose File** button to upload it here.
+1. Export a Roster Report from TroopWebHost (with the "ADULT MEMBERS" / "YOUTH MEMBERS" sections and a "Health Form A/B - Health Form C" column) and upload it here.
 2. Click **Compare Against TroopWebHost**.
 3. Review the table. Uncheck anything you don't want applied. For anyone listed under "not found," type their name exactly as TroopWebHost shows it and click **Fix name & recheck** — that fix is remembered in this browser for every future upload.
 4. Click **Apply Selected Changes**, confirm, and check the save report for anything that didn't verify.
@@ -87,6 +87,7 @@ These are lessons from real bugs or deliberate design decisions, kept here so th
 - **The Roster Report's "Health Form A/B" date is written to BOTH Medical Part A and Medical Part B**, since the report only gives one combined date for that pair, not two separate ones. Tetanus and Other Med Date are never touched — that data isn't in this report at all.
 - **A blank Health Form cell in the file only ever leaves TroopWebHost's existing date alone — it never clears one.** This tool fills dates in; it doesn't remove them.
 - **A real database write deserves verification, not just a 200 response.** After posting, this page refetches the grid fresh and confirms each changed field actually reflects the new value before reporting success to the leader.
+- **A field whose file date is older than TroopWebHost's current value is shown, never hidden, but left unchecked by default** (`mfuIsOlder()`, compared as calendar dates via `mfuDateSortKey()`, not string equality). An older date in an upload is almost always a stale export rather than a deliberate correction, so the safer default leaves TroopWebHost's newer value alone unless a leader opts in by checking the box themselves. A blank current value is never treated as "older" — filling in a date for the first time is always allowed by default.
 - **Access control here is a redirect, not an HTTP error.** Same as every other tool in this repo: `fetch()` follows redirects transparently, so the tell that a login can't reach a given page is `res.redirected`, not a non-2xx status.
 
 ## Troubleshooting
