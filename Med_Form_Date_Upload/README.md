@@ -1,6 +1,6 @@
 # Medical Form Date Bulk Uploader
 
-A single-file custom page for TroopWebHost that reads a Roster Report export, compares everyone's Medical Part A / Part B / Part C dates in it against TroopWebHost's own live combined Medical Recheck admin grid (Scouts and Adults together), and lets a leader review and apply any updates in one batch instead of typing each date in by hand.
+A single-file custom page for TroopWebHost that reads a ScoutBook Plus Roster Report export, compares everyone's Medical Part A / Part B / Part C dates in it against TroopWebHost's own live combined Medical Recheck admin grid (Scouts and Adults together), and lets a leader review and apply any updates in one batch instead of typing each date in by hand.
 
 Leader-only: the Medical Recheck admin grid requires Adult Leader access on TroopWebHost. A Scout or parent login is detected automatically (the same redirect-based check the other tools in this repo use) and shown a plain "restricted" message rather than a guessed-at scoped view.
 
