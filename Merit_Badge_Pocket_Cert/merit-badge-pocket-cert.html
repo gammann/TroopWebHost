@@ -1,0 +1,842 @@
+<!--
+Merit Badge Pocket Certificate Filler
+----------------------------------------
+Paste this WHOLE block into TroopWebHost: Manage Custom Pages -> (new or
+existing Custom Page) -> HTML editor. It must run ON troopwebhost.org
+(same-origin) so the fetch calls below inherit your logged-in session.
+It will NOT work pasted into an external site or previewed elsewhere --
+the fetch calls will be blocked without your session cookie.
+
+WHAT THIS DOES
+--------------
+Pulls your troop's Award Report from TroopWebHost, keeps only the rows
+where Type = "Merit Badge" (Ranks and other Awards on the same report
+are left out), lets you check off which ones to print, then fills the
+official BSA "Merit Badge Pocket Certificate" PDF (item #33414, 8 cards
+per sheet) and hands you a finished, ready-to-print PDF.
+
+READ BEFORE USING
+------------------
+1. Read-only against TroopWebHost -- this page only fetches the Award
+   Report, it never saves anything back. The only network write is the
+   one-time GET of the blank certificate PDF template (from BSA's own
+   Scout Shop media host, or wherever you point "PDF template source"
+   below).
+2. Leader-only. The Award Report requires Adult Leader access on
+   TroopWebHost; a Scout or parent login gets redirected elsewhere,
+   which this page detects (same res.redirected technique as every
+   other custom page in this repo) and shows a plain "restricted"
+   message instead of guessing at a scaled-down view.
+3. Menu_Item_ID=45952 / Form_ID=253 (the Award Report) were confirmed
+   against one real TroopWebHost installation via HAR capture. These
+   are expected to be the standard "Award Report" IDs, but if this
+   page's "Load report" step fails or comes back with unexpected
+   columns, open Membership Hub -> Advancement Hub -> Award Report on
+   your own site, copy the Menu_Item_ID/Form_ID out of that page's URL,
+   and paste them into the "Advanced settings" panel below (saved in
+   this browser's localStorage from then on).
+4. Date printed on each card is whichever of the report's Earned /
+   Awarded / COH columns is filled in first, in that priority order --
+   on the installation this was built against, only "Earned" is ever
+   populated, but other troops may use the later columns instead.
+5. "Council" is NOT part of the Award Report (TroopWebHost has no
+   per-troop Council field to read), so it's a one-time manual setting
+   below, remembered in this browser. "Unit" auto-fills from this
+   site's own page title (e.g. "Troop 997 Ashburn" -> "997") but can be
+   overridden the same way.
+6. The certificate sheet has 8 cards per page with no owner name printed
+   above "HAS MET THE REQUIREMENTS FOR..." on the official card layout
+   itself -- this tool still fills a Scout-name field on each card (the
+   template has one), so double check a printed sample against your
+   physical card stock once before handing out a full batch, in case a
+   given print run of the paper form doesn't have that line.
+7. "Unit Leader" is intentionally left blank on every card -- that's a
+   physical signature line, not something this tool can fill.
+-->
+<div id="mbc-root">
+<style>
+#mbc-root, #mbc-root *{ box-sizing:border-box; }
+#mbc-root{
+  /* THEME -- same probe-and-adapt approach as every other custom page in
+     this repo (see rgApplyLiveSiteTheme() in Rank_Gap/rank-requirement-gap.html
+     for the full rationale), re-scoped under #mbc-root. Two-role accent
+     split: --brass (RAW probed fill, paired with fixed --accent-ink text)
+     for buttons/badges, --brass-text (contrast-adjusted) for the same
+     accent used bare as text/links/borders on the canvas. Canvas/text
+     tokens (--paper-*, --ink*) swap between light and dark via the
+     .mbc-light class below, following the live site's own detected
+     background luminance -- all 6 stock TWH templates are light, so
+     the default here is the light palette with dark as opt-in fallback. */
+  --paper-950:#1c1a16; --paper-900:#242119; --paper-800:#2e2a20;
+  --ink:#f0ead8; --ink-dim:#c9c0a6;
+  --brass:#b8863b; --brass-light:#d9a95c; --brass-text:#d9a95c; --brass-glow:rgba(184,134,59,0.1);
+  --sage:#8fae7a; --rust:#c96b4f; --rust-bg:rgba(201,107,79,0.22);
+  --hair:rgba(240,234,216,0.14); --hair-strong:rgba(240,234,216,0.28);
+  --accent-ink:#241a08;
+  --navy:#3a2d18; --navy-dark:#241b0e;
+  --surface-1:rgba(255,255,255,0.03); --surface-2:rgba(0,0,0,0.25);
+  --surface-3:rgba(0,0,0,0.32); --surface-4:rgba(255,255,255,0.08);
+  background:linear-gradient(180deg, var(--paper-950), var(--paper-900) 40%, var(--paper-950));
+  color:var(--ink);
+  font-family:'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  padding:28px 24px 60px;
+  border-radius:6px;
+  max-width:1100px;
+  margin:20px auto;
+  /* Hidden until mbcApplyLiveSiteTheme() decides light vs. dark, so the
+     page never flashes its dark default before switching to a light
+     site's real colors. Visibility (not display) so layout/scroll
+     position aren't affected. */
+  visibility:hidden;
+}
+#mbc-root.mbc-ready{ visibility:visible; }
+#mbc-root.mbc-light{
+  --paper-950:#f7f2e7; --paper-900:#fbf8f0; --paper-800:#efe6cf;
+  --ink:#2a2416; --ink-dim:#6b6248;
+  --sage:#3f7a3f;
+  --hair:rgba(42,36,22,0.12); --hair-strong:rgba(42,36,22,0.24);
+  --surface-1:rgba(0,0,0,0.025); --surface-2:rgba(0,0,0,0.05);
+  --surface-3:rgba(0,0,0,0.07); --surface-4:rgba(0,0,0,0.05);
+}
+#mbc-root a{ color:var(--brass-text); }
+#mbc-root header.mbc-masthead{
+  border:1px solid var(--hair-strong);
+  border-bottom:6px solid var(--brass);
+  border-radius:4px;
+  padding:24px 26px 20px; margin-bottom:24px;
+  background-image:linear-gradient(160deg, var(--navy) 0%, var(--navy-dark) 100%);
+  color:#fff;
+}
+#mbc-root .mbc-eyebrow{
+  font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.16em;
+  text-transform:uppercase; color:rgba(255,255,255,0.82); margin:0 0 10px;
+}
+#mbc-root h1{
+  font-family:'Roboto Slab', Georgia, serif; font-weight:700;
+  font-size:clamp(22px,3.2vw,30px); margin:0 0 8px; line-height:1.15;
+}
+#mbc-root header.mbc-masthead p.mbc-sub{
+  margin:0; max-width:70ch; color:rgba(255,255,255,0.82); font-size:14px; line-height:1.55;
+}
+#mbc-root section.mbc-card{
+  border:1px solid var(--hair-strong); border-radius:5px;
+  padding:20px 22px; margin-top:20px; background:var(--surface-1);
+}
+#mbc-root section.mbc-card h2{
+  font-family:'JetBrains Mono', monospace; font-size:11.5px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--brass-text); margin:0 0 14px; font-weight:700;
+}
+#mbc-root label.mbc-field{
+  display:block; font-size:11.5px; text-transform:uppercase; letter-spacing:.04em;
+  color:var(--ink-dim); margin-bottom:5px; margin-top:14px;
+}
+#mbc-root label.mbc-field:first-child{ margin-top:0; }
+#mbc-root input[type=text]{
+  width:100%; font-size:14px; padding:8px 10px; border-radius:3px;
+  border:1px solid var(--hair-strong); background:var(--surface-2); color:var(--ink);
+}
+#mbc-root input[type=text]:focus{ outline:2px solid var(--brass); outline-offset:1px; }
+#mbc-root .mbc-grid3{ display:grid; grid-template-columns:2fr 1fr 1fr; gap:0 16px; }
+#mbc-root .mbc-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
+@media (max-width:680px){ #mbc-root .mbc-grid3, #mbc-root .mbc-grid2{ grid-template-columns:1fr; } }
+#mbc-root details.mbc-advanced{ margin-top:18px; }
+#mbc-root details.mbc-advanced > summary{
+  cursor:pointer; font-size:12.5px; color:var(--ink-dim); user-select:none;
+}
+#mbc-root details.mbc-advanced[open] > summary{ margin-bottom:6px; }
+#mbc-root .mbc-btn-row{ margin-top:18px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+#mbc-root button{
+  font-weight:700; font-size:13.5px; padding:10px 20px; border-radius:4px;
+  border:none; cursor:pointer; transition:filter .12s, transform .06s;
+  font-family:inherit;
+}
+#mbc-root button:active{ transform:translateY(1px); }
+#mbc-root button.mbc-primary{ background:var(--brass); color:var(--accent-ink); }
+#mbc-root button.mbc-primary:hover{ filter:brightness(1.08); }
+#mbc-root button.mbc-primary:disabled{ background:var(--surface-4); color:var(--ink-dim); cursor:not-allowed; filter:none; }
+#mbc-root button.mbc-secondary{ background:transparent; color:var(--brass-text); border:1.5px solid var(--brass); }
+#mbc-root button.mbc-secondary:hover{ background:var(--brass-glow); }
+#mbc-root button.mbc-ghost{ background:transparent; color:var(--ink-dim); border:1.5px solid var(--hair-strong); padding:8px 14px; font-size:12px; }
+#mbc-root button.mbc-ghost:hover{ border-color:var(--brass); color:var(--brass-text); }
+#mbc-root .mbc-note{ font-size:13px; line-height:1.6; padding:11px 13px; border-radius:4px; margin-top:14px; }
+#mbc-root .mbc-note.mbc-info{ background:var(--surface-1); color:var(--ink); border-left:3px solid var(--brass); }
+#mbc-root .mbc-note.mbc-warn{ background:var(--rust-bg); color:var(--ink); border-left:3px solid var(--rust); }
+#mbc-root .mbc-note.mbc-ok{ background:var(--surface-1); color:var(--sage); border-left:3px solid var(--sage); }
+#mbc-root .mbc-restricted{ border:1px solid var(--hair-strong); border-radius:4px; padding:16px 18px; background:var(--surface-1); font-size:13.5px; line-height:1.6; }
+#mbc-root .mbc-restricted strong{ color:var(--brass-text); }
+#mbc-root .mbc-toolbar{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:10px; }
+#mbc-root .mbc-count{ font-size:12.5px; color:var(--ink-dim); }
+#mbc-root .mbc-count strong{ color:var(--ink); }
+#mbc-root table.mbc-table{ width:100%; border-collapse:collapse; font-size:13.5px; }
+#mbc-root table.mbc-table th{
+  text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--ink-dim); padding:8px; border-bottom:2px solid var(--hair-strong);
+}
+#mbc-root table.mbc-table td{ padding:7px 8px; border-bottom:1px solid var(--hair); vertical-align:middle; }
+#mbc-root table.mbc-table tr.mbc-row-off td{ opacity:.45; }
+#mbc-root table.mbc-table td.mbc-cb-cell{ width:28px; }
+#mbc-root table.mbc-table input[type=checkbox]{ width:16px; height:16px; accent-color:var(--brass); }
+#mbc-root .mbc-scroll{ max-height:480px; overflow-y:auto; border:1px solid var(--hair-strong); border-radius:4px; }
+#mbc-root .mbc-scroll table.mbc-table{ margin:0; }
+#mbc-root .mbc-scroll thead th{ position:sticky; top:0; background:var(--paper-900); }
+#mbc-root footer.mbc-small-print{ font-size:11.5px; color:var(--ink-dim); margin-top:24px; line-height:1.6; text-align:center; }
+#mbc-root .mbc-hidden{ display:none !important; }
+</style>
+<header class="mbc-masthead">
+  <p class="mbc-eyebrow">Advancement &middot; Awards Report</p>
+  <h1>Merit Badge Pocket Certificate Filler</h1>
+  <p class="mbc-sub">Pulls every earned Merit Badge off your troop's Award Report and fills the official BSA pocket-certificate sheet (item #33414) so you can print and hand them out -- Ranks and other Awards on the same report are left out.</p>
+</header>
+
+<section class="mbc-card">
+  <h2>Settings</h2>
+  <div class="mbc-grid2">
+    <div>
+      <label class="mbc-field" for="mbc-unit">Unit number (printed on each card)</label>
+      <input type="text" id="mbc-unit" placeholder="e.g. 997">
+    </div>
+    <div>
+      <label class="mbc-field" for="mbc-council">Council name (printed on each card)</label>
+      <input type="text" id="mbc-council" placeholder="e.g. National Capital Area Council">
+    </div>
+  </div>
+  <details class="mbc-advanced">
+    <summary>Advanced settings (report location &amp; PDF template source)</summary>
+    <div class="mbc-grid3">
+      <div>
+        <label class="mbc-field" for="mbc-pdfurl">PDF template source URL</label>
+        <input type="text" id="mbc-pdfurl">
+      </div>
+      <div>
+        <label class="mbc-field" for="mbc-menuid">Award Report Menu_Item_ID</label>
+        <input type="text" id="mbc-menuid">
+      </div>
+      <div>
+        <label class="mbc-field" for="mbc-formid">Award Report Form_ID</label>
+        <input type="text" id="mbc-formid">
+      </div>
+    </div>
+    <div class="mbc-btn-row">
+      <button type="button" class="mbc-ghost" id="mbc-settings-save">Save settings</button>
+      <button type="button" class="mbc-ghost" id="mbc-settings-reset">Reset to defaults</button>
+    </div>
+    <div id="mbc-settings-status"></div>
+  </details>
+</section>
+
+<section class="mbc-card">
+  <h2>Step 1 &middot; Load the Award Report</h2>
+  <div class="mbc-btn-row">
+    <button type="button" class="mbc-primary" id="mbc-load-btn">Load merit badges</button>
+  </div>
+  <div id="mbc-load-status"></div>
+</section>
+
+<section class="mbc-card mbc-hidden" id="mbc-results-card">
+  <h2>Step 2 &middot; Choose which certificates to print</h2>
+  <div class="mbc-toolbar">
+    <button type="button" class="mbc-ghost" id="mbc-select-all">Select all</button>
+    <button type="button" class="mbc-ghost" id="mbc-select-none">Select none</button>
+    <span class="mbc-count" id="mbc-count"></span>
+  </div>
+  <div class="mbc-scroll">
+    <table class="mbc-table">
+      <thead>
+        <tr><th></th><th>Scout</th><th>Patrol</th><th>Merit Badge</th><th>Date</th></tr>
+      </thead>
+      <tbody id="mbc-tbody"></tbody>
+    </table>
+  </div>
+</section>
+
+<section class="mbc-card mbc-hidden" id="mbc-gen-card">
+  <h2>Step 3 &middot; Generate the PDF</h2>
+  <p style="font-size:13px;color:var(--ink-dim);margin:0 0 4px;">8 certificates per printed sheet. Certificates are laid out in the order shown above, grouped by Scout.</p>
+  <div class="mbc-btn-row">
+    <button type="button" class="mbc-primary" id="mbc-gen-btn">Generate &amp; download PDF</button>
+  </div>
+  <div id="mbc-gen-status"></div>
+</section>
+
+<footer class="mbc-small-print">
+  Read-only against TroopWebHost -- this page never saves anything back to your site.<br>
+  Boy Scout Award Report data via TroopWebHost. Certificate template &copy; Boy Scouts of America, item #33414.
+</footer>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script>
+(function(){
+'use strict';
+function byId(id){ return document.getElementById(id); }
+
+/* ================= LIVE SITE THEME =================
+   Ported from Rank_Gap/rank-requirement-gap.html's rgProbeSiteTheme()/
+   rgApplyLiveSiteTheme() (itself ported from OA Tracker) -- same probe
+   markup, same sentinel-color technique, same two-role accent split,
+   re-scoped to --brass / --brass-text per this repo's standard theming
+   pattern. */
+function mbcSafeColor(v){
+  if(!v) return null;
+  if(/rgba?\(\s*0,\s*0,\s*0,\s*0\s*\)/.test(v) || v === 'transparent') return null;
+  return v;
+}
+function mbcDarkenColor(rgbStr, amt){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  var r = Math.round(parseInt(m[1],10) * (1-amt));
+  var g = Math.round(parseInt(m[2],10) * (1-amt));
+  var b = Math.round(parseInt(m[3],10) * (1-amt));
+  return 'rgb('+r+', '+g+', '+b+')';
+}
+function mbcToRgba(rgbStr, alpha){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  return 'rgba('+m[1]+','+m[2]+','+m[3]+','+alpha+')';
+}
+function mbcProbeSiteTheme(){
+  var SENTINEL = 'rgb(1, 2, 3)';
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:absolute; left:-9999px; top:-9999px; visibility:hidden; pointer-events:none; color:'+SENTINEL+'; border-color:'+SENTINEL+';';
+  wrap.innerHTML =
+    '<div class="navtable" id="__mbc_probe_navtable">'+
+      '<span class="navicon" id="__mbc_probe_navicon"></span>'+
+      '<span class="navlink" id="__mbc_probe_navlink"><a href="#" id="__mbc_probe_navlink_a">x</a></span>'+
+    '</div>'+
+    '<div class="banner-div" id="__mbc_probe_banner"></div>'+
+    '<ul class="nav-tabs"><li><a href="#" id="__mbc_probe_tab">x</a></li></ul>'+
+    '<table class="table-striped"><thead><tr id="__mbc_probe_gridhead"><th>x</th></tr></thead></table>'+
+    '<table class="table-curved"><tbody><tr><td id="__mbc_probe_border">x</td></tr></tbody></table>'+
+    '<input class="form-control" id="__mbc_probe_input">'+
+    '<span class="RequiredIndicator" id="__mbc_probe_required">*</span>'+
+    '<a href="#" id="__mbc_probe_control_a">x</a>'; // unclassed control anchor -- see note below
+  document.body.appendChild(wrap);
+  function pid(id){ return document.getElementById(id); }
+  function cs(el){ return el ? getComputedStyle(el) : null; }
+  var bg = function(v){ return mbcSafeColor(v); };
+  var inherited = function(v){ return (v && v !== SENTINEL) ? v : null; };
+  var navtableCs = cs(pid('__mbc_probe_navtable'));
+  var bannerCs = cs(pid('__mbc_probe_banner'));
+  var navlinkACs = cs(pid('__mbc_probe_navlink_a'));
+  var controlACs = cs(pid('__mbc_probe_control_a'));
+  var tabCs = cs(pid('__mbc_probe_tab'));
+  var gridheadCs = cs(pid('__mbc_probe_gridhead'));
+  var borderCs = cs(pid('__mbc_probe_border'));
+  var inputCs = cs(pid('__mbc_probe_input'));
+  var requiredCs = cs(pid('__mbc_probe_required'));
+  var result = {
+    navy: bg(navtableCs && navtableCs.backgroundColor),
+    navyDark: bg(bannerCs && bannerCs.backgroundColor),
+    // Anchor tags get their own User-Agent-stylesheet default link color
+    // rather than truly inheriting -- comparing against an unclassed
+    // control anchor sidesteps that.
+    yellow: (navlinkACs && controlACs && navlinkACs.color !== controlACs.color) ? navlinkACs.color : null,
+    gold: bg(tabCs && tabCs.backgroundColor),
+    gridHead: bg(gridheadCs && gridheadCs.backgroundColor),
+    line: inherited(borderCs && borderCs.borderLeftColor),
+    card: bg(inputCs && inputCs.backgroundColor),
+    red: inherited(requiredCs && requiredCs.color),
+    paper: bg(getComputedStyle(document.body).backgroundColor)
+  };
+  wrap.remove();
+  if(!result.navyDark && result.navy) result.navyDark = mbcDarkenColor(result.navy, 0.35);
+  return result;
+}
+function mbcLuminance(rgbStr){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  function lin(c){ c = c/255; return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); }
+  return 0.2126*lin(+m[1]) + 0.7152*lin(+m[2]) + 0.0722*lin(+m[3]);
+}
+function mbcMixWithWhite(rgbStr, amount){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  function clamp(v){ return Math.max(0, Math.min(255, Math.round(v))); }
+  var r = clamp(parseInt(m[1],10)*(1-amount) + 255*amount);
+  var g = clamp(parseInt(m[2],10)*(1-amount) + 255*amount);
+  var b = clamp(parseInt(m[3],10)*(1-amount) + 255*amount);
+  return 'rgb('+r+', '+g+', '+b+')';
+}
+function mbcEnsureContrast(rgbStr, wantLight){
+  if(!rgbStr) return rgbStr;
+  var lum = mbcLuminance(rgbStr);
+  if(lum == null) return rgbStr;
+  if(wantLight && lum < 0.45) return mbcMixWithWhite(rgbStr, 0.55);
+  if(!wantLight && lum > 0.55) return mbcDarkenColor(rgbStr, 0.55);
+  return rgbStr;
+}
+function mbcApplyLiveSiteTheme(){
+  var root = byId('mbc-root');
+  try{
+    var detected = mbcProbeSiteTheme();
+    if(!root) return;
+    var paperLum = detected.paper ? mbcLuminance(detected.paper) : null;
+    var isLight = paperLum != null && paperLum > 0.5;
+    root.classList.toggle('mbc-light', isLight);
+    var wantLightText = !isLight;
+    if(detected.navy){
+      root.style.setProperty('--navy', detected.navy);
+      root.style.setProperty('--navy-dark', detected.navyDark || mbcDarkenColor(detected.navy, 0.35) || detected.navy);
+    }
+    var brass = detected.gold || detected.yellow;
+    if(brass){
+      root.style.setProperty('--brass', brass);
+      root.style.setProperty('--brass-light', brass);
+      root.style.setProperty('--brass-text', mbcEnsureContrast(brass, wantLightText));
+      root.style.setProperty('--brass-glow', mbcToRgba(brass, 0.1) || 'rgba(184,134,59,0.1)');
+    }
+    if(detected.red){
+      var rustText = mbcEnsureContrast(detected.red, wantLightText);
+      root.style.setProperty('--rust', rustText);
+      root.style.setProperty('--rust-bg', mbcToRgba(rustText, 0.22) || 'rgba(201,107,79,0.22)');
+    }
+  }catch(e){
+    console.warn('Merit Badge Pocket Certificate Filler: theme detection failed, using built-in defaults:', e);
+  }finally{
+    if(root) root.classList.add('mbc-ready');
+  }
+}
+// Runs immediately, not on DOMContentLoaded -- #mbc-root already exists
+// in the DOM by the time this script tag runs, and waiting would only
+// widen the flash-of-wrong-theme window.
+mbcApplyLiveSiteTheme();
+
+/* ================= UNIT NUMBER AUTO-DETECT (ported from vCard Export / Swim Classification) ================= */
+function mbcDiscoverUnitNumber(){
+  try{
+    var title = document.title || '';
+    var m = title.match(/\b(?:Troop|Pack|Crew|Ship|Post)\s*#?\s*(\d+[A-Za-z]?)\b/i);
+    if(m) return m[1];
+  }catch(e){
+    console.warn('Merit Badge Pocket Certificate Filler: unit auto-detect failed:', e);
+  }
+  return '';
+}
+
+/* ================= SETTINGS (localStorage) ================= */
+var DEFAULT_PDF_URL = 'https://mediafiles.scoutshop.org/Media/FINAL_33414%282020%29%20MerBadgPktCert_Non-Printing.pdf';
+// Fallback if the Scout Shop media host ever blocks this page's fetch
+// (CORS or otherwise). Points at this repo's own staged copy of the
+// same PDF (Merit_Badge_Pocket_Cert/merit-badge-pocket-cert-template.pdf)
+// on GitHub's raw content host, which is CORS-permissive for GET
+// requests. Used automatically, silently, only if the primary URL
+// above fails -- no user action needed either way.
+var FALLBACK_PDF_URL = 'https://raw.githubusercontent.com/gammann/TroopWebHost/main/Merit_Badge_Pocket_Cert/merit-badge-pocket-cert-template.pdf';
+var MBC_STORE = {
+  pdfUrl: 'mbcPdfUrl',
+  menuId: 'mbcMenuId',
+  formId: 'mbcFormId',
+  council: 'mbcCouncil',
+  unit: 'mbcUnit'
+};
+function mbcGet(key, fallback){
+  try{ var v = localStorage.getItem(key); return (v == null || v === '') ? fallback : v; }
+  catch(e){ return fallback; }
+}
+function mbcSet(key, val){
+  try{ localStorage.setItem(key, val); }catch(e){ /* private browsing etc -- non-fatal */ }
+}
+function mbcLoadSettingsIntoForm(){
+  byId('mbc-pdfurl').value = mbcGet(MBC_STORE.pdfUrl, DEFAULT_PDF_URL);
+  byId('mbc-menuid').value = mbcGet(MBC_STORE.menuId, '45952');
+  byId('mbc-formid').value = mbcGet(MBC_STORE.formId, '253');
+  byId('mbc-council').value = mbcGet(MBC_STORE.council, '');
+  byId('mbc-unit').value = mbcGet(MBC_STORE.unit, mbcDiscoverUnitNumber());
+}
+function mbcCurrentSettings(){
+  return {
+    pdfUrl: (byId('mbc-pdfurl').value || DEFAULT_PDF_URL).trim(),
+    menuId: (byId('mbc-menuid').value || '45952').trim(),
+    formId: (byId('mbc-formid').value || '253').trim(),
+    council: (byId('mbc-council').value || '').trim(),
+    unit: (byId('mbc-unit').value || '').trim()
+  };
+}
+document.addEventListener('DOMContentLoaded', function(){
+  mbcLoadSettingsIntoForm();
+  byId('mbc-settings-save').addEventListener('click', function(e){
+    e.preventDefault();
+    var s = mbcCurrentSettings();
+    mbcSet(MBC_STORE.pdfUrl, s.pdfUrl);
+    mbcSet(MBC_STORE.menuId, s.menuId);
+    mbcSet(MBC_STORE.formId, s.formId);
+    mbcSet(MBC_STORE.council, s.council);
+    mbcSet(MBC_STORE.unit, s.unit);
+    byId('mbc-settings-status').innerHTML = '<div class="mbc-note mbc-ok">Saved in this browser.</div>';
+  });
+  byId('mbc-settings-reset').addEventListener('click', function(e){
+    e.preventDefault();
+    [MBC_STORE.pdfUrl, MBC_STORE.menuId, MBC_STORE.formId].forEach(function(k){
+      try{ localStorage.removeItem(k); }catch(err){}
+    });
+    mbcLoadSettingsIntoForm();
+    byId('mbc-settings-status').innerHTML = '<div class="mbc-note mbc-ok">Reset to defaults (Council and Unit left as-is).</div>';
+  });
+  byId('mbc-load-btn').addEventListener('click', function(e){ e.preventDefault(); mbcLoadReport(); });
+  byId('mbc-gen-btn').addEventListener('click', function(e){ e.preventDefault(); mbcGeneratePdf(); });
+  byId('mbc-select-all').addEventListener('click', function(e){ e.preventDefault(); mbcSetAllChecked(true); });
+  byId('mbc-select-none').addEventListener('click', function(e){ e.preventDefault(); mbcSetAllChecked(false); });
+});
+
+/* ================= FETCH HELPERS (ported from Rank_Gap / Swim Classification) ================= */
+var MBC_FETCH_TIMEOUT_MS = 20000;
+function mbcFetchRaw(url, opts){
+  var controller = new AbortController();
+  var timer = setTimeout(function(){ controller.abort(); }, MBC_FETCH_TIMEOUT_MS);
+  var fetchOpts = { credentials:'same-origin', signal: controller.signal };
+  if(opts) for(var k in opts) fetchOpts[k] = opts[k];
+  return fetch(url, fetchOpts)
+    .catch(function(e){
+      if(e.name === 'AbortError') throw new Error(url+' timed out after '+(MBC_FETCH_TIMEOUT_MS/1000)+'s.');
+      throw e;
+    })
+    .then(function(res){
+      if(res.redirected) throw new Error('REDIRECTED:'+res.url);
+      if(!res.ok) throw new Error(url+' responded HTTP '+res.status+'.');
+      return res;
+    })
+    .finally(function(){ clearTimeout(timer); });
+}
+function mbcFetchDoc(url){
+  return mbcFetchRaw(url).then(function(res){ return res.text(); })
+    .then(function(text){ return new DOMParser().parseFromString(text, 'text/html'); });
+}
+function mbcFetchDocPost(url, formData){
+  return mbcFetchRaw(url, { method:'POST', body:formData }).then(function(res){ return res.text(); })
+    .then(function(text){ return new DOMParser().parseFromString(text, 'text/html'); });
+}
+
+/* ---- generic HTML table-parsing helpers (ported from Rank_Gap / OA Tracker / Eagle Scout tool) ---- */
+function mbcHeaderCells(table){
+  var headRow = table.querySelector('thead tr') || table.querySelector('tr');
+  if(!headRow) return [];
+  var cells = Array.prototype.slice.call(headRow.querySelectorAll('th,td'));
+  return cells.map(function(c){ return c.textContent.replace(/\s+/g,' ').trim(); });
+}
+function mbcTableHasHeaders(table, headerWords){
+  var cells = mbcHeaderCells(table);
+  var txt = cells.join(' | ').toLowerCase();
+  return headerWords.every(function(w){ return txt.indexOf(w.toLowerCase()) !== -1; });
+}
+function mbcFindTable(doc, headerWords){
+  var tables = Array.prototype.slice.call(doc.querySelectorAll('table'));
+  for(var i=0;i<tables.length;i++){
+    if(mbcTableHasHeaders(tables[i], headerWords)) return tables[i];
+  }
+  return null;
+}
+function mbcColIndex(headerCells, label){
+  var l = label.toLowerCase();
+  // Exact match first -- e.g. "Award" must NOT match "Awarded" just
+  // because it's a substring of it. Only fall back to a substring
+  // match if no header is an exact match.
+  for(var i=0;i<headerCells.length;i++){
+    if(headerCells[i].toLowerCase() === l) return i;
+  }
+  for(var i=0;i<headerCells.length;i++){
+    if(headerCells[i].toLowerCase().indexOf(l) !== -1) return i;
+  }
+  return -1;
+}
+
+/* ================= NAME FORMATTING =================
+   The Award Report renders names as "Last, First [Middle...]" (confirmed
+   via HAR capture). Certificates read better as "First [Middle] Last",
+   so this reformats for display/printing only -- it's never used for
+   matching, so a name that doesn't fit the pattern is just shown as-is. */
+function mbcDisplayName(name){
+  var s = (name||'').trim();
+  if(!s) return '';
+  var commaIdx = s.indexOf(',');
+  if(commaIdx === -1) return s;
+  var last = s.slice(0, commaIdx).trim();
+  var rest = s.slice(commaIdx+1).trim();
+  if(!last || !rest) return s;
+  return rest+' '+last;
+}
+
+/* ================= AWARD REPORT: fetch + parse =================
+   Same "GET the report page, then resubmit its own <form id=easyform>
+   with NewRowsPerPage=ALL" technique documented for this report in
+   twh-integration-learnings.md -- confirmed via HAR capture against a
+   real TroopWebHost installation. This report is read-only here; the
+   POST below is TroopWebHost's own paging mechanism, not a save. */
+function mbcAwardReportUrl(menuId, formId){
+  return 'FormDetail.aspx?Menu_Item_ID='+encodeURIComponent(menuId)+'&Form_ID='+encodeURIComponent(formId)+'&Stack=2&ID=1&FK=0';
+}
+var MBC_HEADER_WORDS = ['Scout','Patrol','Type','Award'];
+function mbcParseAwardTable(doc){
+  var table = mbcFindTable(doc, MBC_HEADER_WORDS);
+  if(!table) throw new Error('The Award Report page didn\'t have the expected columns (Scout / Patrol / Type / Award) -- TroopWebHost may have changed this report, or the Menu_Item_ID/Form_ID in Advanced settings may be wrong for your installation.');
+  var headerCells = mbcHeaderCells(table);
+  var idx = {
+    adult: mbcColIndex(headerCells, 'Adult'),
+    scout: mbcColIndex(headerCells, 'Scout'),
+    patrol: mbcColIndex(headerCells, 'Patrol'),
+    type: mbcColIndex(headerCells, 'Type'),
+    award: mbcColIndex(headerCells, 'Award'),
+    earned: mbcColIndex(headerCells, 'Earned'),
+    awarded: mbcColIndex(headerCells, 'Awarded'),
+    coh: mbcColIndex(headerCells, 'COH'),
+    council: mbcColIndex(headerCells, 'Council')
+  };
+  if(idx.scout === -1 || idx.type === -1 || idx.award === -1){
+    throw new Error('The Award Report table was found but is missing one of the Scout / Type / Award columns.');
+  }
+  var bodyRows = Array.prototype.slice.call(table.querySelectorAll('tbody tr'));
+  if(!bodyRows.length){
+    // Some TWH report tables have no explicit <tbody> -- fall back to
+    // every <tr> after the header row.
+    var allRows = Array.prototype.slice.call(table.querySelectorAll('tr'));
+    bodyRows = allRows.slice(1);
+  }
+  var cellText = function(tr, i){
+    if(i === -1) return '';
+    var cells = tr.querySelectorAll('td,th');
+    return cells[i] ? cells[i].textContent.replace(/\s+/g,' ').trim() : '';
+  };
+  var out = [];
+  bodyRows.forEach(function(tr){
+    var scout = cellText(tr, idx.scout);
+    var type = cellText(tr, idx.type);
+    if(!scout || !type) return; // skip blank/spacer rows
+    out.push({
+      adult: cellText(tr, idx.adult),
+      scout: scout,
+      patrol: cellText(tr, idx.patrol),
+      type: type,
+      award: cellText(tr, idx.award),
+      earned: cellText(tr, idx.earned),
+      awarded: cellText(tr, idx.awarded),
+      coh: cellText(tr, idx.coh),
+      council: cellText(tr, idx.council)
+    });
+  });
+  return out;
+}
+function mbcFetchAllAwardRows(menuId, formId){
+  var url = mbcAwardReportUrl(menuId, formId);
+  return mbcFetchDoc(url).then(function(doc){
+    var formEl = doc.getElementById('easyform');
+    if(!formEl){
+      throw new Error('The Award Report page didn\'t have the expected editable form -- your login may not have leader access, or TroopWebHost may have changed this page.');
+    }
+    var fd = new FormData(formEl);
+    fd.set('NewRowsPerPage', 'ALL');
+    return mbcFetchDocPost(url, fd);
+  }).then(mbcParseAwardTable);
+}
+
+var MBC_STATE = { rows: [] };
+
+function mbcLoadReport(){
+  var statusEl = byId('mbc-load-status');
+  var btn = byId('mbc-load-btn');
+  btn.disabled = true;
+  statusEl.innerHTML = '<div class="mbc-note mbc-info">Fetching the Award Report...</div>';
+  byId('mbc-results-card').classList.add('mbc-hidden');
+  byId('mbc-gen-card').classList.add('mbc-hidden');
+  var s = mbcCurrentSettings();
+  mbcFetchAllAwardRows(s.menuId, s.formId).then(function(rows){
+    var badges = rows.filter(function(r){ return r.type.toLowerCase() === 'merit badge'; });
+    if(!badges.length){
+      statusEl.innerHTML = '<div class="mbc-note mbc-warn">The report loaded, but no rows had Type = "Merit Badge". Nothing to print.</div>';
+      btn.disabled = false;
+      return;
+    }
+    // Sort by Scout, then by Merit Badge name, so a Scout's certificates
+    // print together -- makes handing them out at a Court of Honor easier.
+    badges.sort(function(a,b){
+      var an = mbcDisplayName(a.scout), bn = mbcDisplayName(b.scout);
+      if(an !== bn) return an.localeCompare(bn);
+      return mbcBadgeName(a.award).localeCompare(mbcBadgeName(b.award));
+    });
+    MBC_STATE.rows = badges;
+    mbcRenderTable(badges);
+    statusEl.innerHTML = '<div class="mbc-note mbc-ok">Loaded '+rows.length+' award rows, '+badges.length+' of them Merit Badges.</div>';
+    byId('mbc-results-card').classList.remove('mbc-hidden');
+    byId('mbc-gen-card').classList.remove('mbc-hidden');
+    btn.disabled = false;
+  }).catch(function(err){
+    btn.disabled = false;
+    if(String(err.message||'').indexOf('REDIRECTED:') === 0){
+      statusEl.innerHTML = '<div class="mbc-restricted"><strong>Restricted.</strong> Your TroopWebHost login doesn\'t have permission to view the Award Report -- it\'s leader-only. If you believe this is a mistake, contact your Troop\'s TroopWebHost administrator.</div>';
+      return;
+    }
+    statusEl.innerHTML = '<div class="mbc-note mbc-warn">Could not load the Award Report: '+err.message+'</div>';
+  });
+}
+
+function mbcDateFor(row){
+  return row.earned || row.awarded || row.coh || '';
+}
+// TroopWebHost appends a trailing "*" to a Merit Badge's name in this
+// report to mark it as one of the Eagle-required badges (confirmed via
+// HAR capture -- e.g. "Citizenship in the World*"). That's useful on
+// the report itself but would print as a stray asterisk on the
+// certificate, so strip it (and any space before it) for display and
+// for the PDF.
+function mbcBadgeName(award){
+  return (award||'').replace(/\s*\*\s*$/, '').trim();
+}
+
+function mbcRenderTable(rows){
+  var tbody = byId('mbc-tbody');
+  var html = '';
+  rows.forEach(function(r, i){
+    html += '<tr data-idx="'+i+'">'
+      + '<td class="mbc-cb-cell"><input type="checkbox" class="mbc-row-cb" data-idx="'+i+'" checked></td>'
+      + '<td>'+mbcEsc(mbcDisplayName(r.scout))+'</td>'
+      + '<td>'+mbcEsc(r.patrol)+'</td>'
+      + '<td>'+mbcEsc(mbcBadgeName(r.award))+'</td>'
+      + '<td>'+mbcEsc(mbcDateFor(r))+'</td>'
+      + '</tr>';
+  });
+  tbody.innerHTML = html;
+  Array.prototype.slice.call(tbody.querySelectorAll('.mbc-row-cb')).forEach(function(cb){
+    cb.addEventListener('change', function(){
+      var tr = tbody.querySelector('tr[data-idx="'+cb.getAttribute('data-idx')+'"]');
+      if(tr) tr.classList.toggle('mbc-row-off', !cb.checked);
+      mbcUpdateCount();
+    });
+  });
+  mbcUpdateCount();
+}
+function mbcEsc(s){ var d=document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
+function mbcSetAllChecked(on){
+  Array.prototype.slice.call(byId('mbc-tbody').querySelectorAll('.mbc-row-cb')).forEach(function(cb){
+    cb.checked = on;
+    var tr = byId('mbc-tbody').querySelector('tr[data-idx="'+cb.getAttribute('data-idx')+'"]');
+    if(tr) tr.classList.toggle('mbc-row-off', !on);
+  });
+  mbcUpdateCount();
+}
+function mbcSelectedRows(){
+  var idxs = Array.prototype.slice.call(byId('mbc-tbody').querySelectorAll('.mbc-row-cb'))
+    .filter(function(cb){ return cb.checked; })
+    .map(function(cb){ return parseInt(cb.getAttribute('data-idx'),10); });
+  return idxs.map(function(i){ return MBC_STATE.rows[i]; });
+}
+function mbcUpdateCount(){
+  var total = MBC_STATE.rows.length;
+  var selected = mbcSelectedRows().length;
+  var pages = Math.ceil(selected/8) || 0;
+  byId('mbc-count').innerHTML = '<strong>'+selected+'</strong> of '+total+' selected &middot; '+pages+' printed sheet'+(pages===1?'':'s');
+}
+
+/* ================= PDF GENERATION =================
+   Loads a fresh copy of the (unmodified) template for each 8-card sheet
+   needed, fills that copy's "Name N"/"Badge N"/"Date N"/"Unit N"/
+   "Council N" text fields (N = 1..8, confirmed field names for BSA item
+   #33414), flattens the form so the values become static page content
+   (this also sidesteps AcroForm field-name collisions when multiple
+   sheets are merged into one output document), then copies that
+   flattened page into the final combined PDF. "Unit Leader N" is left
+   untouched on every card -- it's a physical signature line. */
+var MBC_SLOTS_PER_PAGE = 8;
+var mbcTemplateBytesPromise = null;
+function mbcFetchTemplateBytes(url){
+  // Genuine cross-origin request (the BSA/Scout Shop media host, not
+  // troopwebhost.org) -- unlike every other fetch in this file it must
+  // NOT use credentials:'same-origin' semantics for a foreign host, and
+  // TWH session redirects are meaningless here, so this intentionally
+  // does not go through mbcFetchRaw.
+  var controller = new AbortController();
+  var timer = setTimeout(function(){ controller.abort(); }, MBC_FETCH_TIMEOUT_MS);
+  return fetch(url, { signal: controller.signal })
+    .catch(function(e){
+      if(e.name === 'AbortError') throw new Error('timed out fetching '+url);
+      throw new Error('network/CORS error fetching '+url+': '+e.message);
+    })
+    .then(function(res){
+      if(!res.ok) throw new Error(url+' responded HTTP '+res.status);
+      return res.arrayBuffer();
+    })
+    .then(function(buf){ return new Uint8Array(buf); })
+    .finally(function(){ clearTimeout(timer); });
+}
+function mbcGetTemplateBytes(){
+  if(mbcTemplateBytesPromise) return mbcTemplateBytesPromise;
+  var s = mbcCurrentSettings();
+  var primary = s.pdfUrl || DEFAULT_PDF_URL;
+  mbcTemplateBytesPromise = mbcFetchTemplateBytes(primary).catch(function(err){
+    if(!FALLBACK_PDF_URL) throw err;
+    console.warn('Merit Badge Pocket Certificate Filler: primary PDF source failed ('+err.message+'), trying fallback.');
+    return mbcFetchTemplateBytes(FALLBACK_PDF_URL);
+  });
+  return mbcTemplateBytesPromise;
+}
+function mbcFillSheet(templateBytes, chunk, settings){
+  return PDFLib.PDFDocument.load(templateBytes).then(function(doc){
+    return doc.embedFont(PDFLib.StandardFonts.Helvetica).then(function(helv){
+      var form = doc.getForm();
+      var setText = function(name, value){
+        if(!value) return;
+        try{ form.getTextField(name).setText(String(value)); }catch(e){ /* field not present -- skip */ }
+      };
+      chunk.forEach(function(row, i){
+        var n = i+1;
+        setText('Name '+n, mbcDisplayName(row.scout));
+        setText('Badge '+n, mbcBadgeName(row.award));
+        setText('Date '+n, mbcDateFor(row));
+        setText('Unit '+n, settings.unit);
+        setText('Council '+n, settings.council);
+        // "Unit Leader N" intentionally left blank -- signature line.
+      });
+      form.updateFieldAppearances(helv);
+      form.flatten();
+      return doc;
+    });
+  });
+}
+function mbcGeneratePdf(){
+  var statusEl = byId('mbc-gen-status');
+  var btn = byId('mbc-gen-btn');
+  var selected = mbcSelectedRows();
+  if(!selected.length){
+    statusEl.innerHTML = '<div class="mbc-note mbc-warn">Select at least one certificate first.</div>';
+    return;
+  }
+  var settings = mbcCurrentSettings();
+  btn.disabled = true;
+  statusEl.innerHTML = '<div class="mbc-note mbc-info">Fetching the certificate template...</div>';
+  mbcGetTemplateBytes().then(function(templateBytes){
+    statusEl.innerHTML = '<div class="mbc-note mbc-info">Building PDF...</div>';
+    var chunks = [];
+    for(var i=0;i<selected.length;i+=MBC_SLOTS_PER_PAGE){
+      chunks.push(selected.slice(i, i+MBC_SLOTS_PER_PAGE));
+    }
+    var outDoc;
+    return PDFLib.PDFDocument.create().then(function(created){
+      outDoc = created;
+      var chain = Promise.resolve();
+      chunks.forEach(function(chunk){
+        chain = chain.then(function(){
+          return mbcFillSheet(templateBytes, chunk, settings).then(function(filledDoc){
+            return outDoc.copyPages(filledDoc, [0]).then(function(pages){
+              outDoc.addPage(pages[0]);
+            });
+          });
+        });
+      });
+      return chain;
+    }).then(function(){ return outDoc.save(); });
+  }).then(function(outBytes){
+    var blob = new Blob([outBytes], { type:'application/pdf' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'Merit_Badge_Pocket_Certificates.pdf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    statusEl.innerHTML = '<div class="mbc-note mbc-ok">Done -- '+chunks_len(selected.length)+' sheet(s) for '+selected.length+' certificate(s). Your download should start automatically. Check a sample print against your card stock before running a full batch.</div>';
+    btn.disabled = false;
+  }).catch(function(err){
+    btn.disabled = false;
+    statusEl.innerHTML = '<div class="mbc-note mbc-warn">Could not generate the PDF: '+err.message+'</div>';
+  });
+}
+function chunks_len(n){ return Math.ceil(n/MBC_SLOTS_PER_PAGE); }
+})();
+</script>
