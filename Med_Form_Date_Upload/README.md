@@ -53,7 +53,7 @@ This only works pasted directly into TroopWebHost's own site (same-origin) — i
 
 ## How to use it
 
-1. Export a Roster Report from TroopWebHost (with the "ADULT MEMBERS" / "YOUTH MEMBERS" sections and a "Health Form A/B - Health Form C" column) and upload it here.
+1. Export a Custom Report from ScoutBook Plus following the TroopWebHost instructions [here](https://www.troopwebhost.org/Help.aspx?ID=558#gsc.tab=0) and use the **Choose File** button to upload it here.
 2. Click **Compare Against TroopWebHost**.
 3. Review the table. Uncheck anything you don't want applied. For anyone listed under "not found," type their name exactly as TroopWebHost shows it and click **Fix name & recheck** — that fix is remembered in this browser for every future upload.
 4. Click **Apply Selected Changes**, confirm, and check the save report for anything that didn't verify.
