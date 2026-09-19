@@ -50,6 +50,8 @@ This only works pasted directly into TroopWebHost's own site (same-origin) — i
 
 ## How to use it
 
+You need the **Rank Advancement** role in order to run the report.
+
 1. Fill in Unit number (auto-filled, editable) and Council name.
 2. Click **Load merit badges**. Unit Leader auto-fills if exactly one person on the Adult Directory has the configured Leadership title; otherwise type it in, or click **Detect from TroopWebHost** to retry.
 3. Review the list and uncheck anyone who shouldn't be on this batch.
