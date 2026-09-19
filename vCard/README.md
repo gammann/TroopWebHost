@@ -2,7 +2,7 @@
 
 A single-file custom page for TroopWebHost that pulls the Scout Directory and Adult Directory — the same reports every member can already open — and lets you pick exactly who to include and exactly which fields go on each card, then downloads standard vCard (`.vcf`) files ready to import into any phone or address book.
 
-**Member-accessible, not leader-only.** Every other data-pulling tool in this repo depends on at least one report that's restricted to Adult Leaders. This one is deliberately built around reports that ordinary Scout and parent logins can already open, so it works for anyone in the troop, not just leaders. A leader-only sibling exists with a richer field set pulled from the full roster export (BSA ID, birthday, emergency contacts, bio) for anyone who specifically needs those — this file trades that richness for universal access.
+**Member-accessible, not leader-only.** Every other data-pulling tool in this repo depends on at least one report that's restricted to leader-level roles (see each tool's Required roles section). This one is deliberately built around reports that ordinary Scout and parent logins can already open, so it works for anyone in the troop, not just leaders. A leader-only sibling exists with a richer field set pulled from the full roster export (BSA ID, birthday, emergency contacts, bio) for anyone who specifically needs those — this file trades that richness for universal access.
 
 ## What it does
 
@@ -27,6 +27,21 @@ Downloading shows a plain confirmation rather than leaving you guessing whether 
 ![Green confirmation message: Downloaded 6 contacts as one file](screenshots/04-download-confirmation.png)
 
 *(All names, addresses, and phone numbers in every screenshot above are made up for this README.)*
+
+## Required roles
+
+| Report | Menu_Item_ID | Needed for | Roles that can reach it |
+|---|---|---|---|
+| Scout Directory | 46012 | Required | Adult, Scout, Membership, Rank Advancement |
+| Adult Directory | 46013 | Required | Adult, Scout, Membership, Rank Advancement |
+| Patrol Roster | 46017 | Optional (adult patrol/crew grouping) | Adult, Scout, Membership, Rank Advancement |
+| Scout Parent Cross Reference With Contact Info | 52053 | Optional (Parent/Guardian contact) | Adult, Scout, Membership, Rank Advancement |
+
+Any one of the **Adult**, **Scout**, **Membership** or **Rank Advancement** roles is enough for every feature
+on this page. **Adult Leader**, **Event Planner** and **Site Administrator** do not reach these reports on their
+own, so a login that holds only those roles sees the restricted message.
+
+Roles come from the site's Task Role and Task Menu Items exports, matched on `Menu_Item_ID`, and were checked against a login that holds only the Adult role. They describe how one troop's TroopWebHost site is configured. A site administrator can change which tasks each role holds (**Menu > Administration > Security Configuration > Assign Tasks to Roles**), so confirm against your own site. A login that lacks access is redirected by TroopWebHost, which this tool detects and reports.
 
 ## Access
 
