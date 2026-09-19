@@ -40,6 +40,24 @@ If nothing usable is found anywhere in that search, it silently falls back to th
 
 This only re-colors the dashboard to match; it never changes the site's actual color scheme, and it never fails visibly — worst case, you just see the default palette instead of a matched one.
 
+## Required roles
+
+| Report | Menu_Item_ID | Needed for | Roles that can reach it |
+|---|---|---|---|
+| Roster (full, includes departed) | 45897 | Required (also the access probe) | Membership, Rank Advancement, Site Administrator |
+| Event Participation export | 45935 | Required | Adult\*, Scout\*, Adult Leader, Event Planner, Rank Advancement, Site Administrator |
+| Rank Advancement History | 46044 | Required | Adult Leader, Rank Advancement |
+| Merit Badge History | 46045 | Required | Adult Leader, Rank Advancement |
+| Event Types admin table | 46065 | Best effort (falls back to a built-in list) | Event Planner, Site Administrator |
+
+**Rank Advancement** is the one role that reaches every required report. Other roles fail part way: a login
+with only Adult Leader cannot pull the Roster, so it is turned away at the access probe, and a login with only
+Membership or Site Administrator passes the probe but is denied the two advancement history reports.
+
+\* Adult and Scout reach this report only because this troop added the **View Event Participation Reports** task to those two roles by hand. It is not part of their default configuration, so a site without that change will deny them.
+
+Roles come from the site's Task Role and Task Menu Items exports, matched on `Menu_Item_ID`, and were checked against a login that holds only the Adult role. They describe how one troop's TroopWebHost site is configured. A site administrator can change which tasks each role holds (**Menu > Administration > Security Configuration > Assign Tasks to Roles**), so confirm against your own site. A login that lacks access is redirected by TroopWebHost, which this tool detects and reports.
+
 ## Access restriction
 
 The page only shows itself to accounts that can actually pull the reports it needs. On load, it silently probes the Roster report; if that fails (logged out, or the account's TroopWebhost role doesn't have report-pulling permission), everything stays hidden behind a **"This page is restricted to Adult Leaders"** message instead of showing controls that wouldn't work anyway. If the probe succeeds, that same roster pull is reused when you click the button, so nothing gets fetched twice.
