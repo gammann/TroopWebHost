@@ -87,6 +87,39 @@ Scouts and parents don't do anything — their view loads and computes automatic
 
 Clicking **Pull Reports Automatically** re-submits TroopWebHost's own Order of the Arrow Eligibility form to set "Compute Eligibility As Of This Date" to whatever you entered. **This is a real save**, identical to a leader typing that date into the field by hand — it will overwrite that value for anyone else who opens that screen. The Events, Uncompleted Requirements, and Active Roster pulls are plain read-only report links with no side effects. The shared-date write-back described above is also a real save, scoped to this page's own source, and only happens if that leader has Custom Page editing rights.
 
+## Required roles
+
+**Leader mode**
+
+| Report | Menu_Item_ID | Roles that can reach it |
+|---|---|---|
+| Scout / Adult OA Eligibility | 53654 | Adult Leader, Membership, Rank Advancement |
+| Events export | 53104 | Event Planner |
+| Uncompleted Requirements | 46046 | Adult Leader, Rank Advancement, Site Administrator |
+| Active Roster | 53747 | Membership, Rank Advancement, Site Administrator |
+
+Leader mode pulls all four, so a login needs **Rank Advancement** (three of the four) plus **Event Planner**
+(the Events export). Adult Leader, Membership or Site Administrator alone each miss at least one.
+
+**Self-service, parent login**
+
+| Report | Menu_Item_ID | Roles that can reach it |
+|---|---|---|
+| My Scout(s) list, profile, rank/position, uncompleted requirement tabs | 45899 | Adult |
+| Upcoming Event Summary (fallback only) | 51898 | Adult, Adult Leader, Event Planner, Scout, Site Administrator |
+| Calendar | 45922 | No task restriction in the export |
+
+A parent login needs the **Adult** role.
+
+**Self-service, direct Scout login.** The two IDs this mode uses (45902 profile, 45911 rank and requirements)
+do not appear in the site's menu source or task export, so their role gating cannot be read from those files.
+The Scout role does not reach My Scouts (45899), which is why this mode exists.
+
+**Shared-date write-back** to this Custom Page needs the **Web Page Editor** role. Without it nothing else
+breaks; the write-back is simply skipped.
+
+Roles come from the site's Task Role and Task Menu Items exports, matched on `Menu_Item_ID`, and were checked against a login that holds only the Adult role. They describe how one troop's TroopWebHost site is configured. A site administrator can change which tasks each role holds (**Menu > Administration > Security Configuration > Assign Tasks to Roles**), so confirm against your own site. A login that lacks access is redirected by TroopWebHost, which this tool detects and reports.
+
 ## Reports Used
 
 Every report URL below was reverse-engineered from captured network requests, not from official documentation, since TroopWebHost has no public API.
