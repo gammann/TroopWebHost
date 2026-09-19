@@ -12,6 +12,24 @@ Code to enhance TroopWebHost
 - **Troop Stats** - Generates some statistics about your Troop for the past year.
 - **vCard** - Creates a vCard Export of contact information for import into your email client of choice.
 
+## Required roles at a glance
+
+Each tool's own README has the full table (Menu_Item_IDs, read/write, notes). In short:
+
+| Tool | Roles a login needs |
+|---|---|
+| Eagle_Scout_Rank_App_Form | Leader mode: Rank Advancement. Parent mode: Adult |
+| Leaderboard | Viewing: any role with View Event Participation Reports\*. Publishing Former/Merit Badge data: Membership, Rank Advancement or Site Administrator, plus Web Page Editor |
+| Med_Form_Date_Upload | Membership or Rank Advancement |
+| Merit_Badge_Pocket_Cert | Adult Leader or Rank Advancement |
+| OA_Tracker | Leader mode: Rank Advancement plus Event Planner. Parent mode: Adult |
+| Rank_Gap | Event Planner plus Rank Advancement (or plus Site Administrator) |
+| Swim_Classification | Event Planner plus Membership or Rank Advancement |
+| Troop Stats | Rank Advancement |
+| vCard | Adult, Scout, Membership or Rank Advancement |
+
+\* Adult and Scout hold View Event Participation Reports only because this troop added the task to those roles.
+
 ## Disclaimer
 
 This is an **unofficial, community-built tool** with no affiliation
