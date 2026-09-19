@@ -10,9 +10,9 @@ switcher, so a troop only needs to paste one Custom Page instead of two.
 Both standalone files are left in the repo for reference, but this one
 supersedes them.
 
-Leader-only: the Upcoming Events list, the Roster export, and the
-Uncompleted Requirements report all require Adult Leader access on
-TroopWebHost. A Scout or parent login is detected automatically (the
+Restricted: the Upcoming Events list needs the Event Planner role, and the
+Roster export and Uncompleted Requirements report need Rank Advancement (or
+Site Administrator) on TroopWebHost -- see [Required roles](#required-roles). A Scout or parent login is detected automatically (the
 same redirect-based check the other tools in this repo use) and shown a
 plain "restricted" message rather than a guessed-at scoped view.
 
@@ -22,6 +22,20 @@ generated with real headless Chromium (`gen_screenshots.js`,
 `rank-requirement-gap.html`, with only the three network sources (Roster,
 Uncompleted Requirements, Upcoming Events + attendees) swapped for canned
 CSV/HTML. No real troop data appears anywhere in this repo.
+
+## Required roles
+
+| Report | Menu_Item_ID | Roles that can reach it |
+|---|---|---|
+| Upcoming Events list and campout attendee detail | 56931 (Form_ID 163 / 259) | Event Planner |
+| Roster export | 45897 | Membership, Rank Advancement, Site Administrator |
+| Uncompleted Rank Requirements | 46046 | Adult Leader, Rank Advancement, Site Administrator |
+
+The page loads all three when it opens, so a login needs all three: **Event Planner** plus **Rank Advancement**
+(or plus **Site Administrator**). Rank Advancement or Site Administrator alone covers the Roster and Uncompleted
+Requirements but not the Events Hub, so the page will report the restriction.
+
+Roles come from the site's Task Role and Task Menu Items exports, matched on `Menu_Item_ID`, and were checked against a login that holds only the Adult role. They describe how one troop's TroopWebHost site is configured. A site administrator can change which tasks each role holds (**Menu > Administration > Security Configuration > Assign Tasks to Roles**), so confirm against your own site. A login that lacks access is redirected by TroopWebHost, which this tool detects and reports.
 
 ## Screenshots
 
