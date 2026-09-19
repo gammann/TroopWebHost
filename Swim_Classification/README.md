@@ -2,7 +2,22 @@
 
 A single-file custom page for TroopWebHost that pulls an upcoming campout's sign-up list, joins it against TroopWebHost's own swim classification and medical recheck records for both Scouts and Adults, flags anyone whose swim test or medical clearance will have lapsed by the trip, and generates a filled BSA #19-122 Swim Classification Record — ready to print and hand to the test supervisor. Corrected swim dates or levels can be saved straight back to TroopWebHost from the same screen.
 
-Leader-only: the Upcoming Events list and the swim classification / medical recheck admin grids all require Adult Leader access on TroopWebHost. A Scout or parent login is detected automatically (the same redirect-based check the other tools use) and shown a plain "restricted" message rather than a guessed-at scoped view.
+Restricted: the Upcoming Events list needs the Event Planner role, and the swim classification / medical recheck admin grids need the Membership or Rank Advancement role, on TroopWebHost (see [Required roles](#required-roles)). A Scout or parent login is detected automatically (the same redirect-based check the other tools use) and shown a plain "restricted" message rather than a guessed-at scoped view.
+
+## Required roles
+
+| Data | Menu_Item_ID / Form_ID | Read/Write | Roles that can reach it |
+|---|---|---|---|
+| Upcoming Events list | 56931 (Form_ID 163) | Read | Event Planner |
+| Campout event detail (attendee list) | 56931 (Form_ID 259) | Read | Event Planner |
+| Swim classification grids (Scouts, Adults) | 56934 (Form_ID 2052 / 7322) | Read + Write | Membership, Rank Advancement |
+| Medical Recheck grids | 56934 (Form_ID 2065 / 3545) | Read | Membership, Rank Advancement |
+
+The page needs both halves, so a login needs **Event Planner** (Events Hub) plus **Membership** or
+**Rank Advancement** (Membership Hub). No single role covers both. **Adult Leader** and **Site Administrator**
+reach neither hub on their own.
+
+Roles come from the site's Task Role and Task Menu Items exports, matched on `Menu_Item_ID`, and were checked against a login that holds only the Adult role. They describe how one troop's TroopWebHost site is configured. A site administrator can change which tasks each role holds (**Menu > Administration > Security Configuration > Assign Tasks to Roles**), so confirm against your own site. A login that lacks access is redirected by TroopWebHost, which this tool detects and reports.
 
 ## What it does
 
@@ -94,7 +109,7 @@ These are lessons from real bugs or deliberate design decisions, kept here so th
 ## Troubleshooting
 
 - **"Could not fetch the template PDF"**: check that `SCR_TEMPLATE_PDF_URL` in CONFIG is reachable and returns a PDF — the default points at BSA's own official `scouting.org` host, which was confirmed working from a live TWH site, but a firewall, ad-blocker, or a future change on BSA's end could still block it. If so, switch the URL to the `raw.githubusercontent.com` copy of `Swim-Classificaiton-record-430-122.pdf` staged in this folder (see the comment above `SCR_TEMPLATE_PDF_URL` in the file).
-- **"This page is restricted to Adult Leaders"** on a login you believe should have access: the Upcoming Events list, the swim classification admin grids, and the Medical Recheck admin grids all require Adult Leader permission on TroopWebHost itself — this page doesn't add any new restriction, it just detects and reports TroopWebHost's own.
+- **"This page is restricted to Adult Leaders"** on a login you believe should have access: the Upcoming Events list needs the Event Planner role, and the swim classification and Medical Recheck admin grids need the Membership or Rank Advancement role, on TroopWebHost itself (Adult Leader alone is not enough) — this page doesn't add any new restriction, it just detects and reports TroopWebHost's own.
 - **A name on the roster shows blank Test Date/Swim Level/Medical Recheck** even though you know they've tested: check the spelling matches exactly between the campout attendee list and the swim/medical admin grids on your site — matching is exact-name (not fuzzy) since both come from the same underlying TroopWebHost database on this page, unlike the last-name-plus-first-word matching some of this repo's other tools use across *different* reports.
 - **A test date looks fine to me but shows "expired"**: check the campout's own end date, not today's — the cutoff is measured back from the last day of the selected campout, so a test that's still current today can already show expired if it will lapse before the trip is over.
 - **Save reports "could not save (see below)"**: either no matching record was found for that name in the relevant grid (check spelling), or the save posted successfully but the refetch didn't confirm the new value — worth checking that person's record directly on TroopWebHost before assuming the write silently failed.
