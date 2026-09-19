@@ -2,7 +2,20 @@
 
 A single-file custom page for TroopWebHost that pulls the troop's Award Report, keeps only the rows where Type is "Merit Badge" (Ranks and other Awards on the same report are left out), lets a leader check off which ones to print, then fills the official BSA "Merit Badge Pocket Certificate" PDF (item #33414, 8 cards per sheet) and hands back a finished, ready-to-print PDF. Unit Leader name can auto-detect from TroopWebHost's own Adult Directory instead of being typed by hand.
 
-Leader-only: the Award Report requires Adult Leader access on TroopWebHost. A Scout or parent login is detected automatically (the same redirect-based check the other tools in this repo use) and shown a plain "restricted" message rather than a guessed-at scoped view.
+Restricted: the Award Report is only available to the Adult Leader and Rank Advancement roles on TroopWebHost (see [Required roles](#required-roles)). A Scout or parent login is detected automatically (the same redirect-based check the other tools in this repo use) and shown a plain "restricted" message rather than a guessed-at scoped view.
+
+## Required roles
+
+| Report | Menu_Item_ID | Needed for | Roles that can reach it |
+|---|---|---|---|
+| Award Report (via Pending Awards) | 45952 (Form_ID 253) | Required | Adult Leader, Rank Advancement |
+| Adult Directory | 46013 | Optional (Unit Leader auto-detect; type the name by hand otherwise) | Adult, Scout, Membership, Rank Advancement |
+
+To load the merit badges you need the **Adult Leader** or **Rank Advancement** role. Rank Advancement also reaches
+the Adult Directory, so Unit Leader auto-detect works. A login that holds only Adult Leader can still load badges
+and print, but Unit Leader has to be typed in unless that login also holds Adult (or another role in the table).
+
+Roles come from the site's Task Role and Task Menu Items exports, matched on `Menu_Item_ID`, and were checked against a login that holds only the Adult role. They describe how one troop's TroopWebHost site is configured. A site administrator can change which tasks each role holds (**Menu > Administration > Security Configuration > Assign Tasks to Roles**), so confirm against your own site. A login that lacks access is redirected by TroopWebHost, which this tool detects and reports.
 
 ## What it does
 
@@ -50,7 +63,7 @@ This only works pasted directly into TroopWebHost's own site (same-origin) — i
 
 ## How to use it
 
-You need the **Rank Advancement** role in order to run the report.
+You need the **Rank Advancement** or **Adult Leader** role in order to run the report (see [Required roles](#required-roles)).
 
 1. Fill in Unit number (auto-filled, editable) and Council name.
 2. Click **Load merit badges**. Unit Leader auto-fills if exactly one person on the Adult Directory has the configured Leadership title; otherwise type it in, or click **Detect from TroopWebHost** to retry.
@@ -87,7 +100,7 @@ These are lessons from real testing, kept here so they aren't reintroduced by a 
 ## Troubleshooting
 
 - **"The Award Report page didn't have the expected columns"**: TroopWebHost may have changed this report, or the Menu_Item_ID/Form_ID in Advanced settings may be wrong for your installation — open Membership Hub → Advancement Hub → Award Report on your own site and copy the IDs out of that page's URL.
-- **"Restricted"** on a login you believe should have access: the Award Report and Adult Directory both require Adult Leader permission on TroopWebHost itself — this page doesn't add any new restriction, it just detects and reports TroopWebHost's own.
+- **"Restricted"** on a login you believe should have access: the Award Report requires the Adult Leader or Rank Advancement role, and the Adult Directory (Unit Leader auto-detect only) requires Adult, Scout, Membership or Rank Advancement, on TroopWebHost itself — this page doesn't add any new restriction, it just detects and reports TroopWebHost's own.
 - **Unit Leader doesn't auto-fill**: either nobody (or more than one person) on your Adult Directory has the configured Leadership title exactly — check the exact wording your installation uses (e.g. some troops use "Scoutmaster (SM)") and adjust "Leadership title to detect" in Advanced settings, or just type the name in by hand.
 - **"Could not generate the PDF" / network or CORS error**: the primary PDF source (`mediafiles.scoutshop.org`) may be temporarily blocking the fetch; the page automatically falls back to this repo's own staged copy, but if both fail, check that `merit-badge-pocket-cert-template.pdf` has actually been pushed to this folder on GitHub and that the fallback URL in the file's `FALLBACK_PDF_URL` constant matches your fork.
 - **Pre-printed cardstock mode text looks misaligned on the physical page**: this would mean either BSA has revised the #33414 layout since this was built, or your printer's own margin handling differs slightly from a straight PDF-point mapping — try adjusting your printer's scaling/margins to "actual size" / "100%" (never "fit to page") before assuming the coordinates themselves are wrong.
