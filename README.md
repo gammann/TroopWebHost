@@ -1,6 +1,16 @@
 # TroopWebHost
 Code to enhance TroopWebHost
 
+## Pages
+- **Eagle_Scout_Rank_App_Form** - Fills out the Eagle Scout Rank Application
+- **Leaderboard** - A leaderboard of camping nights, service hours, hiking miles, merit badges, etc.
+- **Med_Form_Date_Upload** - Takes an export from ScoutBoot Plus and uploads Medical Form dates
+- **Merit_Badge_Pocket_cert** - Allows you to print Merit Badge Pocket Certificate from MBs not yet awarded
+- **OA_Tracker** - Report to show which Scouts are OA eligible and who needs more camping nights and rank requirements before your next election.
+- **Rank_Gap** - Shows all the rank requirements needed up to 1st Class needed by your Scouts, allows you to filter on specific campouts.
+- **Swim_Classification** - Prints a Swim Classification Record for the Scouts/Adults signed up for a Campout.
+- **Troop Stats** - Generates some statistics about your Troop for the past year.
+- **vCard** - Creates a vCard Export of contact information for import into your email client of choice.
 
 ## Disclaimer
 
