@@ -2,7 +2,21 @@
 
 A single-file custom page for TroopWebHost that reads a Roster Report export, compares everyone's Medical Part A / Part B / Part C dates in it against TroopWebHost's own live combined Medical Recheck admin grid (Scouts and Adults together), and lets a leader review and apply any updates in one batch instead of typing each date in by hand.
 
-Leader-only: the Medical Recheck admin grid requires Adult Leader access on TroopWebHost. A Scout or parent login is detected automatically (the same redirect-based check the other tools in this repo use) and shown a plain "restricted" message rather than a guessed-at scoped view.
+Restricted: the Medical Recheck admin grid requires the Membership or Rank Advancement role on TroopWebHost (see [Required roles](#required-roles)). A Scout or parent login is detected automatically (the same redirect-based check the other tools in this repo use) and shown a plain "restricted" message rather than a guessed-at scoped view.
+
+## Required roles
+
+| Data | Menu_Item_ID / Form_ID | Read/Write | Roles that can reach it |
+|---|---|---|---|
+| Medical Recheck admin grid (combined Scout + Adult) | 56934 (Form_ID 9224) | Read + Write | Membership, Rank Advancement |
+| BSA ID admin grids (Scouts, Adults) | 56934 (Form_ID 3547 / 3548) | Read | Membership, Rank Advancement |
+
+Everything runs through TroopWebHost's Membership Hub (56934), so a login needs the **Membership** or
+**Rank Advancement** role. **Adult Leader**, **Event Planner** and **Site Administrator** do not reach the
+Membership Hub on their own. The ScoutbookPlus roster file is uploaded from your computer and needs no
+TroopWebHost role.
+
+Roles come from the site's Task Role and Task Menu Items exports, matched on `Menu_Item_ID`, and were checked against a login that holds only the Adult role. They describe how one troop's TroopWebHost site is configured. A site administrator can change which tasks each role holds (**Menu > Administration > Security Configuration > Assign Tasks to Roles**), so confirm against your own site. A login that lacks access is redirected by TroopWebHost, which this tool detects and reports.
 
 ## What it does
 
@@ -36,7 +50,7 @@ A file that already matches TroopWebHost exactly shows a plain empty state inste
 
 ![Nothing to update](screenshots/05-no-changes.png)
 
-And a login without Adult Leader access sees a plain restricted message rather than a guessed-at partial view:
+And a login without the Membership or Rank Advancement role sees a plain restricted message rather than a guessed-at partial view:
 
 ![Restricted access message](screenshots/06-restricted.png)
 
@@ -92,7 +106,7 @@ These are lessons from real bugs or deliberate design decisions, kept here so th
 
 ## Troubleshooting
 
-- **"This page is restricted to Adult Leaders"** on a login you believe should have access: the Medical Recheck grid and the BSA ID grids all require Adult Leader permission on TroopWebHost itself — this page doesn't add any new restriction, it just detects and reports TroopWebHost's own.
+- **"This page is restricted to Adult Leaders"** on a login you believe should have access: the Medical Recheck grid and the BSA ID grids all require the Membership or Rank Advancement role on TroopWebHost itself (Adult Leader alone is not enough) — this page doesn't add any new restriction, it just detects and reports TroopWebHost's own.
 - **Someone shows up under "not found"**: almost always a Preferred Name mismatch with no BSA Number on file anywhere to bridge it automatically. Type the name exactly as TroopWebHost's grid shows it into the inline box and click "Fix name & recheck" — that fix is remembered for every future upload. Double-check spelling either way; matching is exact, not fuzzy, once you're past the normalized last-name-plus-first-word stage.
 - **Someone shows up under "ambiguous"**: two or more people of the same type on the grid share that normalized name and neither has a BSA Number on file to tell them apart. Update that person's dates directly on TroopWebHost.
 - **A field you expected to change isn't in the review table**: TroopWebHost's date for that field already matches the file exactly — nothing to do. Check the "Matched X by BSA Number, Y by name" line to confirm the person was found at all.
