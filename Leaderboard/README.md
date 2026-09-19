@@ -28,6 +28,23 @@ With the correct permissions granted to all members, the Active Scout/Adult data
 
 This code uses [SheetJS](https://sheetjs.com/) to parse Excel reports exported from TroopWebHost.
 
+## Required roles
+
+| Report | Menu_Item_ID | Needed for | Roles that can reach it |
+|---|---|---|---|
+| Event Participation Summary for Date Range | 46097 | Live Active leaderboard data, for every viewer | Adult\*, Scout\*, Adult Leader, Event Planner, Membership, Rank Advancement, Site Administrator |
+| Export Roster to Excel | 45897 | Regenerating the Former and Merit Badge data | Membership, Rank Advancement, Site Administrator |
+| Save data back into this Custom Page | - | Publishing that data for other visitors | Web Page Editor |
+
+Viewing the live leaderboard only needs a role that holds **View Event Participation Reports** (Step 2 below).
+Refreshing and publishing the Former and Merit Badge data needs a login that can pull the roster export
+(**Membership**, **Rank Advancement** or **Site Administrator**) and also holds the **Web Page Editor** role.
+Everyone else just sees whatever was published most recently.
+
+\* Adult and Scout reach this report only because this troop added the **View Event Participation Reports** task to those two roles by hand. It is not part of their default configuration, so a site without that change will deny them.
+
+Roles come from the site's Task Role and Task Menu Items exports, matched on `Menu_Item_ID`, and were checked against a login that holds only the Adult role. They describe how one troop's TroopWebHost site is configured. A site administrator can change which tasks each role holds (**Menu > Administration > Security Configuration > Assign Tasks to Roles**), so confirm against your own site. A login that lacks access is redirected by TroopWebHost, which this tool detects and reports.
+
 # Setup Guide
 
 
