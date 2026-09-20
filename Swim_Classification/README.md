@@ -29,29 +29,41 @@ Roles come from the site's Task Role and Task Menu Items exports, matched on `Me
 6. **Generate PDF** — fills the real, unmodified BSA #19-122 form with everyone checked, appending each person's own test date after their name (the printed form only has one date field at the top, and dates vary per person). The form's "Medical Recheck Parts A-B" column is left blank on purpose — the medical date is tracked and flagged on-screen only, not printed. Rosters over 15 people get extra copies of the blank form page.
 7. **Save to TroopWebHost** — writes any corrected Test Date / Swim Level back to TroopWebHost's real swim classification records, for everyone on the roster regardless of whether their checkbox is ticked (the checkbox only controls who's on the generated PDF). Asks for confirmation first, and refetches afterward to confirm each change actually stuck before reporting success.
 
-![Upcoming campouts list](screenshots/01-campout-list.png)
+<p align="center">
+<img src="screenshots/01-campout-list.png" alt="Upcoming campouts list" width="50%">
+</p>
 
 *(Fake/placeholder data shown above — not a real troop's calendar.)*
 
-![Roster loaded, showing expired swim tests and Medical Recheck flags](screenshots/02-roster-loaded.png)
+<p align="center">
+<img src="screenshots/02-roster-loaded.png" alt="Roster loaded, showing expired swim tests and Medical Recheck flags" width="50%">
+</p>
 
 *(All names, patrols, and dates above are made up for these screenshots.)* Alder and Hollis show red "expired" swim tests, Castellano and Jessup show "missing" Medical Recheck dates, and Emerson and Hollis show "expired" Medical Recheck dates — every flag measured against this campout's own dates, not today's.
 
 Adding someone who isn't on the campout's attendee list yet pulls from TroopWebHost's full swim classification roster and fills in their current data automatically:
 
-![Add Scout picker, auto-filling from TroopWebHost](screenshots/03-add-scout-picker.png)
+<p align="center">
+<img src="screenshots/03-add-scout-picker.png" alt="Add Scout picker, auto-filling from TroopWebHost" width="50%">
+</p>
 
 Saving reports exactly what changed, per person:
 
-![Save to TroopWebHost report](screenshots/04-save-report.png)
+<p align="center">
+<img src="screenshots/04-save-report.png" alt="Save to TroopWebHost report" width="50%">
+</p>
 
 A campout nobody's signed up for yet shows a plain empty state instead of an empty table:
 
-![Empty campout state](screenshots/05-empty-campout.png)
+<p align="center">
+<img src="screenshots/05-empty-campout.png" alt="Empty campout state" width="50%">
+</p>
 
 And the actual generated PDF — the real, unmodified BSA form with names, per-person dates, and classification marks overlaid at measured coordinates. Note the "Medical Recheck Parts A-B" column stays blank by design, even though it's tracked and flagged on-screen:
 
-![Generated Swim Classification Record PDF](screenshots/06-generated-pdf-sample.png)
+<p align="center">
+<img src="screenshots/06-generated-pdf-sample.png" alt="Generated Swim Classification Record PDF" width="50%">
+</p>
 
 *(Every name, patrol, and date across all six screenshots above is fictional — none of it is a real troop's data.)*
 
