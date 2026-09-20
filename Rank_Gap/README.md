@@ -42,19 +42,25 @@ Roles come from the site's Task Role and Task Menu Items exports, matched on `Me
 **Campouts tab** (the default landing view) -- every upcoming campout on
 the calendar:
 
-![Campouts list](screenshots/01-campouts-list.png)
+<p align="center">
+<img src="screenshots/01-campouts-list.png" alt="Campouts list" width="50%">
+</p>
 
 **Campout gap** -- clicking a campout shows who's signed up (pooled from
 multiple Patrols, so each Scout's card is tagged with their Patrol),
 summary chips, two collapsible group-level sections, and a per-selection
 **Export to Excel** button:
 
-![Campout gap](screenshots/02-campout-gap.png)
+<p align="center">
+<img src="screenshots/02-campout-gap.png" alt="Campout gap" width="50%">
+</p>
 
 **Patrols tab** -- every Patrol on the Roster, with a headcount, a gap
 count, and the bulk **Export All Patrols to Excel** button:
 
-![Patrols list](screenshots/03-patrols-list.png)
+<p align="center">
+<img src="screenshots/03-patrols-list.png" alt="Patrols list" width="50%">
+</p>
 
 **Patrol gap, Requirements Needed By Category expanded** -- note
 "Fitness" here merges one Scout's Tenderfoot, Second Class, and First
@@ -62,32 +68,42 @@ Class Fitness requirements into a single group, each line tagged with
 which rank it's for; individual Scout cards in this view have no Patrol
 tag since everyone shown is already in the same one:
 
-![Patrol gap, by category](screenshots/04-patrol-gap-by-category.png)
+<p align="center">
+<img src="screenshots/04-patrol-gap-by-category.png" alt="Patrol gap, by category" width="50%">
+</p>
 
 **All Scouts tab** -- a one-button prompt to see every active Scout on
 the Roster at once, regardless of Patrol:
 
-![All Scouts tab](screenshots/05-all-scouts-tab.png)
+<p align="center">
+<img src="screenshots/05-all-scouts-tab.png" alt="All Scouts tab" width="50%">
+</p>
 
 **All Scouts gap** -- the same drill-down as a Campout or a Patrol, but
 troop-wide; Patrol tags are back since Scouts are pooled from every
 Patrol:
 
-![All Scouts gap](screenshots/06-all-scouts-gap.png)
+<p align="center">
+<img src="screenshots/06-all-scouts-gap.png" alt="All Scouts gap" width="50%">
+</p>
 
 **Export to Excel** (the shared, per-selection export -- works the same
 for a Campout, a Patrol, or All Scouts) -- Summary, Roster/Attendees, By
 Scout, By Requirement, and By Category tabs; shown here is the By
 Category tab for an All Scouts export:
 
-![Export to Excel, By Category tab](screenshots/07-excel-export-gap.png)
+<p align="center">
+<img src="screenshots/07-excel-export-gap.png" alt="Export to Excel, By Category tab" width="50%">
+</p>
 
 **Export All Patrols to Excel** (the separate bulk export, Patrols tab
 only) -- one tab per Patrol laid out as a Rank/Code/Requirement grid with
 one column per Scout in that Patrol, marked "X" wherever that Scout still
 needs the row's requirement:
 
-![Export All Patrols to Excel, Hawk Patrol tab](screenshots/08-excel-export-patrols-matrix.png)
+<p align="center">
+<img src="screenshots/08-excel-export-patrols-matrix.png" alt="Export All Patrols to Excel, Hawk Patrol tab" width="50%">
+</p>
 
 ## What it shows
 
