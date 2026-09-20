@@ -10,21 +10,29 @@ A single-file custom page for TroopWebHost that pulls the Scout Directory and Ad
 2. **What to include** — independent checkboxes for Organization (troop label + Patrol/Crew), Title (Rank or Leadership position), a Categories tag, mailing address, Cell/Home/Business phone, primary/secondary email, and — in Notes — Age, Grade, and Parent/Guardian contact for Scouts. Nothing is forced on; every field is opt-in.
 3. **Download** — either one combined `.vcf` (most contact apps import multi-card files fine) or a `.zip` with one `.vcf` per person.
 
-![Default landing state: Who panel with Scouts/Adults groups, What to include panel with default field checkboxes, Organization auto-filled as Troop 1234](screenshots/01-default-landing.png)
+<p align="center">
+<img src="screenshots/01-default-landing.png" alt="Default landing state: Who panel with Scouts/Adults groups, What to include panel with default field checkboxes, Organization auto-filled as Troop 1234" width="50%">
+</p>
 
 *(Fake/placeholder Scouts, Adults, and troop number shown above — not a real troop's roster.)*
 
 Search and the patrol dropdown narrow the Who list without losing anything already selected elsewhere:
 
-![Search box and patrol filter narrowing the Who list to Hawk Patrol Scouts matching "a"](screenshots/02-search-and-patrol-filter.png)
+<p align="center">
+<img src="screenshots/02-search-and-patrol-filter.png" alt="Search box and patrol filter narrowing the Who list to Hawk Patrol Scouts matching &quot;a&quot;" width="50%">
+</p>
 
 Selecting people enables the download buttons and updates the count live:
 
-![Six Scouts selected via Select All Scouts, download buttons now enabled](screenshots/03-scouts-selected.png)
+<p align="center">
+<img src="screenshots/03-scouts-selected.png" alt="Six Scouts selected via Select All Scouts, download buttons now enabled" width="50%">
+</p>
 
 Downloading shows a plain confirmation rather than leaving you guessing whether anything happened:
 
-![Green confirmation message: Downloaded 6 contacts as one file](screenshots/04-download-confirmation.png)
+<p align="center">
+<img src="screenshots/04-download-confirmation.png" alt="Green confirmation message: Downloaded 6 contacts as one file" width="50%">
+</p>
 
 *(All names, addresses, and phone numbers in every screenshot above are made up for this README.)*
 
@@ -47,11 +55,15 @@ Roles come from the site's Task Role and Task Menu Items exports, matched on `Me
 
 Confirmed that Scout Directory and Adult Directory are readable by ordinary Scout/parent logins on this site — the whole reason this version exists. The page still checks `res.redirected` on every fetch and shows a plain restricted message if that's ever wrong for a given login, rather than assuming a fixed pattern of access:
 
-![Restricted message shown when the Scout/Adult directories can't be loaded for the current login](screenshots/06-restricted-state.png)
+<p align="center">
+<img src="screenshots/06-restricted-state.png" alt="Restricted message shown when the Scout/Adult directories can&#x27;t be loaded for the current login" width="50%">
+</p>
 
 Two of the four reports this page uses are optional enrichments (adult patrol/crew grouping, and the Parent/Guardian contact field) rather than required — if either is unavailable for a given login, the page still works fully on the two required directories and just disables the one feature that depends on the missing report, with a plain note saying so:
 
-![Degraded-mode note: adult patrol grouping and Parent/Guardian contact unavailable, everything else still works](screenshots/05-degraded-mode.png)
+<p align="center">
+<img src="screenshots/05-degraded-mode.png" alt="Degraded-mode note: adult patrol grouping and Parent/Guardian contact unavailable, everything else still works" width="50%">
+</p>
 
 ## Installation
 
