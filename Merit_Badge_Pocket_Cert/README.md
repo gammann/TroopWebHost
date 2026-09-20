@@ -21,34 +21,48 @@ Roles come from the site's Task Role and Task Menu Items exports, matched on `Me
 
 1. **Settings** — Unit number auto-fills from the site's own page title; Council name is a one-time manual entry (TroopWebHost has no Council field to read); Unit Leader name can be typed by hand or auto-detected (see below). Advanced settings expose the Award Report's `Menu_Item_ID`/`Form_ID`, the Adult Directory's `Menu_Item_ID`, the Leadership title to search for, and the PDF template source URL, all remembered per-browser.
 
-![Initial view — settings and Step 1](screenshots/01-initial.png)
+<p align="center">
+<img src="screenshots/01-initial.png" alt="Initial view — settings and Step 1" width="50%">
+</p>
 
 *(Fake/placeholder data shown above — not a real troop's roster.)*
 
 2. **Load the Award Report** — fetches every Adult/Scout Rank, Award, and Merit Badge row, keeps only Type = "Merit Badge", strips the trailing `*` TroopWebHost appends to mark a badge Eagle-required, and lists the result sorted by Scout then badge name so a Scout's certificates print together.
 
-![Award Report loaded, 11 of 15 rows are Merit Badges](screenshots/02-report-loaded.png)
+<p align="center">
+<img src="screenshots/02-report-loaded.png" alt="Award Report loaded, 11 of 15 rows are Merit Badges" width="50%">
+</p>
 
 *(All names, patrols, and dates above are made up for these screenshots.)*
 
 3. **Choose which certificates to print** — every row is checked by default; uncheck anyone who shouldn't be on this batch (already printed, awaiting a Court of Honor, etc.). The running count and printed-sheet estimate update live.
 
-![Two rows deselected](screenshots/03-selection.png)
+<p align="center">
+<img src="screenshots/03-selection.png" alt="Two rows deselected" width="50%">
+</p>
 
 4. **Unit Leader auto-detect** — reads TroopWebHost's Adult Directory report and looks for whoever has the configured Leadership title (default "Scoutmaster"). Matching is exact-token, not substring, so "Assistant Scoutmaster" is never mistaken for "Scoutmaster". Runs once automatically if the field is empty, and any time the "Detect from TroopWebHost" button is clicked; zero or multiple matches leaves the field for manual entry instead of guessing.
 5. **Generate the PDF** — fills the real, unmodified BSA #33414 form, 8 certificates per sheet, extra sheets added automatically for larger batches.
 
-![PDF generated, ready to download](screenshots/04-generated.png)
+<p align="center">
+<img src="screenshots/04-generated.png" alt="PDF generated, ready to download" width="50%">
+</p>
 
 6. **Pre-printed cardstock mode** — for troops that already stock BSA's pre-printed #33414 cards, a checkbox switches generation to data-only: no background artwork, logos, or "MERIT BADGE" text, just the same fields at the same positions, so it can print directly onto the pre-printed sheet without doubling up the artwork.
 
-![Pre-printed cardstock mode checked](screenshots/05-blankmode-generated.png)
+<p align="center">
+<img src="screenshots/05-blankmode-generated.png" alt="Pre-printed cardstock mode checked" width="50%">
+</p>
 
 And the two kinds of generated PDF output side by side — normal mode (full template) and pre-printed cardstock mode (data only):
 
-![Generated PDF, normal mode](screenshots/06-generated-pdf-sample.png)
+<p align="center">
+<img src="screenshots/06-generated-pdf-sample.png" alt="Generated PDF, normal mode" width="50%">
+</p>
 
-![Generated PDF, pre-printed cardstock mode](screenshots/07-generated-pdf-blankmode-sample.png)
+<p align="center">
+<img src="screenshots/07-generated-pdf-blankmode-sample.png" alt="Generated PDF, pre-printed cardstock mode" width="50%">
+</p>
 
 *(Every name, patrol, and date across all screenshots above is fictional — none of it is a real troop's data.)*
 
