@@ -21,7 +21,9 @@ Official OA eligibility requirements: [oa-scouting.org/about/membership](https:/
 
 **A member appears in exactly one section.** Anyone in Awaiting Ordeal — overdue or not — is excluded from every other section; that's their one home until their Ordeal is resolved (or their election expires). Section 7 also excludes anyone already shown in Section 5 or 6.
 
-![Leader mode](screenshots/leader-mode.png)
+<p align="center">
+<img src="screenshots/leader-mode.png" alt="Leader mode" width="50%">
+</p>
 
 *(Fake/placeholder data shown above — not a real troop's records.)*
 
@@ -39,7 +41,9 @@ If TroopWebHost redirects the OA Eligibility screen away from you — which it d
 
 A bucket only renders if at least one Scout in your household falls into it, so a household with one Scout only ever sees one section.
 
-![Self-service mode](screenshots/self-service-mode.png)
+<p align="center">
+<img src="screenshots/self-service-mode.png" alt="Self-service mode" width="50%">
+</p>
 
 *(Fake/placeholder data shown above — not a real family's records.)*
 
