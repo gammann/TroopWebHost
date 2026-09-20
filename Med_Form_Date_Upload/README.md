@@ -28,31 +28,43 @@ Roles come from the site's Task Role and Task Menu Items exports, matched on `Me
 3. **Review & apply** — every field that would change, with a checkbox per field, grouped so a whole person's changes are easy to scan. A field whose file date is older than what's already on TroopWebHost is shown but left unchecked by default (a stale export usually means the file is wrong, not TroopWebHost). Anyone the file couldn't match is listed separately as "not found" or "ambiguous" and is never auto-applied.
 4. **Save to TroopWebHost** — writes the selected changes back to the real Medical Recheck grid, asks for confirmation first, and refetches afterward to confirm each change actually stuck before reporting success.
 
-![Roster file uploaded and parsed](screenshots/01-upload-summary.png)
+<p align="center">
+<img src="screenshots/01-upload-summary.png" alt="Roster file uploaded and parsed" width="50%">
+</p>
 
 *(All names, BSA numbers, and dates in every screenshot below are made up for documentation purposes — not a real troop's data.)*
 
 Comparing against TroopWebHost shows exactly what would change, matched by BSA Number wherever possible:
 
-![Comparison results, showing matched changes and two unmatched cases](screenshots/02-diff-review.png)
+<p align="center">
+<img src="screenshots/02-diff-review.png" alt="Comparison results, showing matched changes and two unmatched cases" width="50%">
+</p>
 
 Jessup, Robin's three changes matched even though the uploaded file's First Name for that row is "Morgan" — TroopWebHost is displaying a Preferred Name, and the BSA Number match resolved it automatically without needing a name fix at all. Castellano, Ren's Part A and Part B are shown too, but left unchecked and marked "older — unchecked": the uploaded file's date for those fields is older than what TroopWebHost already has, which almost always means a stale export rather than an intentional correction, so this tool defaults to leaving the newer date on TroopWebHost alone unless a leader deliberately checks the box. Delgado, Skylar (spelled differently on the grid than in the file, with no BSA Number recorded either place) landed in "not found," with an inline box to fix it once. Fennimore, Tate has two people on the grid sharing that exact name and no BSA Number to disambiguate them, so it's skipped rather than risk changing the wrong one.
 
 Typing the name exactly as TroopWebHost shows it resolves the match immediately and is remembered for every future upload:
 
-![After using "Fix name & recheck" for Delgado](screenshots/03-fix-name-recheck.png)
+<p align="center">
+<img src="screenshots/03-fix-name-recheck.png" alt="After using &quot;Fix name &amp; recheck&quot; for Delgado" width="50%">
+</p>
 
 Applying reports exactly what was saved and verified, per field:
 
-![Save report after applying changes](screenshots/04-apply-report.png)
+<p align="center">
+<img src="screenshots/04-apply-report.png" alt="Save report after applying changes" width="50%">
+</p>
 
 A file that already matches TroopWebHost exactly shows a plain empty state instead of an empty table:
 
-![Nothing to update](screenshots/05-no-changes.png)
+<p align="center">
+<img src="screenshots/05-no-changes.png" alt="Nothing to update" width="50%">
+</p>
 
 And a login without the Membership or Rank Advancement role sees a plain restricted message rather than a guessed-at partial view:
 
-![Restricted access message](screenshots/06-restricted.png)
+<p align="center">
+<img src="screenshots/06-restricted.png" alt="Restricted access message" width="50%">
+</p>
 
 *(Every name, BSA number, and date across all six screenshots above is fictional — none of it is a real troop's data.)*
 
