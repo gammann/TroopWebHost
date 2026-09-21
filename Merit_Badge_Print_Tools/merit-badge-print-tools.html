@@ -1,0 +1,2559 @@
+<!--
+Merit Badge Print Tools -- Pocket Certificates + Blue Cards
+----------------------------------------
+GENERATED FILE. Do not edit by hand: edit the standalone tools and run
+"node build.js" in Merit_Badge_Print_Tools/ to regenerate this page.
+
+Paste this WHOLE block into TroopWebHost: Manage Custom Pages -> (new or
+existing Custom Page) -> HTML editor. It must run ON troopwebhost.org
+(same-origin) so the fetch calls inherit your logged-in session.
+
+This page hosts each tool on its own tab. The tools are independent: each
+keeps its own settings, and only the Unit number and Council are shared
+(filled into the other tab when empty, and mirrored when changed).
+The notes below are each tool's own "read before using" notes, unchanged.
+
+==== Merit Badge Pocket Certificate Filler ====
+Merit Badge Pocket Certificate Filler
+----------------------------------------
+Paste this WHOLE block into TroopWebHost: Manage Custom Pages -> (new or
+existing Custom Page) -> HTML editor. It must run ON troopwebhost.org
+(same-origin) so the fetch calls below inherit your logged-in session.
+It will NOT work pasted into an external site or previewed elsewhere --
+the fetch calls will be blocked without your session cookie.
+
+WHAT THIS DOES
+--------------
+Pulls your troop's Award Report from TroopWebHost, keeps only the rows
+where Type = "Merit Badge" (Ranks and other Awards on the same report
+are left out), lets you check off which ones to print, then fills the
+official BSA "Merit Badge Pocket Certificate" PDF (item #33414, 8 cards
+per sheet) and hands you a finished, ready-to-print PDF.
+
+READ BEFORE USING
+------------------
+1. Read-only against TroopWebHost -- this page only fetches the Award
+   Report, it never saves anything back. The only network write is the
+   one-time GET of the blank certificate PDF template (from BSA's own
+   Scout Shop media host, or wherever you point "PDF template source"
+   below).
+2. Leader-only. The Award Report requires Adult Leader access on
+   TroopWebHost; a Scout or parent login gets redirected elsewhere,
+   which this page detects (same res.redirected technique as every
+   other custom page in this repo) and shows a plain "restricted"
+   message instead of guessing at a scaled-down view.
+3. Menu_Item_ID=45952 / Form_ID=253 (the Award Report) were confirmed
+   against one real TroopWebHost installation via HAR capture. These
+   are expected to be the standard "Award Report" IDs, but if this
+   page's "Load report" step fails or comes back with unexpected
+   columns, open Membership Hub -> Advancement Hub -> Award Report on
+   your own site, copy the Menu_Item_ID/Form_ID out of that page's URL,
+   and paste them into the "Advanced settings" panel below (saved in
+   this browser's localStorage from then on).
+4. Date printed on each card is whichever of the report's Earned /
+   Awarded / COH columns is filled in first, in that priority order --
+   on the installation this was built against, only "Earned" is ever
+   populated, but other troops may use the later columns instead.
+5. "Council" is NOT part of the Award Report (TroopWebHost has no
+   per-troop Council field to read), so it's a one-time manual setting
+   below, remembered in this browser. "Unit" auto-fills from this
+   site's own page title (e.g. "Troop 997 Ashburn" -> "997") but can be
+   overridden the same way.
+6. "Unit Leader" CAN be auto-detected: the "Detect from TroopWebHost"
+   button reads the Adult Directory report (Menu_Item_ID=46013,
+   confirmed on this installation via the vCard Export tool in this
+   same repo) and looks for whoever has the configured Leadership
+   title (default "Scoutmaster", overridable in Advanced settings).
+   If exactly one adult matches, their name fills the field. If zero
+   or more than one match, nothing is guessed -- the field is left for
+   you to type by hand, same "skip rather than guess" rule the vCard
+   tool uses for ambiguous name joins. Either way the field stays a
+   normal editable text box afterward, so you can always override it.
+6. The certificate sheet has 8 cards per page with no owner name printed
+   above "HAS MET THE REQUIREMENTS FOR..." on the official card layout
+   itself -- this tool still fills a Scout-name field on each card (the
+   template has one), so double check a printed sample against your
+   physical card stock once before handing out a full batch, in case a
+   given print run of the paper form doesn't have that line.
+
+==== Blue Card Printer ====
+Blue Card Printer
+----------------------------------------
+Paste this WHOLE block into TroopWebHost: Manage Custom Pages -> (new or
+existing Custom Page) -> HTML editor. It must run ON troopwebhost.org
+(same-origin) so the fetch calls below inherit your logged-in session.
+It will NOT work pasted into an external site or previewed elsewhere --
+the fetch calls will be blocked without your session cookie.
+
+WHAT THIS DOES
+--------------
+Runs TroopWebHost's own "Download Blue Cards File" export (Awards menu ->
+Export Troop Awards Advancement Files) for you, lists every merit badge
+your Scouts have started but not finished, lets you check off which ones
+to print, then fills the official Scouting America "Application for
+Merit Badge" (blue card, item #34124, fillable PDF) with the Scout's
+name/address, the badge, the counselor (if one is assigned), and the
+requirements already completed, and hands you a print-ready PDF.
+
+READ BEFORE USING
+------------------
+1. Read-only against TroopWebHost. The export is TroopWebHost's own
+   report generator (it builds a CSV file; nothing is saved). Menu_Item_ID
+   45954 (prompt form Form_ID 1689, download Form_ID 1690, button
+   BUTTON7) was confirmed via HAR capture against one real installation.
+   The "Started Since" date field and the button are located on the
+   fetched page by their label/title at run time, not by hard-coded
+   ENTRY ids, so a renumbered field does not break this page.
+2. A REDIRECT MEANS DIFFERENT THINGS HERE. Every other page in this repo
+   treats "res.redirected" as "access denied". This export is the
+   exception: a successful POST answers 302 -> FormCSV.aspx (that IS the
+   file). So only a redirect somewhere OTHER than FormCSV.aspx, or a
+   redirect on the initial page GET, is treated as "restricted".
+3. If the export is not reachable for your login (or you already have the
+   CSV), use "Choose a CSV file instead" in Step 1 -- same columns, same
+   result.
+4. Optional enrichment (best effort, never required): the Scout Directory
+   (46012) supplies each Scout's email, and the Adult Directory (46013)
+   supplies the unit leader's email (whoever holds the Leadership title
+   in Settings, exact-token match so "Assistant Scoutmaster" is never
+   mistaken for "Scoutmaster") plus contact details for any assigned
+   counselor who is also a registered adult in your troop. If either
+   directory is unavailable the cards are still produced with those
+   boxes left blank. Only the values printed on the cards are kept; the
+   directory data itself is discarded after matching.
+5. Left blank on purpose: signatures, Date of approval, Counselor Initial
+   and "Date completed" -- those are for people to write. The Started
+   date is optionally printed beside the unit leader's signature line.
+6. The requirement grid has 22 columns. In "Compact" mode completed
+   items fold into their parent (2.b plus 2.b.1..5 -> "2b") and letters
+   become ranges (1.a..1.g -> "1a-g"). Anything that still does not fit
+   is written into the Counselor's Record "Remarks" box, never dropped.
+7. "Council" and "District" are not available from TroopWebHost, so they
+   are one-time manual settings remembered in this browser. "Unit" fills
+   from this site's own page title (e.g. "Troop 123 Town" -> "123").
+8. The blank template is fetched from this repo's own staged copy
+   (Blue_Card/blue-card-template.pdf on GitHub). No stable official
+   Scouting America URL for the fillable version was identified, so if
+   that fetch is ever blocked, choose your own copy of the PDF with the
+   file picker in Step 3 (the same file works).
+-->
+<div id="mbt-root">
+<style>
+#mbt-root{
+  max-width:1100px; margin:20px auto 0;
+  font-family:'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+#mbt-root, #mbt-root *{ box-sizing:border-box; }
+/* Theme colors are copied from the active tool at run time (see script), so
+   the tabs always match whatever the live site's palette resolved to. */
+#mbt-root .mbt-tabs{ display:flex; flex-wrap:wrap; gap:6px; padding:0 4px; }
+#mbt-root .mbt-tabs button{
+  font-family:inherit; font-weight:700; font-size:13.5px; letter-spacing:.01em;
+  padding:11px 20px; cursor:pointer;
+  border:1px solid var(--mbt-hair, rgba(128,128,128,0.45)); border-bottom:none;
+  border-radius:6px 6px 0 0;
+  background:var(--mbt-paper, #2e2a20); color:var(--mbt-ink, #f0ead8);
+  opacity:.82; transition:opacity .12s, filter .12s;
+}
+#mbt-root .mbt-tabs button:hover{ opacity:1; }
+#mbt-root .mbt-tabs button:focus-visible{ outline:2px solid var(--mbt-brass, #b8863b); outline-offset:2px; opacity:1; }
+#mbt-root .mbt-tabs button[aria-selected="true"]{
+  background:var(--mbt-brass, #b8863b); color:var(--mbt-accent-ink, #241a08);
+  border-color:var(--mbt-brass, #b8863b); opacity:1;
+}
+/* Each tool's own root normally centers itself with a 20px top margin; inside
+   a tab it sits flush under the tab bar. (Two ids beat the tool's one id.) */
+#mbt-root .mbt-panel > div[id]{ margin-top:0 !important; border-top-left-radius:0 !important; }
+#mbt-root .mbt-hidden{ display:none !important; }
+</style>
+<div class="mbt-tabs" role="tablist" aria-label="Advancement printing tools">
+  <button type="button" role="tab" id="mbt-tab-pocket" data-tab="pocket" aria-controls="mbt-panel-pocket" aria-selected="true">Pocket Certificates</button>
+  <button type="button" role="tab" id="mbt-tab-blue" data-tab="blue" aria-controls="mbt-panel-blue" aria-selected="false" tabindex="-1">Blue Cards</button>
+</div>
+
+<div class="mbt-panel" id="mbt-panel-pocket" role="tabpanel" aria-labelledby="mbt-tab-pocket">
+<div id="mbc-root">
+<style>
+#mbc-root, #mbc-root *{ box-sizing:border-box; }
+#mbc-root{
+  /* THEME -- same probe-and-adapt approach as every other custom page in
+     this repo (see rgApplyLiveSiteTheme() in Rank_Gap/rank-requirement-gap.html
+     for the full rationale), re-scoped under #mbc-root. Two-role accent
+     split: --brass (RAW probed fill, paired with fixed --accent-ink text)
+     for buttons/badges, --brass-text (contrast-adjusted) for the same
+     accent used bare as text/links/borders on the canvas. Canvas/text
+     tokens (--paper-*, --ink*) swap between light and dark via the
+     .mbc-light class below, following the live site's own detected
+     background luminance -- all 6 stock TWH templates are light, so
+     the default here is the light palette with dark as opt-in fallback. */
+  --paper-950:#1c1a16; --paper-900:#242119; --paper-800:#2e2a20;
+  --ink:#f0ead8; --ink-dim:#c9c0a6;
+  --brass:#b8863b; --brass-light:#d9a95c; --brass-text:#d9a95c; --brass-glow:rgba(184,134,59,0.1);
+  --sage:#8fae7a; --rust:#c96b4f; --rust-bg:rgba(201,107,79,0.22);
+  --hair:rgba(240,234,216,0.14); --hair-strong:rgba(240,234,216,0.28);
+  --accent-ink:#241a08;
+  --navy:#3a2d18; --navy-dark:#241b0e;
+  --surface-1:rgba(255,255,255,0.03); --surface-2:rgba(0,0,0,0.25);
+  --surface-3:rgba(0,0,0,0.32); --surface-4:rgba(255,255,255,0.08);
+  background:linear-gradient(180deg, var(--paper-950), var(--paper-900) 40%, var(--paper-950));
+  color:var(--ink);
+  font-family:'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  padding:28px 24px 60px;
+  border-radius:6px;
+  max-width:1100px;
+  margin:20px auto;
+  /* Hidden until mbcApplyLiveSiteTheme() decides light vs. dark, so the
+     page never flashes its dark default before switching to a light
+     site's real colors. Visibility (not display) so layout/scroll
+     position aren't affected. */
+  visibility:hidden;
+}
+#mbc-root.mbc-ready{ visibility:visible; }
+#mbc-root.mbc-light{
+  --paper-950:#f7f2e7; --paper-900:#fbf8f0; --paper-800:#efe6cf;
+  --ink:#2a2416; --ink-dim:#6b6248;
+  --sage:#3f7a3f;
+  --hair:rgba(42,36,22,0.12); --hair-strong:rgba(42,36,22,0.24);
+  --surface-1:rgba(0,0,0,0.025); --surface-2:rgba(0,0,0,0.05);
+  --surface-3:rgba(0,0,0,0.07); --surface-4:rgba(0,0,0,0.05);
+}
+#mbc-root a{ color:var(--brass-text); }
+#mbc-root header.mbc-masthead{
+  border:1px solid var(--hair-strong);
+  border-bottom:6px solid var(--brass);
+  border-radius:4px;
+  padding:24px 26px 20px; margin-bottom:24px;
+  background-image:linear-gradient(160deg, var(--navy) 0%, var(--navy-dark) 100%);
+  color:#fff;
+}
+#mbc-root .mbc-eyebrow{
+  font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.16em;
+  text-transform:uppercase; color:rgba(255,255,255,0.82); margin:0 0 10px;
+}
+#mbc-root h1{
+  font-family:'Roboto Slab', Georgia, serif; font-weight:700;
+  font-size:clamp(22px,3.2vw,30px); margin:0 0 8px; line-height:1.15;
+}
+#mbc-root header.mbc-masthead p.mbc-sub{
+  margin:0; max-width:70ch; color:rgba(255,255,255,0.82); font-size:14px; line-height:1.55;
+}
+#mbc-root section.mbc-card{
+  border:1px solid var(--hair-strong); border-radius:5px;
+  padding:20px 22px; margin-top:20px; background:var(--surface-1);
+}
+#mbc-root section.mbc-card h2{
+  font-family:'JetBrains Mono', monospace; font-size:11.5px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--brass-text); margin:0 0 14px; font-weight:700;
+}
+#mbc-root label.mbc-field{
+  display:block; font-size:11.5px; text-transform:uppercase; letter-spacing:.04em;
+  color:var(--ink-dim); margin-bottom:5px; margin-top:14px;
+}
+#mbc-root label.mbc-field:first-child{ margin-top:0; }
+#mbc-root input[type=text]{
+  width:100%; font-size:14px; padding:8px 10px; border-radius:3px;
+  border:1px solid var(--hair-strong); background:var(--surface-2); color:var(--ink);
+}
+#mbc-root input[type=text]:focus{ outline:2px solid var(--brass); outline-offset:1px; }
+#mbc-root .mbc-grid3{ display:grid; grid-template-columns:2fr 1fr 1fr; gap:0 16px; }
+#mbc-root .mbc-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
+@media (max-width:680px){ #mbc-root .mbc-grid3, #mbc-root .mbc-grid2{ grid-template-columns:1fr; } }
+#mbc-root details.mbc-advanced{ margin-top:18px; }
+#mbc-root details.mbc-advanced > summary{
+  cursor:pointer; font-size:12.5px; color:var(--ink-dim); user-select:none;
+}
+#mbc-root details.mbc-advanced[open] > summary{ margin-bottom:6px; }
+#mbc-root .mbc-btn-row{ margin-top:18px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+#mbc-root button{
+  font-weight:700; font-size:13.5px; padding:10px 20px; border-radius:4px;
+  border:none; cursor:pointer; transition:filter .12s, transform .06s;
+  font-family:inherit;
+}
+#mbc-root button:active{ transform:translateY(1px); }
+#mbc-root button.mbc-primary{ background:var(--brass); color:var(--accent-ink); }
+#mbc-root button.mbc-primary:hover{ filter:brightness(1.08); }
+#mbc-root button.mbc-primary:disabled{ background:var(--surface-4); color:var(--ink-dim); cursor:not-allowed; filter:none; }
+#mbc-root button.mbc-secondary{ background:transparent; color:var(--brass-text); border:1.5px solid var(--brass); }
+#mbc-root button.mbc-secondary:hover{ background:var(--brass-glow); }
+#mbc-root button.mbc-ghost{ background:transparent; color:var(--ink-dim); border:1.5px solid var(--hair-strong); padding:8px 14px; font-size:12px; }
+#mbc-root button.mbc-ghost:hover{ border-color:var(--brass); color:var(--brass-text); }
+#mbc-root .mbc-note{ font-size:13px; line-height:1.6; padding:11px 13px; border-radius:4px; margin-top:14px; }
+#mbc-root .mbc-note.mbc-info{ background:var(--surface-1); color:var(--ink); border-left:3px solid var(--brass); }
+#mbc-root .mbc-note.mbc-warn{ background:var(--rust-bg); color:var(--ink); border-left:3px solid var(--rust); }
+#mbc-root .mbc-note.mbc-ok{ background:var(--surface-1); color:var(--sage); border-left:3px solid var(--sage); }
+#mbc-root .mbc-restricted{ border:1px solid var(--hair-strong); border-radius:4px; padding:16px 18px; background:var(--surface-1); font-size:13.5px; line-height:1.6; }
+#mbc-root .mbc-restricted strong{ color:var(--brass-text); }
+#mbc-root .mbc-toolbar{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:10px; }
+#mbc-root .mbc-count{ font-size:12.5px; color:var(--ink-dim); }
+#mbc-root .mbc-count strong{ color:var(--ink); }
+#mbc-root table.mbc-table{ width:100%; border-collapse:collapse; font-size:13.5px; }
+#mbc-root table.mbc-table th{
+  text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--ink-dim); padding:8px; border-bottom:2px solid var(--hair-strong);
+}
+#mbc-root table.mbc-table td{ padding:7px 8px; border-bottom:1px solid var(--hair); vertical-align:middle; }
+#mbc-root table.mbc-table tr.mbc-row-off td{ opacity:.45; }
+#mbc-root table.mbc-table td.mbc-cb-cell{ width:28px; }
+#mbc-root table.mbc-table input[type=checkbox]{ width:16px; height:16px; accent-color:var(--brass); }
+#mbc-root .mbc-scroll{ max-height:480px; overflow-y:auto; border:1px solid var(--hair-strong); border-radius:4px; }
+#mbc-root .mbc-scroll table.mbc-table{ margin:0; }
+#mbc-root .mbc-scroll thead th{ position:sticky; top:0; background:var(--paper-900); }
+#mbc-root footer.mbc-small-print{ font-size:11.5px; color:var(--ink-dim); margin-top:24px; line-height:1.6; text-align:center; }
+#mbc-root .mbc-hidden{ display:none !important; }
+</style>
+<header class="mbc-masthead">
+  <p class="mbc-eyebrow">Advancement &middot; Awards Report</p>
+  <h1>Merit Badge Pocket Certificate Filler</h1>
+  <p class="mbc-sub">Pulls every earned Merit Badge off your troop's Award Report and fills the official BSA pocket-certificate sheet (item #33414) so you can print and hand them out -- Ranks and other Awards on the same report are left out.</p>
+</header>
+
+<section class="mbc-card">
+  <h2>Settings</h2>
+  <div class="mbc-grid2">
+    <div>
+      <label class="mbc-field" for="mbc-unit">Unit number (printed on each card)</label>
+      <input type="text" id="mbc-unit" placeholder="e.g. 997">
+    </div>
+    <div>
+      <label class="mbc-field" for="mbc-council">Council name (printed on each card)</label>
+      <input type="text" id="mbc-council" placeholder="e.g. National Capital Area Council">
+    </div>
+  </div>
+  <label class="mbc-field" for="mbc-leader">Unit Leader name (printed on the signature line)</label>
+  <div class="mbc-btn-row" style="margin-top:5px;">
+    <input type="text" id="mbc-leader" placeholder="e.g. Jane Smith" style="flex:1;">
+    <button type="button" class="mbc-ghost" id="mbc-leader-detect">Detect from TroopWebHost</button>
+  </div>
+  <div id="mbc-leader-status"></div>
+  <details class="mbc-advanced">
+    <summary>Advanced settings (report location &amp; PDF template source)</summary>
+    <div class="mbc-grid3">
+      <div>
+        <label class="mbc-field" for="mbc-pdfurl">PDF template source URL</label>
+        <input type="text" id="mbc-pdfurl">
+      </div>
+      <div>
+        <label class="mbc-field" for="mbc-menuid">Award Report Menu_Item_ID</label>
+        <input type="text" id="mbc-menuid">
+      </div>
+      <div>
+        <label class="mbc-field" for="mbc-formid">Award Report Form_ID</label>
+        <input type="text" id="mbc-formid">
+      </div>
+    </div>
+    <div class="mbc-grid3">
+      <div>
+        <label class="mbc-field" for="mbc-adultdirid">Adult Directory Menu_Item_ID</label>
+        <input type="text" id="mbc-adultdirid">
+      </div>
+      <div>
+        <label class="mbc-field" for="mbc-leadertitle">Leadership title to detect (exact, e.g. "Scoutmaster" -- won't match "Assistant Scoutmaster")</label>
+        <input type="text" id="mbc-leadertitle" placeholder="e.g. Scoutmaster">
+      </div>
+    </div>
+    <div class="mbc-btn-row">
+      <button type="button" class="mbc-ghost" id="mbc-settings-save">Save settings</button>
+      <button type="button" class="mbc-ghost" id="mbc-settings-reset">Reset to defaults</button>
+    </div>
+    <div id="mbc-settings-status"></div>
+  </details>
+</section>
+
+<section class="mbc-card">
+  <h2>Step 1 &middot; Load the Award Report</h2>
+  <div class="mbc-btn-row">
+    <button type="button" class="mbc-primary" id="mbc-load-btn">Load merit badges</button>
+  </div>
+  <div id="mbc-load-status"></div>
+</section>
+
+<section class="mbc-card mbc-hidden" id="mbc-results-card">
+  <h2>Step 2 &middot; Choose which certificates to print</h2>
+  <div class="mbc-toolbar">
+    <button type="button" class="mbc-ghost" id="mbc-select-all">Select all</button>
+    <button type="button" class="mbc-ghost" id="mbc-select-none">Select none</button>
+    <span class="mbc-count" id="mbc-count"></span>
+  </div>
+  <div class="mbc-scroll">
+    <table class="mbc-table">
+      <thead>
+        <tr><th></th><th>Scout</th><th>Patrol</th><th>Merit Badge</th><th>Date</th></tr>
+      </thead>
+      <tbody id="mbc-tbody"></tbody>
+    </table>
+  </div>
+</section>
+
+<section class="mbc-card mbc-hidden" id="mbc-gen-card">
+  <h2>Step 3 &middot; Generate the PDF</h2>
+  <p style="font-size:13px;color:var(--ink-dim);margin:0 0 4px;">8 certificates per printed sheet. Certificates are laid out in the order shown above, grouped by Scout.</p>
+  <label style="display:flex;align-items:flex-start;gap:8px;font-size:13px;color:var(--ink);margin:14px 0 4px;cursor:pointer;">
+    <input type="checkbox" id="mbc-blankmode" style="margin-top:2px;">
+    <span>I'm printing onto <strong>pre-printed</strong> certificate cardstock (item #33414) -- print only the filled-in text (name, badge, date, unit, council, leader), with no background artwork, logos, or "MERIT BADGE" text, so it doesn't double-print over the pre-printed sheet.</span>
+  </label>
+  <div class="mbc-btn-row">
+    <button type="button" class="mbc-primary" id="mbc-gen-btn">Generate &amp; download PDF</button>
+  </div>
+  <div id="mbc-gen-status"></div>
+</section>
+
+<footer class="mbc-small-print">
+  Read-only against TroopWebHost -- this page never saves anything back to your site.<br>
+  Boy Scout Award Report data via TroopWebHost. Certificate template &copy; Boy Scouts of America, item #33414.
+</footer>
+</div>
+</div>
+
+<div class="mbt-panel mbt-hidden" id="mbt-panel-blue" role="tabpanel" aria-labelledby="mbt-tab-blue">
+<div id="bcp-root">
+<style>
+#bcp-root, #bcp-root *{ box-sizing:border-box; }
+#bcp-root{
+  /* THEME -- same probe-and-adapt approach as every other custom page in
+     this repo (see the Merit Badge Pocket Certificate page for the full
+     rationale), re-scoped under #bcp-root. Two-role accent split:
+     --brass (RAW probed fill, paired with fixed --accent-ink text) for
+     buttons/badges, --brass-text (contrast-adjusted) for the same accent
+     used bare as text/links/borders. Canvas tokens swap between light
+     and dark via .bcp-light, following the live site's own background. */
+  --paper-950:#1c1a16; --paper-900:#242119; --paper-800:#2e2a20;
+  --ink:#f0ead8; --ink-dim:#c9c0a6;
+  --brass:#b8863b; --brass-light:#d9a95c; --brass-text:#d9a95c; --brass-glow:rgba(184,134,59,0.1);
+  --sage:#8fae7a; --rust:#c96b4f; --rust-bg:rgba(201,107,79,0.22);
+  --hair:rgba(240,234,216,0.14); --hair-strong:rgba(240,234,216,0.28);
+  --accent-ink:#241a08;
+  --navy:#3a2d18; --navy-dark:#241b0e;
+  --surface-1:rgba(255,255,255,0.03); --surface-2:rgba(0,0,0,0.25);
+  --surface-3:rgba(0,0,0,0.32); --surface-4:rgba(255,255,255,0.08);
+  background:linear-gradient(180deg, var(--paper-950), var(--paper-900) 40%, var(--paper-950));
+  color:var(--ink);
+  font-family:'Public Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  padding:28px 24px 60px;
+  border-radius:6px;
+  max-width:1100px;
+  margin:20px auto;
+  /* Hidden until bcpApplyLiveSiteTheme() decides light vs. dark, so the
+     page never flashes its dark default on a light site. */
+  visibility:hidden;
+}
+#bcp-root.bcp-ready{ visibility:visible; }
+#bcp-root.bcp-light{
+  --paper-950:#f7f2e7; --paper-900:#fbf8f0; --paper-800:#efe6cf;
+  --ink:#2a2416; --ink-dim:#6b6248;
+  --sage:#3f7a3f; --brass-text:#8a6116; --rust:#a4462c; --rust-bg:rgba(164,70,44,0.14);
+  --hair:rgba(42,36,22,0.12); --hair-strong:rgba(42,36,22,0.24);
+  --surface-1:rgba(0,0,0,0.025); --surface-2:rgba(0,0,0,0.05);
+  --surface-3:rgba(0,0,0,0.07); --surface-4:rgba(0,0,0,0.05);
+}
+#bcp-root a{ color:var(--brass-text); }
+#bcp-root header.bcp-masthead{
+  border:1px solid var(--hair-strong);
+  border-bottom:6px solid var(--brass);
+  border-radius:4px;
+  padding:24px 26px 20px; margin-bottom:24px;
+  background-image:linear-gradient(160deg, var(--navy) 0%, var(--navy-dark) 100%);
+  color:#fff;
+}
+#bcp-root .bcp-eyebrow{
+  font-family:'JetBrains Mono', monospace; font-size:11px; letter-spacing:.16em;
+  text-transform:uppercase; color:rgba(255,255,255,0.82); margin:0 0 10px;
+}
+#bcp-root h1{
+  font-family:'Roboto Slab', Georgia, serif; font-weight:700;
+  font-size:clamp(22px,3.2vw,30px); margin:0 0 8px; line-height:1.15; color:#fff;
+}
+#bcp-root header.bcp-masthead p.bcp-sub{
+  margin:0; max-width:72ch; color:rgba(255,255,255,0.82); font-size:14px; line-height:1.55;
+}
+#bcp-root section.bcp-card{
+  border:1px solid var(--hair-strong); border-radius:5px;
+  padding:20px 22px; margin-top:20px; background:var(--surface-1);
+}
+#bcp-root section.bcp-card h2{
+  font-family:'JetBrains Mono', monospace; font-size:11.5px; letter-spacing:.1em;
+  text-transform:uppercase; color:var(--brass-text); margin:0 0 14px; font-weight:700;
+}
+#bcp-root label.bcp-field{
+  display:block; font-size:11.5px; text-transform:uppercase; letter-spacing:.04em;
+  color:var(--ink-dim); margin-bottom:5px; margin-top:14px;
+}
+#bcp-root .bcp-grid3 label.bcp-field,
+#bcp-root .bcp-grid2 label.bcp-field{ margin-top:0; }
+#bcp-root .bcp-grid3, #bcp-root .bcp-grid2{ margin-top:14px; }
+#bcp-root h2 + .bcp-grid3, #bcp-root h2 + .bcp-grid2{ margin-top:0; }
+#bcp-root input[type=text], #bcp-root input[type=date], #bcp-root select{
+  width:100%; font-size:14px; padding:8px 10px; border-radius:3px;
+  border:1px solid var(--hair-strong); background:var(--surface-2); color:var(--ink);
+  font-family:inherit;
+}
+#bcp-root input[type=text]:focus, #bcp-root input[type=date]:focus, #bcp-root select:focus{ outline:2px solid var(--brass); outline-offset:1px; }
+#bcp-root .bcp-grid3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:0 16px; }
+#bcp-root .bcp-grid2{ display:grid; grid-template-columns:1fr 1fr; gap:0 16px; }
+@media (max-width:760px){ #bcp-root .bcp-grid3, #bcp-root .bcp-grid2{ grid-template-columns:1fr; } }
+#bcp-root .bcp-check{ display:flex; gap:8px; align-items:flex-start; font-size:13px; line-height:1.45; margin-top:12px; color:var(--ink); }
+#bcp-root .bcp-check input{ margin-top:3px; width:16px; height:16px; accent-color:var(--brass); flex:0 0 auto; }
+#bcp-root details.bcp-advanced{ margin-top:18px; }
+#bcp-root details.bcp-advanced > summary{ cursor:pointer; font-size:12.5px; color:var(--ink-dim); user-select:none; }
+#bcp-root details.bcp-advanced[open] > summary{ margin-bottom:6px; }
+#bcp-root .bcp-hint{ font-size:12px; color:var(--ink-dim); margin:6px 0 0; line-height:1.5; }
+#bcp-root .bcp-btn-row{ margin-top:18px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+#bcp-root button{
+  font-weight:700; font-size:13.5px; padding:10px 20px; border-radius:4px;
+  border:none; cursor:pointer; transition:filter .12s, transform .06s; font-family:inherit;
+}
+#bcp-root button:active{ transform:translateY(1px); }
+#bcp-root button.bcp-primary{ background:var(--brass); color:var(--accent-ink); }
+#bcp-root button.bcp-primary:hover{ filter:brightness(1.08); }
+#bcp-root button.bcp-primary:disabled{ background:var(--surface-4); color:var(--ink-dim); cursor:not-allowed; filter:none; }
+#bcp-root button.bcp-secondary{ background:transparent; color:var(--brass-text); border:1.5px solid var(--brass); }
+#bcp-root button.bcp-secondary:hover{ background:var(--brass-glow); }
+#bcp-root button.bcp-ghost{ background:transparent; color:var(--ink-dim); border:1.5px solid var(--hair-strong); padding:8px 14px; font-size:12px; }
+#bcp-root button.bcp-ghost:hover{ border-color:var(--brass); color:var(--brass-text); }
+#bcp-root .bcp-note{ font-size:13px; line-height:1.6; padding:11px 13px; border-radius:4px; margin-top:14px; }
+#bcp-root .bcp-note.bcp-info{ background:var(--surface-1); color:var(--ink); border-left:3px solid var(--brass); }
+#bcp-root .bcp-note.bcp-warn{ background:var(--rust-bg); color:var(--ink); border-left:3px solid var(--rust); }
+#bcp-root .bcp-note.bcp-ok{ background:var(--surface-1); color:var(--sage); border-left:3px solid var(--sage); }
+#bcp-root .bcp-restricted{ border:1px solid var(--hair-strong); border-radius:4px; padding:16px 18px; background:var(--surface-1); font-size:13.5px; line-height:1.6; margin-top:14px; }
+#bcp-root .bcp-restricted strong{ color:var(--brass-text); }
+#bcp-root .bcp-toolbar{ display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:10px; }
+#bcp-root .bcp-toolbar input[type=text]{ width:220px; padding:6px 10px; font-size:13px; }
+#bcp-root .bcp-count{ font-size:12.5px; color:var(--ink-dim); }
+#bcp-root .bcp-count strong{ color:var(--ink); }
+#bcp-root table.bcp-table{ width:100%; border-collapse:collapse; font-size:13.5px; }
+#bcp-root table.bcp-table th{
+  text-align:left; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em;
+  color:var(--ink-dim); padding:8px; border-bottom:2px solid var(--hair-strong);
+}
+#bcp-root table.bcp-table td{ padding:6px 8px; border-bottom:1px solid var(--hair); vertical-align:top; }
+#bcp-root table.bcp-table tr.bcp-grp td{ background:var(--surface-3); font-weight:700; padding-top:8px; padding-bottom:8px; }
+#bcp-root table.bcp-table tr.bcp-row-off td{ opacity:.45; }
+#bcp-root table.bcp-table td.bcp-cb-cell{ width:28px; }
+#bcp-root table.bcp-table input[type=checkbox]{ width:16px; height:16px; accent-color:var(--brass); }
+#bcp-root .bcp-reqs{ font-family:'JetBrains Mono', monospace; font-size:11.5px; color:var(--ink-dim); line-height:1.5; }
+#bcp-root .bcp-chip{ display:inline-block; font-size:10.5px; padding:1px 7px; border-radius:9px; margin-left:6px; background:var(--rust-bg); color:var(--ink); font-family:inherit; }
+#bcp-root .bcp-meta{ font-weight:400; font-size:11.5px; color:var(--ink-dim); margin-left:8px; }
+#bcp-root .bcp-scroll{ max-height:520px; overflow-y:auto; border:1px solid var(--hair-strong); border-radius:4px; }
+#bcp-root .bcp-scroll table.bcp-table{ margin:0; }
+#bcp-root .bcp-scroll thead th{ position:sticky; top:0; background:var(--paper-900); z-index:1; }
+#bcp-root footer.bcp-small-print{ font-size:11.5px; color:var(--ink-dim); margin-top:24px; line-height:1.6; text-align:center; }
+#bcp-root .bcp-hidden{ display:none !important; }
+</style>
+<header class="bcp-masthead">
+  <p class="bcp-eyebrow">Advancement &middot; Blue Cards</p>
+  <h1>Blue Card Printer</h1>
+  <p class="bcp-sub">Pulls the merit badges your Scouts have started but not finished from TroopWebHost's Troop Awards export and fills the official Scouting America Application for Merit Badge (blue card, #34124) -- Scout, badge, counselor, and the requirements already done -- ready to print.</p>
+</header>
+
+<section class="bcp-card">
+  <h2>Settings</h2>
+  <div class="bcp-grid3">
+    <div>
+      <label class="bcp-field" for="bcp-unit">Unit number (printed on each card)</label>
+      <input type="text" id="bcp-unit" placeholder="e.g. 123">
+    </div>
+    <div>
+      <label class="bcp-field" for="bcp-district">District (optional)</label>
+      <input type="text" id="bcp-district" placeholder="e.g. Sample District">
+    </div>
+    <div>
+      <label class="bcp-field" for="bcp-council">Council (optional)</label>
+      <input type="text" id="bcp-council" placeholder="e.g. Example Council">
+    </div>
+  </div>
+  <div class="bcp-grid2">
+    <div>
+      <label class="bcp-field" for="bcp-leader-email">Unit leader's email (printed on each card)</label>
+      <input type="text" id="bcp-leader-email" placeholder="Fills automatically from the Adult Directory if empty">
+    </div>
+    <div>
+      <label class="bcp-field" for="bcp-layout">Layout</label>
+      <select id="bcp-layout">
+        <option value="3">3 cards per sheet (card only, reduced to 96% to clear printer margins)</option>
+        <option value="2">2 cards per sheet (card only, full size)</option>
+        <option value="1">1 card per page (full template page with instructions)</option>
+      </select>
+    </div>
+  </div>
+  <div class="bcp-grid2">
+    <div>
+      <label class="bcp-field" for="bcp-reqmode">Requirements listing</label>
+      <select id="bcp-reqmode">
+        <option value="compact">Compact (letters become ranges, sub-items fold into parent)</option>
+        <option value="full">As recorded (one cell per item)</option>
+      </select>
+    </div>
+    <div>
+      <label class="bcp-field" for="bcp-leader-title">Unit leader Leadership title to look for</label>
+      <input type="text" id="bcp-leader-title" placeholder="Scoutmaster">
+    </div>
+  </div>
+  <label class="bcp-check"><input type="checkbox" id="bcp-printdate"><span>Print the Date Started beside the unit leader's signature line</span></label>
+  <label class="bcp-check"><input type="checkbox" id="bcp-lookups"><span>Fill Scout email, leader email and counselor contact details from the Scout and Adult Directory (applies the next time you load)</span></label>
+  <details class="bcp-advanced">
+    <summary>Advanced settings (report locations &amp; PDF template source)</summary>
+    <div class="bcp-grid3">
+      <div>
+        <label class="bcp-field" for="bcp-menuid">Troop Awards export Menu_Item_ID</label>
+        <input type="text" id="bcp-menuid">
+      </div>
+      <div>
+        <label class="bcp-field" for="bcp-scoutdirid">Scout Directory Menu_Item_ID</label>
+        <input type="text" id="bcp-scoutdirid">
+      </div>
+      <div>
+        <label class="bcp-field" for="bcp-adultdirid">Adult Directory Menu_Item_ID</label>
+        <input type="text" id="bcp-adultdirid">
+      </div>
+    </div>
+    <label class="bcp-field" for="bcp-pdfurl">PDF template source URL</label>
+    <input type="text" id="bcp-pdfurl">
+    <div class="bcp-btn-row">
+      <button type="button" class="bcp-ghost" id="bcp-adv-reset">Reset advanced settings to defaults</button>
+    </div>
+    <div id="bcp-settings-status"></div>
+  </details>
+</section>
+
+<section class="bcp-card">
+  <h2>Step 1 &middot; Load unfinished merit badges</h2>
+  <div class="bcp-grid2">
+    <div>
+      <label class="bcp-field" for="bcp-since">Include badges started on or after</label>
+      <input type="date" id="bcp-since">
+      <p class="bcp-hint">TroopWebHost exports every badge started on or after this date that is not yet complete.</p>
+    </div>
+  </div>
+  <div class="bcp-btn-row">
+    <button type="button" class="bcp-primary" id="bcp-load-btn">Load from TroopWebHost</button>
+    <button type="button" class="bcp-secondary" id="bcp-csv-btn">Choose a CSV file instead</button>
+    <input type="file" id="bcp-csv-file" accept=".csv,text/csv" class="bcp-hidden">
+  </div>
+  <div id="bcp-load-status"></div>
+</section>
+
+<section class="bcp-card bcp-hidden" id="bcp-results-card">
+  <h2>Step 2 &middot; Choose which cards to print</h2>
+  <div class="bcp-toolbar">
+    <input type="text" id="bcp-filter" placeholder="Filter by Scout or badge">
+    <button type="button" class="bcp-ghost" id="bcp-select-all">Select all shown</button>
+    <button type="button" class="bcp-ghost" id="bcp-select-none">Select none shown</button>
+    <span class="bcp-count" id="bcp-count"></span>
+  </div>
+  <div class="bcp-scroll">
+    <table class="bcp-table">
+      <thead>
+        <tr><th></th><th>Merit badge</th><th>Started</th><th>Counselor</th><th>Requirements that will print</th></tr>
+      </thead>
+      <tbody id="bcp-tbody"></tbody>
+    </table>
+  </div>
+</section>
+
+<section class="bcp-card bcp-hidden" id="bcp-gen-card">
+  <h2>Step 3 &middot; Generate the PDF</h2>
+  <p class="bcp-hint" id="bcp-gen-hint" style="margin:0 0 4px;"></p>
+  <div class="bcp-btn-row">
+    <button type="button" class="bcp-primary" id="bcp-gen-btn">Generate &amp; download PDF</button>
+  </div>
+  <div id="bcp-gen-status"></div>
+  <label class="bcp-field" for="bcp-pdf-file">Blank template (optional): use your own copy</label>
+  <input type="file" id="bcp-pdf-file" accept="application/pdf,.pdf">
+  <p class="bcp-hint">Normally not needed -- the page fetches the blank blue card automatically. If that ever fails, choose your copy of the fillable blue card PDF (#34124) here and the PDF will be generated right away.</p>
+</section>
+
+<footer class="bcp-small-print">
+  Read-only against TroopWebHost -- this page never saves anything back to your site.<br>
+  Report data via TroopWebHost. Blue card template &copy; Scouting America (Boy Scouts of America), item #34124. Unofficial community tool.
+</footer>
+</div>
+</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+<script>
+(function(){
+'use strict';
+function byId(id){ return document.getElementById(id); }
+
+/* ================= LIVE SITE THEME =================
+   Ported from Rank_Gap/rank-requirement-gap.html's rgProbeSiteTheme()/
+   rgApplyLiveSiteTheme() (itself ported from OA Tracker) -- same probe
+   markup, same sentinel-color technique, same two-role accent split,
+   re-scoped to --brass / --brass-text per this repo's standard theming
+   pattern. */
+function mbcSafeColor(v){
+  if(!v) return null;
+  if(/rgba?\(\s*0,\s*0,\s*0,\s*0\s*\)/.test(v) || v === 'transparent') return null;
+  return v;
+}
+function mbcDarkenColor(rgbStr, amt){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  var r = Math.round(parseInt(m[1],10) * (1-amt));
+  var g = Math.round(parseInt(m[2],10) * (1-amt));
+  var b = Math.round(parseInt(m[3],10) * (1-amt));
+  return 'rgb('+r+', '+g+', '+b+')';
+}
+function mbcToRgba(rgbStr, alpha){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  return 'rgba('+m[1]+','+m[2]+','+m[3]+','+alpha+')';
+}
+function mbcProbeSiteTheme(){
+  var SENTINEL = 'rgb(1, 2, 3)';
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:absolute; left:-9999px; top:-9999px; visibility:hidden; pointer-events:none; color:'+SENTINEL+'; border-color:'+SENTINEL+';';
+  wrap.innerHTML =
+    '<div class="navtable" id="__mbc_probe_navtable">'+
+      '<span class="navicon" id="__mbc_probe_navicon"></span>'+
+      '<span class="navlink" id="__mbc_probe_navlink"><a href="#" id="__mbc_probe_navlink_a">x</a></span>'+
+    '</div>'+
+    '<div class="banner-div" id="__mbc_probe_banner"></div>'+
+    '<ul class="nav-tabs"><li><a href="#" id="__mbc_probe_tab">x</a></li></ul>'+
+    '<table class="table-striped"><thead><tr id="__mbc_probe_gridhead"><th>x</th></tr></thead></table>'+
+    '<table class="table-curved"><tbody><tr><td id="__mbc_probe_border">x</td></tr></tbody></table>'+
+    '<input class="form-control" id="__mbc_probe_input">'+
+    '<span class="RequiredIndicator" id="__mbc_probe_required">*</span>'+
+    '<a href="#" id="__mbc_probe_control_a">x</a>'; // unclassed control anchor -- see note below
+  document.body.appendChild(wrap);
+  function pid(id){ return document.getElementById(id); }
+  function cs(el){ return el ? getComputedStyle(el) : null; }
+  var bg = function(v){ return mbcSafeColor(v); };
+  var inherited = function(v){ return (v && v !== SENTINEL) ? v : null; };
+  var navtableCs = cs(pid('__mbc_probe_navtable'));
+  var bannerCs = cs(pid('__mbc_probe_banner'));
+  var navlinkACs = cs(pid('__mbc_probe_navlink_a'));
+  var controlACs = cs(pid('__mbc_probe_control_a'));
+  var tabCs = cs(pid('__mbc_probe_tab'));
+  var gridheadCs = cs(pid('__mbc_probe_gridhead'));
+  var borderCs = cs(pid('__mbc_probe_border'));
+  var inputCs = cs(pid('__mbc_probe_input'));
+  var requiredCs = cs(pid('__mbc_probe_required'));
+  var result = {
+    navy: bg(navtableCs && navtableCs.backgroundColor),
+    navyDark: bg(bannerCs && bannerCs.backgroundColor),
+    // Anchor tags get their own User-Agent-stylesheet default link color
+    // rather than truly inheriting -- comparing against an unclassed
+    // control anchor sidesteps that.
+    yellow: (navlinkACs && controlACs && navlinkACs.color !== controlACs.color) ? navlinkACs.color : null,
+    gold: bg(tabCs && tabCs.backgroundColor),
+    gridHead: bg(gridheadCs && gridheadCs.backgroundColor),
+    line: inherited(borderCs && borderCs.borderLeftColor),
+    card: bg(inputCs && inputCs.backgroundColor),
+    red: inherited(requiredCs && requiredCs.color),
+    paper: bg(getComputedStyle(document.body).backgroundColor)
+  };
+  wrap.remove();
+  if(!result.navyDark && result.navy) result.navyDark = mbcDarkenColor(result.navy, 0.35);
+  return result;
+}
+function mbcLuminance(rgbStr){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  function lin(c){ c = c/255; return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); }
+  return 0.2126*lin(+m[1]) + 0.7152*lin(+m[2]) + 0.0722*lin(+m[3]);
+}
+function mbcMixWithWhite(rgbStr, amount){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  function clamp(v){ return Math.max(0, Math.min(255, Math.round(v))); }
+  var r = clamp(parseInt(m[1],10)*(1-amount) + 255*amount);
+  var g = clamp(parseInt(m[2],10)*(1-amount) + 255*amount);
+  var b = clamp(parseInt(m[3],10)*(1-amount) + 255*amount);
+  return 'rgb('+r+', '+g+', '+b+')';
+}
+function mbcEnsureContrast(rgbStr, wantLight){
+  if(!rgbStr) return rgbStr;
+  var lum = mbcLuminance(rgbStr);
+  if(lum == null) return rgbStr;
+  if(wantLight && lum < 0.45) return mbcMixWithWhite(rgbStr, 0.55);
+  if(!wantLight && lum > 0.55) return mbcDarkenColor(rgbStr, 0.55);
+  return rgbStr;
+}
+function mbcApplyLiveSiteTheme(){
+  var root = byId('mbc-root');
+  try{
+    var detected = mbcProbeSiteTheme();
+    if(!root) return;
+    var paperLum = detected.paper ? mbcLuminance(detected.paper) : null;
+    var isLight = paperLum != null && paperLum > 0.5;
+    root.classList.toggle('mbc-light', isLight);
+    var wantLightText = !isLight;
+    if(detected.navy){
+      root.style.setProperty('--navy', detected.navy);
+      root.style.setProperty('--navy-dark', detected.navyDark || mbcDarkenColor(detected.navy, 0.35) || detected.navy);
+    }
+    var brass = detected.gold || detected.yellow;
+    if(brass){
+      root.style.setProperty('--brass', brass);
+      root.style.setProperty('--brass-light', brass);
+      root.style.setProperty('--brass-text', mbcEnsureContrast(brass, wantLightText));
+      root.style.setProperty('--brass-glow', mbcToRgba(brass, 0.1) || 'rgba(184,134,59,0.1)');
+    }
+    if(detected.red){
+      var rustText = mbcEnsureContrast(detected.red, wantLightText);
+      root.style.setProperty('--rust', rustText);
+      root.style.setProperty('--rust-bg', mbcToRgba(rustText, 0.22) || 'rgba(201,107,79,0.22)');
+    }
+  }catch(e){
+    console.warn('Merit Badge Pocket Certificate Filler: theme detection failed, using built-in defaults:', e);
+  }finally{
+    if(root) root.classList.add('mbc-ready');
+  }
+}
+// Runs immediately, not on DOMContentLoaded -- #mbc-root already exists
+// in the DOM by the time this script tag runs, and waiting would only
+// widen the flash-of-wrong-theme window.
+mbcApplyLiveSiteTheme();
+
+/* ================= UNIT NUMBER AUTO-DETECT (ported from vCard Export / Swim Classification) ================= */
+function mbcDiscoverUnitNumber(){
+  try{
+    var title = document.title || '';
+    var m = title.match(/\b(?:Troop|Pack|Crew|Ship|Post)\s*#?\s*(\d+[A-Za-z]?)\b/i);
+    if(m) return m[1];
+  }catch(e){
+    console.warn('Merit Badge Pocket Certificate Filler: unit auto-detect failed:', e);
+  }
+  return '';
+}
+
+/* ================= SETTINGS (localStorage) ================= */
+var DEFAULT_PDF_URL = 'https://mediafiles.scoutshop.org/Media/FINAL_33414%282020%29%20MerBadgPktCert_Non-Printing.pdf';
+// Fallback if the Scout Shop media host ever blocks this page's fetch
+// (CORS or otherwise). Points at this repo's own staged copy of the
+// same PDF (Merit_Badge_Pocket_Cert/merit-badge-pocket-cert-template.pdf)
+// on GitHub's raw content host, which is CORS-permissive for GET
+// requests. Used automatically, silently, only if the primary URL
+// above fails -- no user action needed either way.
+var FALLBACK_PDF_URL = 'https://raw.githubusercontent.com/gammann/TroopWebHost/main/Merit_Badge_Pocket_Cert/merit-badge-pocket-cert-template.pdf';
+var DEFAULT_ADULT_DIR_MENU_ID = '46013'; // Adult Directory -- confirmed on this installation via the vCard Export tool in this repo
+var DEFAULT_LEADER_TITLE = 'Scoutmaster';
+var MBC_STORE = {
+  pdfUrl: 'mbcPdfUrl',
+  menuId: 'mbcMenuId',
+  formId: 'mbcFormId',
+  council: 'mbcCouncil',
+  unit: 'mbcUnit',
+  leader: 'mbcLeader',
+  adultDirId: 'mbcAdultDirId',
+  leaderTitle: 'mbcLeaderTitle',
+  blankMode: 'mbcBlankMode'
+};
+function mbcGet(key, fallback){
+  try{ var v = localStorage.getItem(key); return (v == null || v === '') ? fallback : v; }
+  catch(e){ return fallback; }
+}
+function mbcSet(key, val){
+  try{ localStorage.setItem(key, val); }catch(e){ /* private browsing etc -- non-fatal */ }
+}
+function mbcLoadSettingsIntoForm(){
+  byId('mbc-pdfurl').value = mbcGet(MBC_STORE.pdfUrl, DEFAULT_PDF_URL);
+  byId('mbc-menuid').value = mbcGet(MBC_STORE.menuId, '45952');
+  byId('mbc-formid').value = mbcGet(MBC_STORE.formId, '253');
+  byId('mbc-council').value = mbcGet(MBC_STORE.council, '');
+  byId('mbc-unit').value = mbcGet(MBC_STORE.unit, mbcDiscoverUnitNumber());
+  byId('mbc-leader').value = mbcGet(MBC_STORE.leader, '');
+  byId('mbc-adultdirid').value = mbcGet(MBC_STORE.adultDirId, DEFAULT_ADULT_DIR_MENU_ID);
+  byId('mbc-leadertitle').value = mbcGet(MBC_STORE.leaderTitle, DEFAULT_LEADER_TITLE);
+}
+function mbcCurrentSettings(){
+  return {
+    pdfUrl: (byId('mbc-pdfurl').value || DEFAULT_PDF_URL).trim(),
+    menuId: (byId('mbc-menuid').value || '45952').trim(),
+    formId: (byId('mbc-formid').value || '253').trim(),
+    council: (byId('mbc-council').value || '').trim(),
+    unit: (byId('mbc-unit').value || '').trim(),
+    leader: (byId('mbc-leader').value || '').trim(),
+    adultDirId: (byId('mbc-adultdirid').value || DEFAULT_ADULT_DIR_MENU_ID).trim(),
+    leaderTitle: (byId('mbc-leadertitle').value || DEFAULT_LEADER_TITLE).trim()
+  };
+}
+document.addEventListener('DOMContentLoaded', function(){
+  mbcLoadSettingsIntoForm();
+  byId('mbc-settings-save').addEventListener('click', function(e){
+    e.preventDefault();
+    var s = mbcCurrentSettings();
+    mbcSet(MBC_STORE.pdfUrl, s.pdfUrl);
+    mbcSet(MBC_STORE.menuId, s.menuId);
+    mbcSet(MBC_STORE.formId, s.formId);
+    mbcSet(MBC_STORE.council, s.council);
+    mbcSet(MBC_STORE.unit, s.unit);
+    mbcSet(MBC_STORE.leader, s.leader);
+    mbcSet(MBC_STORE.adultDirId, s.adultDirId);
+    mbcSet(MBC_STORE.leaderTitle, s.leaderTitle);
+    byId('mbc-settings-status').innerHTML = '<div class="mbc-note mbc-ok">Saved in this browser.</div>';
+  });
+  byId('mbc-settings-reset').addEventListener('click', function(e){
+    e.preventDefault();
+    [MBC_STORE.pdfUrl, MBC_STORE.menuId, MBC_STORE.formId, MBC_STORE.adultDirId, MBC_STORE.leaderTitle].forEach(function(k){
+      try{ localStorage.removeItem(k); }catch(err){}
+    });
+    mbcLoadSettingsIntoForm();
+    byId('mbc-settings-status').innerHTML = '<div class="mbc-note mbc-ok">Reset to defaults (Council, Unit, and Unit Leader left as-is).</div>';
+  });
+  byId('mbc-load-btn').addEventListener('click', function(e){ e.preventDefault(); mbcLoadReport(); });
+  byId('mbc-gen-btn').addEventListener('click', function(e){ e.preventDefault(); mbcGeneratePdf(); });
+  byId('mbc-select-all').addEventListener('click', function(e){ e.preventDefault(); mbcSetAllChecked(true); });
+  byId('mbc-select-none').addEventListener('click', function(e){ e.preventDefault(); mbcSetAllChecked(false); });
+  byId('mbc-leader-detect').addEventListener('click', function(e){ e.preventDefault(); mbcDetectUnitLeader(true); });
+  byId('mbc-blankmode').checked = mbcGet(MBC_STORE.blankMode, '') === '1';
+  byId('mbc-blankmode').addEventListener('change', function(){
+    mbcSet(MBC_STORE.blankMode, this.checked ? '1' : '0');
+  });
+  // One free auto-detect attempt on page load if the field is empty --
+  // never overwrites a name that's already there (typed or remembered
+  // from a previous session), and never surfaces an error if it fails;
+  // the button above is always there for an explicit retry.
+  if(!byId('mbc-leader').value) mbcDetectUnitLeader(false);
+});
+
+/* ================= FETCH HELPERS (ported from Rank_Gap / Swim Classification) ================= */
+var MBC_FETCH_TIMEOUT_MS = 20000;
+function mbcFetchRaw(url, opts){
+  var controller = new AbortController();
+  var timer = setTimeout(function(){ controller.abort(); }, MBC_FETCH_TIMEOUT_MS);
+  var fetchOpts = { credentials:'same-origin', signal: controller.signal };
+  if(opts) for(var k in opts) fetchOpts[k] = opts[k];
+  return fetch(url, fetchOpts)
+    .catch(function(e){
+      if(e.name === 'AbortError') throw new Error(url+' timed out after '+(MBC_FETCH_TIMEOUT_MS/1000)+'s.');
+      throw e;
+    })
+    .then(function(res){
+      if(res.redirected) throw new Error('REDIRECTED:'+res.url);
+      if(!res.ok) throw new Error(url+' responded HTTP '+res.status+'.');
+      return res;
+    })
+    .finally(function(){ clearTimeout(timer); });
+}
+function mbcFetchDoc(url){
+  return mbcFetchRaw(url).then(function(res){ return res.text(); })
+    .then(function(text){ return new DOMParser().parseFromString(text, 'text/html'); });
+}
+function mbcFetchDocPost(url, formData){
+  return mbcFetchRaw(url, { method:'POST', body:formData }).then(function(res){ return res.text(); })
+    .then(function(text){ return new DOMParser().parseFromString(text, 'text/html'); });
+}
+// Some TWH reports (the "export" style URLs, as opposed to the
+// on-page-grid style Award Report above) are fetched as a single GET
+// with ReportFormat=XLS and parsed with SheetJS -- ported from the
+// vCard Export tool's vceFetchReportBuffer()/bufferToObjects(). TWH
+// returns plain CSV despite the XLS in the URL; XLSX.read handles
+// both transparently.
+function mbcFetchReportBuffer(url){
+  return mbcFetchRaw(url).then(function(res){
+    var ct = (res.headers.get('content-type')||'').toLowerCase();
+    if(ct.indexOf('html') !== -1) throw new Error(url+' returned a webpage instead of report data.');
+    return res.arrayBuffer();
+  });
+}
+function mbcBufferToObjects(buf){
+  var wb = XLSX.read(buf, {type:'array'});
+  var ws = wb.Sheets[wb.SheetNames[0]];
+  return XLSX.utils.sheet_to_json(ws, {defval:'', raw:false});
+}
+
+/* ---- generic HTML table-parsing helpers (ported from Rank_Gap / OA Tracker / Eagle Scout tool) ---- */
+function mbcHeaderCells(table){
+  var headRow = table.querySelector('thead tr') || table.querySelector('tr');
+  if(!headRow) return [];
+  var cells = Array.prototype.slice.call(headRow.querySelectorAll('th,td'));
+  return cells.map(function(c){ return c.textContent.replace(/\s+/g,' ').trim(); });
+}
+function mbcTableHasHeaders(table, headerWords){
+  var cells = mbcHeaderCells(table);
+  var txt = cells.join(' | ').toLowerCase();
+  return headerWords.every(function(w){ return txt.indexOf(w.toLowerCase()) !== -1; });
+}
+function mbcFindTable(doc, headerWords){
+  var tables = Array.prototype.slice.call(doc.querySelectorAll('table'));
+  for(var i=0;i<tables.length;i++){
+    if(mbcTableHasHeaders(tables[i], headerWords)) return tables[i];
+  }
+  return null;
+}
+function mbcColIndex(headerCells, label){
+  var l = label.toLowerCase();
+  // Exact match first -- e.g. "Award" must NOT match "Awarded" just
+  // because it's a substring of it. Only fall back to a substring
+  // match if no header is an exact match.
+  for(var i=0;i<headerCells.length;i++){
+    if(headerCells[i].toLowerCase() === l) return i;
+  }
+  for(var i=0;i<headerCells.length;i++){
+    if(headerCells[i].toLowerCase().indexOf(l) !== -1) return i;
+  }
+  return -1;
+}
+
+/* ================= NAME FORMATTING =================
+   The Award Report renders names as "Last, First [Middle...]" (confirmed
+   via HAR capture). Certificates read better as "First [Middle] Last",
+   so this reformats for display/printing only -- it's never used for
+   matching, so a name that doesn't fit the pattern is just shown as-is. */
+function mbcDisplayName(name){
+  var s = (name||'').trim();
+  if(!s) return '';
+  var commaIdx = s.indexOf(',');
+  if(commaIdx === -1) return s;
+  var last = s.slice(0, commaIdx).trim();
+  var rest = s.slice(commaIdx+1).trim();
+  if(!last || !rest) return s;
+  return rest+' '+last;
+}
+
+/* ================= UNIT LEADER AUTO-DETECT =================
+   Reads the Adult Directory report (a plain single-GET FormReport.aspx
+   export, unlike the Award Report's grid-resubmit dance) and looks for
+   whoever has the configured Leadership title. "Leadership" is the
+   confirmed column name for an adult's position(s) on this report
+   (ported from the vCard Export tool's parseAdults()). Only fills the
+   Unit Leader field on exactly one match -- zero or multiple matches
+   is left for the person to resolve by hand, same "skip rather than
+   guess" rule the vCard tool uses for ambiguous name joins. */
+function mbcAdultDirUrl(menuId){
+  return 'FormReport.aspx?Menu_Item_ID='+encodeURIComponent(menuId)+'&Stack=1&ReportFormat=XLS';
+}
+// A person can hold more than one position (e.g. "Scoutmaster, Committee
+// Member"), so the Leadership cell is split into individual tokens and
+// each is compared for an EXACT match against the configured title --
+// not a substring match. Substring matching would wrongly treat
+// "Assistant Scoutmaster" as a match for the default title
+// "Scoutmaster", since the shorter title is fully contained in the
+// longer one.
+function mbcLeadershipTokens(raw){
+  return String(raw||'').split(/[,;/|]|\band\b/i).map(function(t){ return t.trim(); }).filter(Boolean);
+}
+function mbcFindLeaderMatches(rows, titleQuery){
+  var q = titleQuery.trim().toLowerCase();
+  if(!q) return [];
+  return rows.filter(function(row){
+    return mbcLeadershipTokens(row['Leadership']).some(function(tok){ return tok.toLowerCase() === q; });
+  }).map(function(row){ return mbcDisplayName(String(row['Name']||'')); })
+    .filter(Boolean);
+}
+function mbcDetectUnitLeader(explicit){
+  var statusEl = byId('mbc-leader-status');
+  var s = mbcCurrentSettings();
+  if(explicit) statusEl.innerHTML = '<div class="mbc-note mbc-info">Checking the Adult Directory...</div>';
+  return mbcFetchReportBuffer(mbcAdultDirUrl(s.adultDirId)).then(function(buf){
+    var rows = mbcBufferToObjects(buf);
+    var matches = mbcFindLeaderMatches(rows, s.leaderTitle);
+    // De-duplicate in case the same person has more than one row/title
+    // containing the search text.
+    var unique = matches.filter(function(name, i){ return matches.indexOf(name) === i; });
+    if(unique.length === 1){
+      byId('mbc-leader').value = unique[0];
+      if(explicit) statusEl.innerHTML = '<div class="mbc-note mbc-ok">Detected from TroopWebHost: '+mbcEsc(unique[0])+' ('+mbcEsc(s.leaderTitle)+').</div>';
+      else statusEl.innerHTML = '';
+    }else if(unique.length === 0){
+      if(explicit) statusEl.innerHTML = '<div class="mbc-note mbc-warn">No one on the Adult Directory has "'+mbcEsc(s.leaderTitle)+'" listed as a Leadership title -- enter a name manually, or adjust the title in Advanced settings.</div>';
+    }else{
+      if(explicit) statusEl.innerHTML = '<div class="mbc-note mbc-warn">'+unique.length+' people have "'+mbcEsc(s.leaderTitle)+'" listed ('+mbcEsc(unique.join(', '))+') -- enter the one you want manually.</div>';
+    }
+  }).catch(function(err){
+    if(String(err.message||'').indexOf('REDIRECTED:') === 0){
+      if(explicit) statusEl.innerHTML = '<div class="mbc-note mbc-warn">Your TroopWebHost login doesn\'t have permission to view the Adult Directory -- enter the Unit Leader name manually.</div>';
+      return;
+    }
+    if(explicit) statusEl.innerHTML = '<div class="mbc-note mbc-warn">Could not check the Adult Directory: '+err.message+'</div>';
+    else console.warn('Merit Badge Pocket Certificate Filler: Unit Leader auto-detect failed silently on page load:', err.message);
+  });
+}
+
+/* ================= AWARD REPORT: fetch + parse =================
+   Same "GET the report page, then resubmit its own <form id=easyform>
+   with NewRowsPerPage=ALL" technique documented for this report in
+   twh-integration-learnings.md -- confirmed via HAR capture against a
+   real TroopWebHost installation. This report is read-only here; the
+   POST below is TroopWebHost's own paging mechanism, not a save. */
+function mbcAwardReportUrl(menuId, formId){
+  return 'FormDetail.aspx?Menu_Item_ID='+encodeURIComponent(menuId)+'&Form_ID='+encodeURIComponent(formId)+'&Stack=2&ID=1&FK=0';
+}
+var MBC_HEADER_WORDS = ['Scout','Patrol','Type','Award'];
+function mbcParseAwardTable(doc){
+  var table = mbcFindTable(doc, MBC_HEADER_WORDS);
+  if(!table) throw new Error('The Award Report page didn\'t have the expected columns (Scout / Patrol / Type / Award) -- TroopWebHost may have changed this report, or the Menu_Item_ID/Form_ID in Advanced settings may be wrong for your installation.');
+  var headerCells = mbcHeaderCells(table);
+  var idx = {
+    adult: mbcColIndex(headerCells, 'Adult'),
+    scout: mbcColIndex(headerCells, 'Scout'),
+    patrol: mbcColIndex(headerCells, 'Patrol'),
+    type: mbcColIndex(headerCells, 'Type'),
+    award: mbcColIndex(headerCells, 'Award'),
+    earned: mbcColIndex(headerCells, 'Earned'),
+    awarded: mbcColIndex(headerCells, 'Awarded'),
+    coh: mbcColIndex(headerCells, 'COH'),
+    council: mbcColIndex(headerCells, 'Council')
+  };
+  if(idx.scout === -1 || idx.type === -1 || idx.award === -1){
+    throw new Error('The Award Report table was found but is missing one of the Scout / Type / Award columns.');
+  }
+  var bodyRows = Array.prototype.slice.call(table.querySelectorAll('tbody tr'));
+  if(!bodyRows.length){
+    // Some TWH report tables have no explicit <tbody> -- fall back to
+    // every <tr> after the header row.
+    var allRows = Array.prototype.slice.call(table.querySelectorAll('tr'));
+    bodyRows = allRows.slice(1);
+  }
+  var cellText = function(tr, i){
+    if(i === -1) return '';
+    var cells = tr.querySelectorAll('td,th');
+    return cells[i] ? cells[i].textContent.replace(/\s+/g,' ').trim() : '';
+  };
+  var out = [];
+  bodyRows.forEach(function(tr){
+    var scout = cellText(tr, idx.scout);
+    var type = cellText(tr, idx.type);
+    if(!scout || !type) return; // skip blank/spacer rows
+    out.push({
+      adult: cellText(tr, idx.adult),
+      scout: scout,
+      patrol: cellText(tr, idx.patrol),
+      type: type,
+      award: cellText(tr, idx.award),
+      earned: cellText(tr, idx.earned),
+      awarded: cellText(tr, idx.awarded),
+      coh: cellText(tr, idx.coh),
+      council: cellText(tr, idx.council)
+    });
+  });
+  return out;
+}
+function mbcFetchAllAwardRows(menuId, formId){
+  var url = mbcAwardReportUrl(menuId, formId);
+  return mbcFetchDoc(url).then(function(doc){
+    var formEl = doc.getElementById('easyform');
+    if(!formEl){
+      throw new Error('The Award Report page didn\'t have the expected editable form -- your login may not have leader access, or TroopWebHost may have changed this page.');
+    }
+    var fd = new FormData(formEl);
+    fd.set('NewRowsPerPage', 'ALL');
+    return mbcFetchDocPost(url, fd);
+  }).then(mbcParseAwardTable);
+}
+
+var MBC_STATE = { rows: [] };
+
+function mbcLoadReport(){
+  var statusEl = byId('mbc-load-status');
+  var btn = byId('mbc-load-btn');
+  btn.disabled = true;
+  statusEl.innerHTML = '<div class="mbc-note mbc-info">Fetching the Award Report...</div>';
+  byId('mbc-results-card').classList.add('mbc-hidden');
+  byId('mbc-gen-card').classList.add('mbc-hidden');
+  var s = mbcCurrentSettings();
+  mbcFetchAllAwardRows(s.menuId, s.formId).then(function(rows){
+    var badges = rows.filter(function(r){ return r.type.toLowerCase() === 'merit badge'; });
+    if(!badges.length){
+      statusEl.innerHTML = '<div class="mbc-note mbc-warn">The report loaded, but no rows had Type = "Merit Badge". Nothing to print.</div>';
+      btn.disabled = false;
+      return;
+    }
+    // Sort by Scout, then by Merit Badge name, so a Scout's certificates
+    // print together -- makes handing them out at a Court of Honor easier.
+    badges.sort(function(a,b){
+      var an = mbcDisplayName(a.scout), bn = mbcDisplayName(b.scout);
+      if(an !== bn) return an.localeCompare(bn);
+      return mbcBadgeName(a.award).localeCompare(mbcBadgeName(b.award));
+    });
+    MBC_STATE.rows = badges;
+    mbcRenderTable(badges);
+    statusEl.innerHTML = '<div class="mbc-note mbc-ok">Loaded '+rows.length+' award rows, '+badges.length+' of them Merit Badges.</div>';
+    byId('mbc-results-card').classList.remove('mbc-hidden');
+    byId('mbc-gen-card').classList.remove('mbc-hidden');
+    btn.disabled = false;
+  }).catch(function(err){
+    btn.disabled = false;
+    if(String(err.message||'').indexOf('REDIRECTED:') === 0){
+      statusEl.innerHTML = '<div class="mbc-restricted"><strong>Restricted.</strong> Your TroopWebHost login doesn\'t have permission to view the Award Report -- it\'s leader-only. If you believe this is a mistake, contact your Troop\'s TroopWebHost administrator.</div>';
+      return;
+    }
+    statusEl.innerHTML = '<div class="mbc-note mbc-warn">Could not load the Award Report: '+err.message+'</div>';
+  });
+}
+
+function mbcDateFor(row){
+  return row.earned || row.awarded || row.coh || '';
+}
+// TroopWebHost appends a trailing "*" to a Merit Badge's name in this
+// report to mark it as one of the Eagle-required badges (confirmed via
+// HAR capture -- e.g. "Citizenship in the World*"). That's useful on
+// the report itself but would print as a stray asterisk on the
+// certificate, so strip it (and any space before it) for display and
+// for the PDF.
+function mbcBadgeName(award){
+  return (award||'').replace(/\s*\*\s*$/, '').trim();
+}
+
+function mbcRenderTable(rows){
+  var tbody = byId('mbc-tbody');
+  var html = '';
+  rows.forEach(function(r, i){
+    html += '<tr data-idx="'+i+'">'
+      + '<td class="mbc-cb-cell"><input type="checkbox" class="mbc-row-cb" data-idx="'+i+'" checked></td>'
+      + '<td>'+mbcEsc(mbcDisplayName(r.scout))+'</td>'
+      + '<td>'+mbcEsc(r.patrol)+'</td>'
+      + '<td>'+mbcEsc(mbcBadgeName(r.award))+'</td>'
+      + '<td>'+mbcEsc(mbcDateFor(r))+'</td>'
+      + '</tr>';
+  });
+  tbody.innerHTML = html;
+  Array.prototype.slice.call(tbody.querySelectorAll('.mbc-row-cb')).forEach(function(cb){
+    cb.addEventListener('change', function(){
+      var tr = tbody.querySelector('tr[data-idx="'+cb.getAttribute('data-idx')+'"]');
+      if(tr) tr.classList.toggle('mbc-row-off', !cb.checked);
+      mbcUpdateCount();
+    });
+  });
+  mbcUpdateCount();
+}
+function mbcEsc(s){ var d=document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
+function mbcSetAllChecked(on){
+  Array.prototype.slice.call(byId('mbc-tbody').querySelectorAll('.mbc-row-cb')).forEach(function(cb){
+    cb.checked = on;
+    var tr = byId('mbc-tbody').querySelector('tr[data-idx="'+cb.getAttribute('data-idx')+'"]');
+    if(tr) tr.classList.toggle('mbc-row-off', !on);
+  });
+  mbcUpdateCount();
+}
+function mbcSelectedRows(){
+  var idxs = Array.prototype.slice.call(byId('mbc-tbody').querySelectorAll('.mbc-row-cb'))
+    .filter(function(cb){ return cb.checked; })
+    .map(function(cb){ return parseInt(cb.getAttribute('data-idx'),10); });
+  return idxs.map(function(i){ return MBC_STATE.rows[i]; });
+}
+function mbcUpdateCount(){
+  var total = MBC_STATE.rows.length;
+  var selected = mbcSelectedRows().length;
+  var pages = Math.ceil(selected/8) || 0;
+  byId('mbc-count').innerHTML = '<strong>'+selected+'</strong> of '+total+' selected &middot; '+pages+' printed sheet'+(pages===1?'':'s');
+}
+
+/* ================= PDF GENERATION =================
+   Two modes, chosen by the "pre-printed cardstock" checkbox:
+
+   NORMAL MODE loads a fresh copy of the (unmodified) template for each
+   8-card sheet needed, fills that copy's "Name N"/"Badge N"/"Date N"/
+   "Unit N"/"Council N" text fields (N = 1..8, confirmed field names for
+   BSA item #33414), flattens the form so the values become static page
+   content (this also sidesteps AcroForm field-name collisions when
+   multiple sheets are merged into one output document), then copies
+   that flattened page into the final combined PDF.
+
+   BLANK MODE (pre-printed cardstock) never touches the template at
+   all -- it draws ONLY the same text, at the same positions, on a
+   blank page, so it can be printed straight onto BSA's own pre-printed
+   #33414 stock without doubling up the artwork. Field positions
+   (MBC_FIELD_RECTS below) and page size were read directly from the
+   template's own AcroForm field /Rect entries and page /MediaBox via
+   pypdf -- confirmed against the actual PDF, not estimated. Every
+   field on this template is center-aligned (/Q 1), so blank mode
+   centers text the same way, with a shrink-to-fit font size standing
+   in for the AcroForm's own auto-size (font size 0) behavior.
+
+   In both modes, "Unit Leader N" is only filled if a Unit Leader name
+   is set (see settings) -- left blank otherwise for a physical
+   signature. */
+var MBC_SLOTS_PER_PAGE = 8;
+var MBC_PAGE_SIZE = [792, 612]; // template's own /MediaBox (points) -- confirmed via pypdf
+var MBC_FIELD_RECTS = {
+  1: { name:[14.07, 514.87, 162.76, 531.62], badge:[14.07, 486.21, 162.76, 502.96], date:[27.72, 441.31, 102.49, 455.19], unit:[121.59, 441.84, 162.18, 455.19], council:[59.64, 422.29, 162.72, 436.71], leader:[59.64, 403.13, 162.72, 415.95] },
+  2: { name:[196.87, 514.87, 345.56, 531.62], badge:[196.87, 486.21, 345.56, 502.96], date:[206.51, 441.31, 281.28, 455.19], unit:[301.57, 441.84, 342.16, 455.19], council:[239.62, 422.59, 342.69, 437.01], leader:[239.62, 403.44, 342.69, 416.25] },
+  3: { name:[376.38, 514.87, 525.07, 531.62], badge:[376.95, 486.21, 525.64, 502.96], date:[385.93, 441.31, 460.69, 455.19], unit:[481.86, 442.41, 520.71, 455.19], council:[419.04, 422.08, 522.11, 436.5], leader:[419.04, 402.92, 522.11, 415.74] },
+  4: { name:[556.01, 514.29, 704.7, 531.04], badge:[557.15, 486.21, 705.84, 502.96], date:[566.42, 441.31, 641.18, 455.19], unit:[661.48, 441.84, 702.06, 455.19], council:[599.53, 422.1, 702.6, 436.52], leader:[599.53, 402.94, 702.6, 415.76] },
+  5: { name:[13.21, 247.4, 161.9, 264.15], badge:[12.06, 218.18, 160.75, 234.93], date:[26.47, 172.12, 101.24, 186.0], unit:[121.53, 171.65, 162.12, 185.0], council:[59.58, 152.89, 162.65, 167.31], leader:[59.58, 133.74, 162.65, 146.55] },
+  6: { name:[194.29, 246.83, 342.98, 263.58], badge:[194.29, 218.18, 342.98, 234.93], date:[206.51, 171.59, 281.28, 185.47], unit:[301.57, 171.12, 342.16, 184.47], council:[239.62, 152.36, 342.69, 166.78], leader:[239.62, 133.21, 342.69, 146.02] },
+  7: { name:[373.05, 246.26, 521.74, 263.01], badge:[375.92, 217.61, 524.61, 234.36], date:[385.93, 171.61, 460.69, 185.5], unit:[480.99, 171.15, 521.58, 184.5], council:[419.04, 152.38, 522.11, 166.8], leader:[419.04, 133.23, 522.11, 146.04] },
+  8: { name:[553.33, 245.69, 702.02, 262.44], badge:[555.05, 217.61, 703.74, 234.36], date:[565.88, 171.1, 640.65, 184.98], unit:[660.94, 170.63, 701.53, 183.98], council:[598.99, 151.87, 702.06, 166.29], leader:[598.99, 132.72, 702.06, 145.53] }
+};
+// Roughly matches how these fields render when the template's own
+// auto-size (font size 0) AcroForm fields fill up their box height --
+// eyeballed against a rendered sample, not an exact PDF-spec formula.
+var MBC_FIELD_MAX_FONT = { name:14, badge:14, date:10.5, unit:10.5, council:9.5, leader:9.5 };
+var mbcTemplateBytesPromise = null;
+function mbcFetchTemplateBytes(url){
+  // Genuine cross-origin request (the BSA/Scout Shop media host, not
+  // troopwebhost.org) -- unlike every other fetch in this file it must
+  // NOT use credentials:'same-origin' semantics for a foreign host, and
+  // TWH session redirects are meaningless here, so this intentionally
+  // does not go through mbcFetchRaw.
+  var controller = new AbortController();
+  var timer = setTimeout(function(){ controller.abort(); }, MBC_FETCH_TIMEOUT_MS);
+  return fetch(url, { signal: controller.signal })
+    .catch(function(e){
+      if(e.name === 'AbortError') throw new Error('timed out fetching '+url);
+      throw new Error('network/CORS error fetching '+url+': '+e.message);
+    })
+    .then(function(res){
+      if(!res.ok) throw new Error(url+' responded HTTP '+res.status);
+      return res.arrayBuffer();
+    })
+    .then(function(buf){ return new Uint8Array(buf); })
+    .finally(function(){ clearTimeout(timer); });
+}
+function mbcGetTemplateBytes(){
+  if(mbcTemplateBytesPromise) return mbcTemplateBytesPromise;
+  var s = mbcCurrentSettings();
+  var primary = s.pdfUrl || DEFAULT_PDF_URL;
+  mbcTemplateBytesPromise = mbcFetchTemplateBytes(primary).catch(function(err){
+    if(!FALLBACK_PDF_URL) throw err;
+    console.warn('Merit Badge Pocket Certificate Filler: primary PDF source failed ('+err.message+'), trying fallback.');
+    return mbcFetchTemplateBytes(FALLBACK_PDF_URL);
+  });
+  return mbcTemplateBytesPromise;
+}
+function mbcFillSheet(templateBytes, chunk, settings){
+  return PDFLib.PDFDocument.load(templateBytes).then(function(doc){
+    return doc.embedFont(PDFLib.StandardFonts.Helvetica).then(function(helv){
+      var form = doc.getForm();
+      var setText = function(name, value){
+        if(!value) return;
+        try{ form.getTextField(name).setText(String(value)); }catch(e){ /* field not present -- skip */ }
+      };
+      chunk.forEach(function(row, i){
+        var n = i+1;
+        setText('Name '+n, mbcDisplayName(row.scout));
+        setText('Badge '+n, mbcBadgeName(row.award));
+        setText('Date '+n, mbcDateFor(row));
+        setText('Unit '+n, settings.unit);
+        setText('Council '+n, settings.council);
+        setText('Unit Leader '+n, settings.leader);
+      });
+      form.updateFieldAppearances(helv);
+      form.flatten();
+      return doc;
+    });
+  });
+}
+// Shrinks fontSize (from startSize down to a 6pt floor) until `text`
+// fits within maxWidth at that size -- a manual stand-in for the
+// AcroForm auto-size behavior mbcFillSheet gets for free from pdf-lib,
+// since blank mode draws directly on a blank page instead.
+function mbcFitFontSize(font, text, maxWidth, startSize){
+  var size = startSize;
+  while(size > 6 && font.widthOfTextAtSize(text, size) > maxWidth){
+    size -= 0.5;
+  }
+  return size;
+}
+function mbcDrawCentered(page, font, text, rect, maxFontSize){
+  if(!text) return;
+  var padding = 3;
+  var boxWidth = (rect[2]-rect[0]) - padding*2;
+  var size = mbcFitFontSize(font, text, boxWidth, maxFontSize);
+  var textWidth = font.widthOfTextAtSize(text, size);
+  var x = rect[0] + ((rect[2]-rect[0]) - textWidth)/2;
+  // Baseline placed a bit above the box's vertical center -- text
+  // hangs below its baseline (descenders), so a true vertical-center
+  // of the box would look slightly low; this matches the rendered
+  // template closely enough for pre-printed alignment.
+  var y = rect[1] + ((rect[3]-rect[1]) - size)/2 + size*0.22;
+  page.drawText(text, { x:x, y:y, size:size, font:font });
+}
+function mbcBuildBlankSheet(outDoc, helv, chunk, settings){
+  var page = outDoc.addPage(MBC_PAGE_SIZE);
+  chunk.forEach(function(row, i){
+    var n = i+1;
+    var r = MBC_FIELD_RECTS[n];
+    mbcDrawCentered(page, helv, mbcDisplayName(row.scout), r.name, MBC_FIELD_MAX_FONT.name);
+    mbcDrawCentered(page, helv, mbcBadgeName(row.award), r.badge, MBC_FIELD_MAX_FONT.badge);
+    mbcDrawCentered(page, helv, mbcDateFor(row), r.date, MBC_FIELD_MAX_FONT.date);
+    mbcDrawCentered(page, helv, settings.unit, r.unit, MBC_FIELD_MAX_FONT.unit);
+    mbcDrawCentered(page, helv, settings.council, r.council, MBC_FIELD_MAX_FONT.council);
+    mbcDrawCentered(page, helv, settings.leader, r.leader, MBC_FIELD_MAX_FONT.leader);
+  });
+}
+function mbcGeneratePdf(){
+  var statusEl = byId('mbc-gen-status');
+  var btn = byId('mbc-gen-btn');
+  var selected = mbcSelectedRows();
+  if(!selected.length){
+    statusEl.innerHTML = '<div class="mbc-note mbc-warn">Select at least one certificate first.</div>';
+    return;
+  }
+  var settings = mbcCurrentSettings();
+  var blankMode = byId('mbc-blankmode').checked;
+  var chunks = [];
+  for(var i=0;i<selected.length;i+=MBC_SLOTS_PER_PAGE){
+    chunks.push(selected.slice(i, i+MBC_SLOTS_PER_PAGE));
+  }
+  btn.disabled = true;
+  var buildPromise;
+  if(blankMode){
+    // No template fetch at all in this mode -- nothing to download
+    // and nothing that can fail on CORS/network grounds, since every
+    // page is drawn from scratch.
+    statusEl.innerHTML = '<div class="mbc-note mbc-info">Building PDF (data only, for pre-printed cardstock)...</div>';
+    buildPromise = PDFLib.PDFDocument.create().then(function(outDoc){
+      return outDoc.embedFont(PDFLib.StandardFonts.Helvetica).then(function(helv){
+        chunks.forEach(function(chunk){ mbcBuildBlankSheet(outDoc, helv, chunk, settings); });
+        return outDoc.save();
+      });
+    });
+  }else{
+    statusEl.innerHTML = '<div class="mbc-note mbc-info">Fetching the certificate template...</div>';
+    buildPromise = mbcGetTemplateBytes().then(function(templateBytes){
+      statusEl.innerHTML = '<div class="mbc-note mbc-info">Building PDF...</div>';
+      var outDoc;
+      return PDFLib.PDFDocument.create().then(function(created){
+        outDoc = created;
+        var chain = Promise.resolve();
+        chunks.forEach(function(chunk){
+          chain = chain.then(function(){
+            return mbcFillSheet(templateBytes, chunk, settings).then(function(filledDoc){
+              return outDoc.copyPages(filledDoc, [0]).then(function(pages){
+                outDoc.addPage(pages[0]);
+              });
+            });
+          });
+        });
+        return chain;
+      }).then(function(){ return outDoc.save(); });
+    });
+  }
+  buildPromise.then(function(outBytes){
+    var blob = new Blob([outBytes], { type:'application/pdf' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = blankMode ? 'Merit_Badge_Pocket_Certificates_DataOnly.pdf' : 'Merit_Badge_Pocket_Certificates.pdf';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    statusEl.innerHTML = '<div class="mbc-note mbc-ok">Done -- '+chunks_len(selected.length)+' sheet(s) for '+selected.length+' certificate(s). Your download should start automatically. '+(blankMode ? 'Check alignment against a real pre-printed sheet by holding a printed page up to one before running a full batch.' : 'Check a sample print against your card stock before running a full batch.')+'</div>';
+    btn.disabled = false;
+  }).catch(function(err){
+    btn.disabled = false;
+    statusEl.innerHTML = '<div class="mbc-note mbc-warn">Could not generate the PDF: '+err.message+'</div>';
+  });
+}
+function chunks_len(n){ return Math.ceil(n/MBC_SLOTS_PER_PAGE); }
+})();
+</script>
+<script>
+(function(){
+'use strict';
+function byId(id){ return document.getElementById(id); }
+function esc(s){ var d=document.createElement('div'); d.textContent = s==null?'':s; return d.innerHTML; }
+
+/* ================= LIVE SITE THEME =================
+   Ported from the Merit Badge Pocket Certificate page (itself ported from
+   Rank_Gap / OA Tracker) -- same probe markup, same sentinel-color
+   technique, same two-role accent split, re-scoped to #bcp-root. */
+function bcpSafeColor(v){
+  if(!v) return null;
+  if(/rgba?\(\s*0,\s*0,\s*0,\s*0\s*\)/.test(v) || v === 'transparent') return null;
+  return v;
+}
+function bcpDarkenColor(rgbStr, amt){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  return 'rgb('+Math.round(parseInt(m[1],10)*(1-amt))+', '+Math.round(parseInt(m[2],10)*(1-amt))+', '+Math.round(parseInt(m[3],10)*(1-amt))+')';
+}
+function bcpToRgba(rgbStr, alpha){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  return 'rgba('+m[1]+','+m[2]+','+m[3]+','+alpha+')';
+}
+function bcpProbeSiteTheme(){
+  var SENTINEL = 'rgb(1, 2, 3)';
+  var wrap = document.createElement('div');
+  wrap.style.cssText = 'position:absolute; left:-9999px; top:-9999px; visibility:hidden; pointer-events:none; color:'+SENTINEL+'; border-color:'+SENTINEL+';';
+  wrap.innerHTML =
+    '<div class="navtable" id="__bcp_probe_navtable">'+
+      '<span class="navicon" id="__bcp_probe_navicon"></span>'+
+      '<span class="navlink" id="__bcp_probe_navlink"><a href="#" id="__bcp_probe_navlink_a">x</a></span>'+
+    '</div>'+
+    '<div class="banner-div" id="__bcp_probe_banner"></div>'+
+    '<ul class="nav-tabs"><li><a href="#" id="__bcp_probe_tab">x</a></li></ul>'+
+    '<table class="table-striped"><thead><tr id="__bcp_probe_gridhead"><th>x</th></tr></thead></table>'+
+    '<table class="table-curved"><tbody><tr><td id="__bcp_probe_border">x</td></tr></tbody></table>'+
+    '<input class="form-control" id="__bcp_probe_input">'+
+    '<span class="RequiredIndicator" id="__bcp_probe_required">*</span>'+
+    '<a href="#" id="__bcp_probe_control_a">x</a>';
+  document.body.appendChild(wrap);
+  function pid(id){ return document.getElementById(id); }
+  function cs(el){ return el ? getComputedStyle(el) : null; }
+  var inherited = function(v){ return (v && v !== SENTINEL) ? v : null; };
+  var navtableCs = cs(pid('__bcp_probe_navtable'));
+  var bannerCs = cs(pid('__bcp_probe_banner'));
+  var navlinkACs = cs(pid('__bcp_probe_navlink_a'));
+  var controlACs = cs(pid('__bcp_probe_control_a'));
+  var tabCs = cs(pid('__bcp_probe_tab'));
+  var requiredCs = cs(pid('__bcp_probe_required'));
+  var result = {
+    navy: bcpSafeColor(navtableCs && navtableCs.backgroundColor),
+    navyDark: bcpSafeColor(bannerCs && bannerCs.backgroundColor),
+    yellow: (navlinkACs && controlACs && navlinkACs.color !== controlACs.color) ? navlinkACs.color : null,
+    gold: bcpSafeColor(tabCs && tabCs.backgroundColor),
+    red: inherited(requiredCs && requiredCs.color),
+    paper: bcpSafeColor(getComputedStyle(document.body).backgroundColor)
+  };
+  wrap.remove();
+  if(!result.navyDark && result.navy) result.navyDark = bcpDarkenColor(result.navy, 0.35);
+  return result;
+}
+function bcpLuminance(rgbStr){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  function lin(c){ c = c/255; return c <= 0.03928 ? c/12.92 : Math.pow((c+0.055)/1.055, 2.4); }
+  return 0.2126*lin(+m[1]) + 0.7152*lin(+m[2]) + 0.0722*lin(+m[3]);
+}
+function bcpMixWithWhite(rgbStr, amount){
+  var m = rgbStr && rgbStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+  if(!m) return null;
+  function clamp(v){ return Math.max(0, Math.min(255, Math.round(v))); }
+  return 'rgb('+clamp(parseInt(m[1],10)*(1-amount)+255*amount)+', '+clamp(parseInt(m[2],10)*(1-amount)+255*amount)+', '+clamp(parseInt(m[3],10)*(1-amount)+255*amount)+')';
+}
+function bcpEnsureContrast(rgbStr, wantLight){
+  if(!rgbStr) return rgbStr;
+  var lum = bcpLuminance(rgbStr);
+  if(lum == null) return rgbStr;
+  if(wantLight && lum < 0.45) return bcpMixWithWhite(rgbStr, 0.55);
+  if(!wantLight && lum > 0.55) return bcpDarkenColor(rgbStr, 0.55);
+  return rgbStr;
+}
+function bcpApplyLiveSiteTheme(){
+  var root = byId('bcp-root');
+  try{
+    var detected = bcpProbeSiteTheme();
+    if(!root) return;
+    var paperLum = detected.paper ? bcpLuminance(detected.paper) : null;
+    var isLight = paperLum != null && paperLum > 0.5;
+    root.classList.toggle('bcp-light', isLight);
+    var wantLightText = !isLight;
+    if(detected.navy){
+      root.style.setProperty('--navy', detected.navy);
+      root.style.setProperty('--navy-dark', detected.navyDark || bcpDarkenColor(detected.navy, 0.35) || detected.navy);
+    }
+    var brass = detected.gold || detected.yellow;
+    if(brass){
+      root.style.setProperty('--brass', brass);
+      root.style.setProperty('--brass-light', brass);
+      root.style.setProperty('--brass-text', bcpEnsureContrast(brass, wantLightText));
+      root.style.setProperty('--brass-glow', bcpToRgba(brass, 0.1) || 'rgba(184,134,59,0.1)');
+    }
+    if(detected.red){
+      var rustText = bcpEnsureContrast(detected.red, wantLightText);
+      root.style.setProperty('--rust', rustText);
+      root.style.setProperty('--rust-bg', bcpToRgba(rustText, 0.22) || 'rgba(201,107,79,0.22)');
+    }
+  }catch(e){
+    console.warn('Blue Card Printer: theme detection failed, using built-in defaults:', e);
+  }finally{
+    if(root) root.classList.add('bcp-ready');
+  }
+}
+// Runs immediately, not on DOMContentLoaded -- #bcp-root already exists in
+// the DOM by the time this script tag runs.
+bcpApplyLiveSiteTheme();
+
+/* =====================================================================
+   PURE LOGIC (no DOM, no network) -- unit-tested in test_harness.js,
+   which extracts everything between the BEGIN/END markers.
+   ===================================================================== */
+/* BEGIN PURE LOGIC */
+
+/* ---- CSV (RFC 4180): quoted fields, doubled quotes, CRLF, BOM ---- */
+function bcpParseCsv(text){
+  var rows = [], row = [], field = '', inQ = false, i = 0, n = text.length, c;
+  if(n && text.charCodeAt(0) === 0xFEFF) i = 1;
+  for(; i < n; i++){
+    c = text.charAt(i);
+    if(inQ){
+      if(c === '"'){
+        if(text.charAt(i+1) === '"'){ field += '"'; i++; } else { inQ = false; }
+      } else { field += c; }
+    } else if(c === '"'){ inQ = true; }
+    else if(c === ','){ row.push(field); field = ''; }
+    else if(c === '\r'){
+      if(text.charAt(i+1) !== '\n'){ row.push(field); rows.push(row); row = []; field = ''; }
+    }
+    else if(c === '\n'){ row.push(field); rows.push(row); row = []; field = ''; }
+    else { field += c; }
+  }
+  if(field !== '' || row.length){ row.push(field); rows.push(row); }
+  return rows.filter(function(r){ return r.some(function(f){ return String(f).trim() !== ''; }); });
+}
+function bcpCsvObjects(text){
+  var rows = bcpParseCsv(text);
+  if(!rows.length) return { headers: [], objects: [] };
+  var headers = rows[0].map(function(h){ return String(h).trim(); });
+  var objects = rows.slice(1).map(function(r){
+    var o = {};
+    headers.forEach(function(h, i){ o[h] = r[i] == null ? '' : String(r[i]).trim(); });
+    return o;
+  });
+  return { headers: headers, objects: objects };
+}
+function bcpNormHeader(h){ return String(h||'').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+// Returns the header text (as it appears in the file) for the first
+// candidate that matches, or null.
+function bcpFindHeader(headers, candidates){
+  for(var c = 0; c < candidates.length; c++){
+    var want = bcpNormHeader(candidates[c]);
+    for(var i = 0; i < headers.length; i++){
+      if(bcpNormHeader(headers[i]) === want) return headers[i];
+    }
+  }
+  return null;
+}
+
+/* ---- small formatters ---- */
+// "1/28/2024 12:00:00 AM" -> "1/28/2024". The time part is deliberately
+// ignored (no timezone conversion) so an 11:59 PM stamp keeps its date.
+function bcpFmtDate(s){
+  s = String(s||'').trim();
+  var m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})/);
+  if(m){
+    var y = m[3];
+    if(y.length === 2) y = (parseInt(y,10) >= 70 ? '19' : '20') + y;
+    return parseInt(m[1],10)+'/'+parseInt(m[2],10)+'/'+y;
+  }
+  m = s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(m) return parseInt(m[2],10)+'/'+parseInt(m[3],10)+'/'+m[1];
+  return s;
+}
+function bcpCityStateZip(city, state, zip){
+  city = String(city||'').trim(); state = String(state||'').trim(); zip = String(zip||'').trim();
+  var tail = (state+' '+zip).trim();
+  if(city && tail) return city+', '+tail;
+  return city || tail;
+}
+// "Last, First" -> "First Last"; anything else is returned as-is.
+function bcpDisplayName(name){
+  var s = String(name||'').trim();
+  var i = s.indexOf(',');
+  if(i === -1) return s;
+  var last = s.slice(0, i).trim(), rest = s.slice(i+1).trim();
+  if(!last || !rest) return s;
+  return rest+' '+last;
+}
+// TroopWebHost appends a trailing "*" to Eagle-required badge names.
+function bcpBadgeName(s){ return String(s||'').replace(/\s*\*\s*$/, '').trim(); }
+function bcpLastToken(name){
+  var t = String(name||'').trim().split(/\s+/);
+  return (t[t.length-1] || '').toLowerCase();
+}
+
+/* ---- requirement tokens: "01.a", "02.", "09.b.3", "2A.a", "5.B.a" ---- */
+function bcpParseReq(token){
+  var t = String(token||'').trim();
+  if(!t) return null;
+  var segs = t.split('.').map(function(s){ return s.trim(); }).filter(function(s){ return s !== ''; });
+  if(!segs.length) return null;
+  return segs.map(function(s){ return s.replace(/^0+(?=\d)/, ''); });
+}
+function bcpIsNum(s){ return /^\d+$/.test(s); }
+function bcpIsLetter(s){ return /^[A-Za-z]$/.test(s); }
+function bcpSegCmp(a, b){
+  if(bcpIsNum(a) && bcpIsNum(b)) return parseInt(a,10) - parseInt(b,10);
+  var am = a.match(/^(\d+)(.*)$/), bm = b.match(/^(\d+)(.*)$/);
+  if(am && bm){
+    var d = parseInt(am[1],10) - parseInt(bm[1],10);
+    if(d) return d;
+    a = am[2]; b = bm[2];
+  } else if(am && !bm){ return -1; }
+  else if(!am && bm){ return 1; }
+  a = a.toLowerCase(); b = b.toLowerCase();
+  return a < b ? -1 : (a > b ? 1 : 0);
+}
+function bcpPathCmp(p, q){
+  var n = Math.min(p.length, q.length);
+  for(var i = 0; i < n; i++){ var d = bcpSegCmp(p[i], q[i]); if(d) return d; }
+  return p.length - q.length;
+}
+// ['1','a'] -> "1a"   ['9','b','3'] -> "9b(3)"   ['2A','a'] -> "2A.a"
+function bcpFmtPath(p){
+  var out = String(p[0]);
+  for(var i = 1; i < p.length; i++){
+    var s = p[i], prev = p[i-1];
+    if(bcpIsNum(s)){ out += bcpIsNum(prev) ? '.'+s : '('+s+')'; }
+    else if(bcpIsLetter(s) && bcpIsNum(prev)){ out += s; }
+    else { out += '.'+s; }
+  }
+  return out;
+}
+// Consecutive runs -> "a-c,e" / "1,3-4". valueOf maps a segment to a
+// comparable integer (char code for letters, number for digits).
+function bcpRuns(segs, valueOf){
+  var vals = segs.map(function(s){ return { s: s, v: valueOf(s) }; }).sort(function(a,b){ return a.v - b.v; });
+  var runs = [], cur = null;
+  vals.forEach(function(x){
+    if(cur && x.v === cur.endV + 1){ cur.end = x.s; cur.endV = x.v; cur.len++; }
+    else { cur = { start: x.s, end: x.s, endV: x.v, len: 1 }; runs.push(cur); }
+  });
+  return runs.map(function(r){ return r.len === 1 ? r.start : r.start+'-'+r.end; });
+}
+function bcpPackRuns(prefix, runs, open, close, maxLen){
+  var pieces = [], cur = [];
+  function flush(){ if(cur.length){ pieces.push(prefix + open + cur.join(',') + close); cur = []; } }
+  runs.forEach(function(r){
+    var trial = prefix + open + cur.concat([r]).join(',') + close;
+    if(cur.length && trial.length > maxLen) flush();
+    cur.push(r);
+  });
+  flush();
+  return pieces;
+}
+var BCP_MAX_PIECE = 14;
+// Returns an array of strings, one per grid cell, in requirement order.
+// mode "full": one cell per recorded item. mode "compact": items whose
+// parent is also listed are dropped (parent complete implies children),
+// then siblings are collapsed into ranges.
+function bcpBuildPieces(tokens, mode){
+  var paths = [], seen = {};
+  tokens.forEach(function(t){
+    var p = bcpParseReq(t);
+    if(!p) return;
+    var k = p.join('.');
+    if(seen[k]) return;
+    seen[k] = true;
+    paths.push(p);
+  });
+  if(mode === 'full'){
+    paths.sort(bcpPathCmp);
+    return paths.map(bcpFmtPath);
+  }
+  paths = paths.filter(function(p){
+    for(var k = 1; k < p.length; k++){ if(seen[p.slice(0,k).join('.')]) return false; }
+    return true;
+  });
+  paths.sort(bcpPathCmp);
+  var groups = {}, order = [];
+  paths.forEach(function(p){
+    var last = p[p.length-1], type;
+    if(p.length === 1 && bcpIsNum(last)) type = 'T';
+    else if(bcpIsLetter(last)) type = 'L';
+    else if(bcpIsNum(last)) type = 'N';
+    else type = 'X';
+    var gk = type === 'X' ? 'X:'+p.join('.') : type+':'+p.slice(0,-1).join('.');
+    if(!groups[gk]){ groups[gk] = { type: type, parent: p.slice(0,-1), items: [], first: p }; order.push(gk); }
+    groups[gk].items.push(p);
+  });
+  var out = [];
+  order.forEach(function(gk){
+    var g = groups[gk];
+    var lastOf = function(p){ return p[p.length-1]; };
+    if(g.type === 'T'){
+      // top-level bare numbers: only runs of 3+ are folded ("11-15")
+      var nums = g.items.map(function(p){ return parseInt(p[0],10); });
+      var i = 0;
+      while(i < nums.length){
+        var j = i;
+        while(j+1 < nums.length && nums[j+1] === nums[j]+1) j++;
+        if(j - i >= 2){ out.push({ first: [String(nums[i])], text: nums[i]+'-'+nums[j] }); }
+        else { for(var k = i; k <= j; k++) out.push({ first: [String(nums[k])], text: String(nums[k]) }); }
+        i = j+1;
+      }
+    } else if(g.type === 'L'){
+      var par = g.parent;
+      var prefix = par.length ? bcpFmtPath(par) + (bcpIsNum(par[par.length-1]) ? '' : '.') : '';
+      var runs = bcpRuns(g.items.map(lastOf), function(s){ return s.charCodeAt(0); });
+      bcpPackRuns(prefix, runs, '', '', BCP_MAX_PIECE).forEach(function(t, idx){ out.push({ first: idx === 0 ? g.first : g.items[g.items.length-1], text: t }); });
+    } else if(g.type === 'N'){
+      var runsN = bcpRuns(g.items.map(lastOf), function(s){ return parseInt(s,10); });
+      bcpPackRuns(bcpFmtPath(g.parent), runsN, '(', ')', BCP_MAX_PIECE).forEach(function(t, idx){ out.push({ first: idx === 0 ? g.first : g.items[g.items.length-1], text: t }); });
+    } else {
+      out.push({ first: g.first, text: bcpFmtPath(g.items[0]) });
+    }
+  });
+  out.sort(function(a,b){ return bcpPathCmp(a.first, b.first); });
+  return out.map(function(o){ return o.text; });
+}
+var BCP_GRID_SLOTS = 22;
+// Grid columns in the template are numbered 01..22 but 12..22 sit in the
+// TOP block of the card and 01..11 in the bottom block, so fill the top
+// block first (reading order).
+var BCP_GRID_ORDER = [12,13,14,15,16,17,18,19,20,21,22,1,2,3,4,5,6,7,8,9,10,11];
+function bcpBuildCells(tokens, mode){
+  var pieces = bcpBuildPieces(tokens, mode);
+  return { cells: pieces.slice(0, BCP_GRID_SLOTS), overflow: pieces.slice(BCP_GRID_SLOTS), all: pieces };
+}
+
+/* ---- name matching between "First Middle Last" and "Last, First ..." ---- */
+function bcpNameTokens(s){
+  var t = String(s||'');
+  try{ t = t.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }catch(e){}
+  return t.toLowerCase().replace(/["'`.]/g, '').replace(/[^a-z0-9]+/g, ' ').trim().split(' ').filter(Boolean);
+}
+// Directory "Last, First Middle" (optionally with a "Nickname") -> key
+function bcpDirKey(raw){
+  raw = String(raw||'').trim();
+  var ci = raw.indexOf(',');
+  var last = ci === -1 ? raw : raw.slice(0, ci);
+  var rest = ci === -1 ? '' : raw.slice(ci+1);
+  var nick = rest.match(/"([^"]+)"/);
+  var firsts = {};
+  var restClean = rest.replace(/"[^"]+"/g, ' ');
+  var ft = bcpNameTokens(restClean);
+  if(ft.length) firsts[ft[0]] = true;
+  if(nick){ var nt = bcpNameTokens(nick[1]); if(nt.length) firsts[nt[0]] = true; }
+  return { lastTokens: bcpNameTokens(last), firsts: firsts };
+}
+// csvName is "First [Middle] Last" (or "Last, First"). Returns the single
+// matching entry, or null on zero OR ambiguous matches (never guess).
+function bcpFindByName(csvName, entries){
+  var t = bcpNameTokens(bcpDisplayName(csvName));
+  if(t.length < 2) return null;
+  var found = null, count = 0;
+  entries.forEach(function(e){
+    var k = e.key, n = k.lastTokens.length;
+    if(!n || t.length <= n) return;
+    if(t.slice(t.length - n).join(' ') !== k.lastTokens.join(' ')) return;
+    if(!k.firsts[t[0]]) return;
+    count++; found = e;
+  });
+  return count === 1 ? found : null;
+}
+// Leadership cell like "Scoutmaster, Committee Member": exact-token match.
+function bcpHasLeadership(cell, title){
+  var want = String(title||'').trim().toLowerCase();
+  if(!want) return false;
+  return String(cell||'').split(/[,;\/|]|\band\b/i).some(function(tok){ return tok.trim().toLowerCase() === want; });
+}
+
+/* ---- CSV rows -> card models ---- */
+var BCP_COLS = {
+  scout:      ['ScoutName','Scout Name','Scout','Name'],
+  badge:      ['MeritBadge','Merit Badge','Badge'],
+  started:    ['DateStarted','Date Started','Started'],
+  addr:       ['ScoutAddress','Address','Mailing Address Line 1'],
+  city:       ['ScoutCity','City'],
+  state:      ['ScoutState','State'],
+  zip:        ['ScoutZip','Zip','Zip Code'],
+  counselor:  ['CounselorName','Counselor'],
+  reqs:       ['CompletedRequirements','Completed Requirements','Requirements']
+};
+function bcpBuildCards(headers, objects, reqMode){
+  var col = {};
+  Object.keys(BCP_COLS).forEach(function(k){ col[k] = bcpFindHeader(headers, BCP_COLS[k]); });
+  if(!col.scout || !col.badge){
+    throw new Error('The file is missing the ScoutName / MeritBadge columns -- this does not look like the Troop Awards Blue Cards export.');
+  }
+  var get = function(o, k){ return col[k] ? String(o[col[k]]||'').trim() : ''; };
+  var cards = [];
+  objects.forEach(function(o){
+    var scout = bcpDisplayName(get(o,'scout'));
+    var badge = bcpBadgeName(get(o,'badge'));
+    if(!scout || !badge) return;
+    var tokens = get(o,'reqs').split(';').map(function(t){ return t.trim(); }).filter(Boolean);
+    cards.push({
+      scout: scout, badge: badge,
+      started: bcpFmtDate(get(o,'started')),
+      addr: get(o,'addr'),
+      cityStateZip: bcpCityStateZip(get(o,'city'), get(o,'state'), get(o,'zip')),
+      counselor: get(o,'counselor'),
+      tokens: tokens,
+      scoutEmail: '', counselorInfo: null,
+      selected: true
+    });
+  });
+  cards.sort(function(a,b){
+    var la = bcpLastToken(a.scout), lb = bcpLastToken(b.scout);
+    if(la !== lb) return la < lb ? -1 : 1;
+    if(a.scout !== b.scout) return a.scout < b.scout ? -1 : 1;
+    return a.badge < b.badge ? -1 : (a.badge > b.badge ? 1 : 0);
+  });
+  bcpApplyReqMode(cards, reqMode);
+  return cards;
+}
+function bcpApplyReqMode(cards, mode){
+  cards.forEach(function(c){
+    var r = bcpBuildCells(c.tokens, mode);
+    c.cells = r.cells; c.overflow = r.overflow; c.all = r.all;
+  });
+}
+// Counselor phone preference: cell, home, business.
+function bcpPickPhone(row){
+  return String(row['Cell Phone']||row['Home Phone']||row['Business Phone']||'').trim();
+}
+/* END PURE LOGIC */
+
+/* ================= UNIT NUMBER AUTO-DETECT ================= */
+function bcpDiscoverUnitNumber(){
+  try{
+    var m = (document.title || '').match(/\b(?:Troop|Pack|Crew|Ship|Post)\s*#?\s*(\d+[A-Za-z]?)\b/i);
+    if(m) return m[1];
+  }catch(e){ console.warn('Blue Card Printer: unit auto-detect failed:', e); }
+  return '';
+}
+
+/* ================= SETTINGS (localStorage) ================= */
+var DEFAULT_PDF_URL = 'https://raw.githubusercontent.com/gammann/TroopWebHost/main/Blue_Card/blue-card-template.pdf';
+var BCP_KEYS = {
+  unit:'bcpUnit', district:'bcpDistrict', council:'bcpCouncil', leaderEmail:'bcpLeaderEmail',
+  leaderTitle:'bcpLeaderTitle', layout:'bcpLayout', reqMode:'bcpReqMode',
+  printDate:'bcpPrintDate', lookups:'bcpLookups', since:'bcpSince',
+  menuId:'bcpMenuId', scoutDirId:'bcpScoutDirId', adultDirId:'bcpAdultDirId', pdfUrl:'bcpPdfUrl'
+};
+function bcpGet(key, fallback){
+  try{ var v = localStorage.getItem(key); return (v == null || v === '') ? fallback : v; }
+  catch(e){ return fallback; }
+}
+function bcpSet(key, val){ try{ localStorage.setItem(key, val); }catch(e){ /* private browsing -- non-fatal */ } }
+function bcpDefaultSince(){
+  // Jan 1 of six years ago: wide enough to catch old partials.
+  return (new Date().getFullYear() - 6) + '-01-01';
+}
+function bcpLoadSettingsIntoForm(){
+  byId('bcp-unit').value = bcpGet(BCP_KEYS.unit, bcpDiscoverUnitNumber());
+  byId('bcp-district').value = bcpGet(BCP_KEYS.district, '');
+  byId('bcp-council').value = bcpGet(BCP_KEYS.council, '');
+  byId('bcp-leader-email').value = bcpGet(BCP_KEYS.leaderEmail, '');
+  byId('bcp-leader-title').value = bcpGet(BCP_KEYS.leaderTitle, 'Scoutmaster');
+  byId('bcp-layout').value = bcpGet(BCP_KEYS.layout, '2');
+  byId('bcp-reqmode').value = bcpGet(BCP_KEYS.reqMode, 'compact');
+  byId('bcp-printdate').checked = bcpGet(BCP_KEYS.printDate, '1') === '1';
+  byId('bcp-lookups').checked = bcpGet(BCP_KEYS.lookups, '1') === '1';
+  byId('bcp-since').value = bcpGet(BCP_KEYS.since, bcpDefaultSince());
+  byId('bcp-menuid').value = bcpGet(BCP_KEYS.menuId, '45954');
+  byId('bcp-scoutdirid').value = bcpGet(BCP_KEYS.scoutDirId, '46012');
+  byId('bcp-adultdirid').value = bcpGet(BCP_KEYS.adultDirId, '46013');
+  byId('bcp-pdfurl').value = bcpGet(BCP_KEYS.pdfUrl, DEFAULT_PDF_URL);
+}
+function bcpSettings(){
+  var v = function(id, d){ return (byId(id).value || d || '').trim(); };
+  return {
+    unit: v('bcp-unit'), district: v('bcp-district'), council: v('bcp-council'),
+    leaderEmail: v('bcp-leader-email'), leaderTitle: v('bcp-leader-title', 'Scoutmaster'),
+    layout: v('bcp-layout', '2'), reqMode: v('bcp-reqmode', 'compact'),
+    printDate: byId('bcp-printdate').checked, lookups: byId('bcp-lookups').checked,
+    since: v('bcp-since', bcpDefaultSince()),
+    menuId: v('bcp-menuid', '45954'), scoutDirId: v('bcp-scoutdirid', '46012'),
+    adultDirId: v('bcp-adultdirid', '46013'), pdfUrl: v('bcp-pdfurl', DEFAULT_PDF_URL)
+  };
+}
+function bcpSaveSettings(){
+  var s = bcpSettings();
+  bcpSet(BCP_KEYS.unit, s.unit); bcpSet(BCP_KEYS.district, s.district); bcpSet(BCP_KEYS.council, s.council);
+  bcpSet(BCP_KEYS.leaderEmail, s.leaderEmail); bcpSet(BCP_KEYS.leaderTitle, s.leaderTitle);
+  bcpSet(BCP_KEYS.layout, s.layout); bcpSet(BCP_KEYS.reqMode, s.reqMode);
+  bcpSet(BCP_KEYS.printDate, s.printDate ? '1' : '0'); bcpSet(BCP_KEYS.lookups, s.lookups ? '1' : '0');
+  bcpSet(BCP_KEYS.since, s.since);
+  bcpSet(BCP_KEYS.menuId, s.menuId); bcpSet(BCP_KEYS.scoutDirId, s.scoutDirId);
+  bcpSet(BCP_KEYS.adultDirId, s.adultDirId); bcpSet(BCP_KEYS.pdfUrl, s.pdfUrl);
+}
+
+/* ================= STATE ================= */
+var BCP = { cards: [], localTemplate: null, templatePromise: null, retryAfterPick: false };
+
+/* ================= FETCH HELPERS =================
+   Sequential only (TWH's session state races under concurrent fetches),
+   credentials:'same-origin', redirect checked BEFORE res.ok. */
+var BCP_FETCH_TIMEOUT_MS = 45000;
+async function bcpFetchRaw(url, opts, allowRedirectRe){
+  var controller = new AbortController();
+  var timer = setTimeout(function(){ controller.abort(); }, BCP_FETCH_TIMEOUT_MS);
+  var fetchOpts = { credentials:'same-origin', signal: controller.signal };
+  if(opts) for(var k in opts) fetchOpts[k] = opts[k];
+  try{
+    var res;
+    try{ res = await fetch(url, fetchOpts); }
+    catch(e){
+      if(e.name === 'AbortError') throw new Error(url+' timed out after '+(BCP_FETCH_TIMEOUT_MS/1000)+'s.');
+      throw e;
+    }
+    if(res.redirected && !(allowRedirectRe && allowRedirectRe.test(res.url))) throw new Error('REDIRECTED:'+res.url);
+    if(!res.ok) throw new Error(url+' responded HTTP '+res.status+'.');
+    return res;
+  } finally { clearTimeout(timer); }
+}
+// TWH text exports are usually UTF-8 but can be Windows-1252; never let a
+// stray accented name turn into replacement characters.
+function bcpDecode(buf){
+  var text;
+  try{ text = new TextDecoder('utf-8', { fatal:true }).decode(buf); }
+  catch(e){ text = new TextDecoder('windows-1252').decode(buf); }
+  return text.charCodeAt(0) === 0xFEFF ? text.slice(1) : text;
+}
+function bcpUsDate(iso){
+  var m = String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? m[2]+'/'+m[3]+'/'+m[1] : '';
+}
+
+/* ================= TROOP AWARDS EXPORT =================
+   Same three requests the browser makes (see HAR): GET the prompt page,
+   POST the page's own easyform with the date and the "Download Blue
+   Cards File" button, and follow the 302 to FormCSV.aspx. */
+function bcpFindDateInput(formEl){
+  var inputs = Array.prototype.slice.call(formEl.querySelectorAll('input[type="text"]'));
+  var byLabel = inputs.filter(function(i){
+    var row = i.closest('tr');
+    return row && /started\s+since/i.test(row.textContent || '');
+  });
+  if(byLabel.length) return byLabel[0];
+  var entries = inputs.filter(function(i){ return /^ENTRY\d+$/.test(i.name || ''); });
+  return entries.length === 1 ? entries[0] : null;
+}
+function bcpFindBlueCardButton(formEl){
+  var btns = Array.prototype.slice.call(formEl.querySelectorAll('input[type="button"],button'));
+  var hit = btns.filter(function(b){ return /blue\s*cards?/i.test((b.getAttribute('title')||'')+' '+(b.value||'')+' '+(b.textContent||'')); });
+  if(hit.length) return { id: hit[0].id || 'BUTTON7', name: hit[0].getAttribute('name') || 'save continue' };
+  return { id: 'BUTTON7', name: 'save continue' };
+}
+async function bcpFetchExportCsv(menuId, sinceUs){
+  var res = await bcpFetchRaw('FormDetail.aspx?Menu_Item_ID='+encodeURIComponent(menuId)+'&Stack=2');
+  var doc = new DOMParser().parseFromString(await res.text(), 'text/html');
+  var formEl = doc.getElementById('easyform');
+  if(!formEl) throw new Error('The Troop Awards export page did not have the expected form -- your login may not have access, or TroopWebHost may have changed this page.');
+  var dateInput = bcpFindDateInput(formEl);
+  if(!dateInput) throw new Error('Could not find the "Started Since" date box on the export page -- TroopWebHost may have changed it.');
+  dateInput.value = sinceUs;
+  var btn = bcpFindBlueCardButton(formEl);
+  var fd = new FormData(formEl);
+  fd.set('Selected_Action', btn.name);
+  fd.set('Hover_Action', btn.name);
+  fd.set('Selected_Button_ID', btn.id);
+  // A redirect to FormCSV.aspx IS the success case here.
+  var post = await bcpFetchRaw('FormDetail.aspx', { method:'POST', body: fd }, /FormCSV\.aspx/i);
+  var text = bcpDecode(await post.arrayBuffer());
+  if(/^\s*</.test(text)) throw new Error('TroopWebHost answered with a web page instead of the CSV file. Try again, or download the file from the Troop Awards export page and use "Choose a CSV file instead".');
+  return text;
+}
+async function bcpFetchDirectory(menuId){
+  var res = await bcpFetchRaw('FormReport.aspx?Menu_Item_ID='+encodeURIComponent(menuId)+'&Stack=1&ReportFormat=XLS');
+  var text = bcpDecode(await res.arrayBuffer());
+  if(/^\s*</.test(text)) throw new Error('Directory came back as a web page, not a report.');
+  return bcpCsvObjects(text).objects;
+}
+
+/* ================= ENRICHMENT (best effort) ================= */
+async function bcpEnrich(cards, s){
+  var notes = [];
+  var scoutRows = null, adultRows = null;
+  try{ scoutRows = await bcpFetchDirectory(s.scoutDirId); }
+  catch(e){ notes.push('Scout Directory not available, so Scout emails are left blank.'); }
+  try{ adultRows = await bcpFetchDirectory(s.adultDirId); }
+  catch(e){ notes.push('Adult Directory not available, so leader email and counselor details are left blank.'); }
+  var result = { scoutsMatched: 0, counselorsMatched: 0, leaderEmail: '', notes: notes };
+  if(scoutRows){
+    var sEntries = scoutRows.map(function(r){ return { key: bcpDirKey(r['Name']), row: r }; });
+    var cache = {};
+    cards.forEach(function(c){
+      if(!(c.scout in cache)){
+        var m = bcpFindByName(c.scout, sEntries);
+        cache[c.scout] = m ? String(m.row['Email'] || m.row['Email #2'] || '').trim() : '';
+      }
+      c.scoutEmail = cache[c.scout];
+    });
+    var seen = {};
+    cards.forEach(function(c){ if(c.scoutEmail && !seen[c.scout]){ seen[c.scout] = 1; result.scoutsMatched++; } });
+  }
+  if(adultRows){
+    var matchedCounselors = {};
+    var aEntries = adultRows.map(function(r){ return { key: bcpDirKey(r['Name']), row: r }; });
+    cards.forEach(function(c){
+      if(!c.counselor) return;
+      var m = bcpFindByName(c.counselor, aEntries);
+      if(!m) return;
+      var r = m.row;
+      var addr = [r['Mailing Address Line 1'], r['Mailing Address Line 2']].map(function(x){ return String(x||'').trim(); }).filter(Boolean).join(', ');
+      matchedCounselors[c.counselor] = true;
+      c.counselorInfo = {
+        address: addr,
+        cityStateZip: bcpCityStateZip(r['City'], r['State'], r['Zip Code']),
+        phone: bcpPickPhone(r),
+        email: String(r['Email'] || r['Email #2'] || '').trim()
+      };
+    });
+    result.counselorsMatched = Object.keys(matchedCounselors).length;
+    var leaders = adultRows.filter(function(r){ return bcpHasLeadership(r['Leadership'], s.leaderTitle); });
+    var withEmail = leaders.filter(function(r){ return String(r['Email']||'').trim(); });
+    if(withEmail.length) result.leaderEmail = String(withEmail[0]['Email']).trim();
+    else if(leaders.length) notes.push('Found a "'+s.leaderTitle+'" in the Adult Directory but they have no email on file.');
+    else notes.push('Nobody in the Adult Directory has the Leadership title "'+s.leaderTitle+'" -- type the leader email in Settings.');
+  }
+  return result;
+}
+
+/* ================= LOAD PIPELINE ================= */
+function bcpSetStatus(id, cls, html){ byId(id).innerHTML = '<div class="bcp-note bcp-'+cls+'">'+html+'</div>'; }
+function bcpRestricted(id){
+  byId(id).innerHTML = '<div class="bcp-restricted"><strong>Restricted.</strong> Your TroopWebHost login does not have access to the <em>Export Troop Awards Advancement Files</em> page (Awards menu), which this tool runs for you. If you believe this is a mistake, contact your Troop\'s TroopWebHost administrator -- or download the file from someone who has access and use &quot;Choose a CSV file instead&quot;.</div>';
+}
+async function bcpIngest(text, source){
+  var parsed = bcpCsvObjects(text);
+  if(!parsed.headers.length) throw new Error('The file is empty.');
+  var s = bcpSettings();
+  var cards = bcpBuildCards(parsed.headers, parsed.objects, s.reqMode);
+  if(!cards.length){
+    byId('bcp-results-card').classList.add('bcp-hidden');
+    byId('bcp-gen-card').classList.add('bcp-hidden');
+    bcpSetStatus('bcp-load-status', 'info', 'The report loaded from '+esc(source)+' but there are no unfinished merit badges in it for that start date. Try an earlier date.');
+    return;
+  }
+  var enrichNotes = [], extra = '';
+  if(s.lookups){
+    bcpSetStatus('bcp-load-status', 'info', 'Loaded '+cards.length+' unfinished badges. Looking up emails and counselor details...');
+    var r = await bcpEnrich(cards, s);
+    enrichNotes = r.notes;
+    if(r.leaderEmail && !byId('bcp-leader-email').value.trim()){ byId('bcp-leader-email').value = r.leaderEmail; bcpSaveSettings(); }
+    var scouts = {}; cards.forEach(function(c){ scouts[c.scout] = 1; });
+    extra = ' Scout emails found for '+r.scoutsMatched+' of '+Object.keys(scouts).length+' Scouts; '+r.counselorsMatched+' assigned counselor(s) matched in the Adult Directory.';
+  }
+  BCP.cards = cards;
+  bcpRenderTable();
+  var scoutCount = Object.keys(cards.reduce(function(a,c){ a[c.scout]=1; return a; }, {})).length;
+  bcpSetStatus('bcp-load-status', 'ok', 'Loaded '+cards.length+' unfinished merit badges for '+scoutCount+' Scouts from '+esc(source)+'.'+esc(extra)
+    + enrichNotes.map(function(n){ return '<br>'+esc(n); }).join(''));
+  byId('bcp-results-card').classList.remove('bcp-hidden');
+  byId('bcp-gen-card').classList.remove('bcp-hidden');
+}
+async function bcpLoadFromTwh(){
+  var btn = byId('bcp-load-btn'); btn.disabled = true;
+  try{
+    var s = bcpSettings();
+    var since = bcpUsDate(s.since);
+    if(!since){ bcpSetStatus('bcp-load-status', 'warn', 'Pick a valid start date first.'); return; }
+    bcpSaveSettings();
+    bcpSetStatus('bcp-load-status', 'info', 'Asking TroopWebHost for the Blue Cards export...');
+    var text = await bcpFetchExportCsv(s.menuId, since);
+    await bcpIngest(text, 'TroopWebHost');
+  }catch(err){
+    if(String(err.message||'').indexOf('REDIRECTED:') === 0) bcpRestricted('bcp-load-status');
+    else bcpSetStatus('bcp-load-status', 'warn', 'Could not load the report: '+esc(err.message));
+  }finally{ btn.disabled = false; }
+}
+async function bcpLoadFromFile(file){
+  try{
+    bcpSaveSettings();
+    var buf = await file.arrayBuffer();
+    await bcpIngest(bcpDecode(buf), esc(file.name));
+  }catch(err){
+    if(String(err.message||'').indexOf('REDIRECTED:') === 0) bcpSetStatus('bcp-load-status', 'warn', 'The CSV loaded, but the directory lookups were not allowed for your login.');
+    else bcpSetStatus('bcp-load-status', 'warn', 'Could not read that file: '+esc(err.message));
+  }finally{ byId('bcp-csv-file').value = ''; }
+}
+
+/* ================= STEP 2: TABLE ================= */
+function bcpRenderTable(){
+  var tbody = byId('bcp-tbody'), html = '', lastScout = null;
+  BCP.cards.forEach(function(c, i){
+    if(c.scout !== lastScout){
+      lastScout = c.scout;
+      var n = BCP.cards.filter(function(x){ return x.scout === c.scout; }).length;
+      html += '<tr class="bcp-grp" data-scout="'+esc(c.scout)+'"><td class="bcp-cb-cell"><input type="checkbox" class="bcp-grp-cb" data-scout="'+esc(c.scout)+'"></td>'
+        + '<td colspan="4">'+esc(c.scout)+'<span class="bcp-meta">'+n+' badge'+(n===1?'':'s')+(c.scoutEmail ? ' &middot; '+esc(c.scoutEmail) : '')+'</span></td></tr>';
+    }
+    var chip = c.overflow.length ? '<span class="bcp-chip">+'+c.overflow.length+' in Remarks</span>' : '';
+    html += '<tr class="bcp-row" data-idx="'+i+'" data-scout="'+esc(c.scout)+'" data-search="'+esc((c.scout+' '+c.badge).toLowerCase())+'">'
+      + '<td class="bcp-cb-cell"><input type="checkbox" class="bcp-row-cb" data-idx="'+i+'"'+(c.selected?' checked':'')+'></td>'
+      + '<td>'+esc(c.badge)+'</td><td>'+esc(c.started)+'</td><td>'+esc(c.counselor)+'</td>'
+      + '<td class="bcp-reqs">'+(c.all.length ? esc(c.all.join('; ')) : '<em>none recorded</em>')+chip+'</td></tr>';
+  });
+  tbody.innerHTML = html;
+  bcpRefreshSelectionUi();
+}
+function bcpVisibleRows(){
+  return Array.prototype.slice.call(byId('bcp-tbody').querySelectorAll('tr.bcp-row')).filter(function(tr){ return !tr.classList.contains('bcp-hidden'); });
+}
+function bcpApplyFilter(){
+  var q = byId('bcp-filter').value.trim().toLowerCase();
+  var rows = Array.prototype.slice.call(byId('bcp-tbody').querySelectorAll('tr.bcp-row'));
+  var shownScouts = {};
+  rows.forEach(function(tr){
+    var show = !q || tr.getAttribute('data-search').indexOf(q) !== -1;
+    tr.classList.toggle('bcp-hidden', !show);
+    if(show) shownScouts[tr.getAttribute('data-scout')] = 1;
+  });
+  Array.prototype.slice.call(byId('bcp-tbody').querySelectorAll('tr.bcp-grp')).forEach(function(tr){
+    tr.classList.toggle('bcp-hidden', !shownScouts[tr.getAttribute('data-scout')]);
+  });
+}
+function bcpRefreshSelectionUi(){
+  var tbody = byId('bcp-tbody');
+  Array.prototype.slice.call(tbody.querySelectorAll('tr.bcp-row')).forEach(function(tr){
+    var c = BCP.cards[parseInt(tr.getAttribute('data-idx'),10)];
+    tr.classList.toggle('bcp-row-off', !c.selected);
+    tr.querySelector('.bcp-row-cb').checked = c.selected;
+  });
+  Array.prototype.slice.call(tbody.querySelectorAll('.bcp-grp-cb')).forEach(function(cb){
+    var mine = BCP.cards.filter(function(c){ return c.scout === cb.getAttribute('data-scout'); });
+    var on = mine.filter(function(c){ return c.selected; }).length;
+    cb.checked = on === mine.length; cb.indeterminate = on > 0 && on < mine.length;
+  });
+  var sel = BCP.cards.filter(function(c){ return c.selected; }).length;
+  var s = bcpSettings();
+  var sheets = Math.ceil(sel / bcpLayout(s.layout).per);
+  byId('bcp-count').innerHTML = '<strong>'+sel+'</strong> of '+BCP.cards.length+' selected &middot; '+sheets+' sheet'+(sheets===1?'':'s')+' (printed double-sided)';
+  byId('bcp-gen-hint').textContent = s.layout === '3'
+    ? 'Three cards per sheet, reduced to 96% so the outer cut lines clear your printer\'s margins. Front on page 1 and back on page 2 of each sheet. Print double-sided, flip on the LONG edge, at "Actual size" / 100% (never "fit to page"), then cut along the dashed lines.'
+    : (s.layout === '2'
+      ? 'Two cards per sheet, front on page 1 and back on page 2 of each sheet. Print double-sided, flip on the LONG edge, at 100% (never "fit to page"), then cut along the dashed lines.'
+      : 'One card per page (front, then back), including the template\'s instruction text. Print double-sided, flip on the LONG edge, at 100%, then cut along the dashed line.');
+}
+function bcpSetVisibleSelected(on){
+  bcpVisibleRows().forEach(function(tr){ BCP.cards[parseInt(tr.getAttribute('data-idx'),10)].selected = on; });
+  bcpRefreshSelectionUi();
+}
+
+/* ================= PDF GENERATION ================= */
+function bcpPad2(n){ return (n < 10 ? '0' : '') + n; }
+// Standard PDF fonts only encode WinAnsi. Strip accents where possible and
+// replace anything else with "?" so one odd character never aborts a batch.
+function bcpPdfSafe(text, font){
+  var out = '';
+  String(text||'').normalize('NFC').split('').forEach(function(ch){
+    try{ font.encodeText(ch); out += ch; return; }catch(e){}
+    var base = ch.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+    try{ if(base){ font.encodeText(base); out += base; return; } }catch(e2){}
+    out += '?';
+  });
+  return out;
+}
+async function bcpTemplateBytes(url){
+  if(BCP.localTemplate) return BCP.localTemplate;
+  if(BCP.templatePromise) return BCP.templatePromise;
+  async function attempt(u, noStore){
+    var controller = new AbortController();
+    var timer = setTimeout(function(){ controller.abort(); }, BCP_FETCH_TIMEOUT_MS);
+    try{
+      var opts = { signal: controller.signal };
+      if(noStore) opts.cache = 'no-store';
+      var res = await fetch(u, opts);
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      var bytes = new Uint8Array(await res.arrayBuffer());
+      if(String.fromCharCode(bytes[0], bytes[1], bytes[2], bytes[3]) !== '%PDF') throw new Error('not a PDF');
+      return bytes;
+    }finally{ clearTimeout(timer); }
+  }
+  BCP.templatePromise = (async function(){
+    try{ return await attempt(url, false); }
+    catch(e1){
+      // GitHub (and browsers) can cache a "not found" answer for a few
+      // minutes, e.g. right after a file is first pushed. Retry once with a
+      // unique query string and no-store so a stale 404 cannot stick.
+      try{ return await attempt(url + (url.indexOf('?') === -1 ? '?' : '&') + 'v=' + Date.now(), true); }
+      catch(e2){ throw new Error(e1.message + '; retry: ' + e2.message); }
+    }
+  })().catch(function(e){ BCP.templatePromise = null; throw e; });
+  return BCP.templatePromise;
+}
+// Builds one flattened document from a fresh copy of the template.
+//   card === null  -> the BLANK card: all artwork plus the template's own
+//                     default marks (Scout/Troop boxes), values untouched.
+//   card !== null  -> a text-only OVERLAY: the page content and resources
+//                     are stripped first, so the result holds nothing but
+//                     this card's values (a few KB), to be drawn on top of
+//                     the blank card. The blank card is embedded ONCE per
+//                     PDF, so output size and time stay small even for a
+//                     whole troop's worth of cards.
+// Flattening (values become static page content) also avoids AcroForm
+// field-name collisions between cards.
+async function bcpFlatten(templateBytes, card, s, warnings){
+  var PL = window.PDFLib;
+  var doc = await PL.PDFDocument.load(templateBytes);
+  var times = await doc.embedFont(PL.StandardFonts.TimesRoman);
+  var form = doc.getForm();
+  var missing = {};
+  if(card){
+    doc.getPages().forEach(function(p){
+      p.node.set(PL.PDFName.of('Contents'), doc.context.obj([]));
+      p.node.set(PL.PDFName.of('Resources'), doc.context.obj({}));
+    });
+    // The Scout/Troop marks live on the blank card; don't draw them twice.
+    try{ form.removeField(form.getRadioGroup('UnitTypeRB')); }catch(e){}
+    try{ form.removeField(form.getDropdown('UnitType')); }catch(e){}
+  }
+  function field(name){
+    try{ return form.getTextField(name); }
+    catch(e){ if(!missing[name]){ missing[name] = 1; warnings.push('The PDF has no field named "'+name+'" -- is it the fillable #34124 blue card?'); } return null; }
+  }
+  // Text runs along the field's long side for the 90-degree requirement cells.
+  function availLen(f){
+    return Math.min.apply(null, f.acroField.getWidgets().map(function(w){
+      var r = w.getRectangle(), ap = w.getAppearanceCharacteristics(), rot = ap ? ap.getRotation() : 0;
+      return ((rot === 90 || rot === 270) ? r.height : r.width);
+    })) - 4;
+  }
+  function setFit(name, text, maxSize, minSize){
+    var f = field(name);
+    text = bcpPdfSafe(text, times).trim();
+    if(!f || !text) return;
+    var avail = availLen(f), size = maxSize;
+    while(size > minSize && times.widthOfTextAtSize(text, size) > avail) size -= 0.25;
+    if(times.widthOfTextAtSize(text, size) > avail){
+      var full = text;
+      while(text.length > 1 && times.widthOfTextAtSize(text, size) > avail) text = text.slice(0, -1);
+      warnings.push(card.scout+' / '+card.badge+': "'+full+'" was too long for its box and was cut short.');
+    }
+    f.setFontSize(size);
+    f.setText(text);
+  }
+  var remText = '';
+  if(card){
+    setFit('Name1', card.scout, 10, 6);
+    setFit('Address1', card.addr, 10, 6);
+    setFit('CityStateZip1', card.cityStateZip, 10, 6);
+    if(s.lookups) setFit('ScoutEmail', card.scoutEmail, 10, 6);
+    setFit('UnitNumber', s.unit, 10, 6);
+    setFit('District', s.district, 10, 6);
+    setFit('Council', s.council, 10, 6);
+    setFit('LeaderEmail', s.leaderEmail, 10, 6);
+    setFit('MeritBadge1', card.badge, 11, 6);
+    setFit('Counselor1', card.counselor, 10, 6);
+    if(card.counselorInfo && s.lookups){
+      setFit('CounselorAddress1', card.counselorInfo.address, 10, 6);
+      setFit('CounselorCityStateZip1', card.counselorInfo.cityStateZip, 10, 6);
+      setFit('CounselorPhone1', card.counselorInfo.phone, 10, 6);
+      setFit('CounselorEmail', card.counselorInfo.email, 10, 6);
+    }
+    for(var i = 0; i < BCP_GRID_SLOTS; i++){
+      if(card.cells[i]) setFit('Requirement1.'+bcpPad2(BCP_GRID_ORDER[i]), card.cells[i], 9, 6);
+    }
+    if(card.overflow.length) remText = bcpPdfSafe('Also completed: '+card.overflow.join(', '), times);
+  }
+  // Remarks is a rich-text field: pdf-lib refuses to regenerate it unless
+  // it has been set, so always set it (to '' when unused).
+  var rem = field('Remarks1');
+  if(rem){
+    rem.setFontSize(remText.length > 120 ? 7 : 9);
+    rem.setText(remText);
+  }
+  form.updateFieldAppearances(times);
+  form.flatten();
+  // pdf-lib's removeField leaves refs to the deleted (kid) widgets in each
+  // page's /Annots -- prune them so the output has no dangling references.
+  doc.getPages().forEach(function(p){
+    var a = p.node.Annots();
+    if(!a) return;
+    for(var j = a.size()-1; j >= 0; j--){
+      var r = a.get(j);
+      if(r instanceof PL.PDFRef && !doc.context.lookup(r)) a.remove(j);
+    }
+  });
+  if(card && s.printDate && card.started){
+    var txt = bcpPdfSafe(card.started, times), sz = 9;
+    doc.getPage(0).drawText(txt, { x: 566 - times.widthOfTextAtSize(txt, sz), y: 589, size: sz, font: times });
+  }
+  // pdf-lib only writes an embedded font's dictionary at save() time, so
+  // embedding pages from this still-unsaved document would leave every font
+  // reference dangling in the merged output (text vanishes). Round-trip
+  // through save()+load() so the pages are self-contained.
+  return await PL.PDFDocument.load(await doc.save({ useObjectStreams: false }));
+}
+// Card strip (front/back) inside each 612x792 template page.
+var BCP_STRIP = { left: 0, bottom: 506, right: 612, top: 780 };
+var BCP_FULL = { left: 0, bottom: 0, right: 612, top: 792 };
+var BCP_SLOT_Y = [437, 81]; // bottoms of the two cards on a 2-up sheet (evenly spaced)
+// Measured from the template: the card artwork spans y=516..774 (257.5 pt,
+// about 3.58 in) on BOTH pages, so this crop keeps ~2 pt of white around it.
+// Three at full size would leave only ~0.13 in of margin per side -- inside
+// most printers' unprintable zone, so the outer cut lines would be clipped.
+// At 96% the three cards leave ~0.26 in top and bottom.
+var BCP_TIGHT = { left: 0, bottom: 514, right: 612, top: 776 };
+var BCP_3UP_SCALE = 0.96;
+function bcpLayout(id){
+  if(id === '1') return { per: 1, box: BCP_FULL, scale: 1, x: 0, ys: [0] };
+  if(id === '3'){
+    var sc = BCP_3UP_SCALE, h = (BCP_TIGHT.top - BCP_TIGHT.bottom) * sc, m = (792 - 3 * h) / 2;
+    return { per: 3, box: BCP_TIGHT, scale: sc, x: 612 * (1 - sc) / 2, ys: [m + 2 * h, m + h, m] };
+  }
+  return { per: 2, box: BCP_STRIP, scale: 1, x: 0, ys: BCP_SLOT_Y };
+}
+async function bcpBuildPdf(cards, s, templateBytes, onProgress){
+  var PL = window.PDFLib, warnings = [];
+  var out = await PL.PDFDocument.create();
+  var L = bcpLayout(s.layout);
+  var blank = await bcpFlatten(templateBytes, null, s, warnings);
+  var bgFront = await out.embedPage(blank.getPage(0), L.box);
+  var bgBack = await out.embedPage(blank.getPage(1), L.box);
+  // Front and back use the identical crop, scale and position, so each card's
+  // back lands exactly behind its front when printed double-sided (long edge).
+  async function drawCard(front, back, card, y){
+    var ov = await bcpFlatten(templateBytes, card, s, warnings);
+    var of = await out.embedPage(ov.getPage(0), L.box);
+    var ob = await out.embedPage(ov.getPage(1), L.box);
+    var opt = { x: L.x, y: y, xScale: L.scale, yScale: L.scale };
+    front.drawPage(bgFront, opt); front.drawPage(of, opt);
+    back.drawPage(bgBack, opt); back.drawPage(ob, opt);
+  }
+  for(var k = 0; k < cards.length; k += L.per){
+    var front = out.addPage([612, 792]), back = out.addPage([612, 792]);
+    for(var j = 0; j < L.per && k+j < cards.length; j++){
+      onProgress(k+j+1, cards.length);
+      await drawCard(front, back, cards[k+j], L.ys[j]);
+    }
+  }
+  return { bytes: await out.save({ useObjectStreams: false }), warnings: warnings };
+}
+function bcpSafeFilePart(s){ return String(s||'').replace(/[\\\/:*?"<>|]/g, '').replace(/\s+/g, ' ').trim(); }
+async function bcpGenerate(){
+  var statusId = 'bcp-gen-status', btn = byId('bcp-gen-btn');
+  var selected = BCP.cards.filter(function(c){ return c.selected; });
+  if(!selected.length){ bcpSetStatus(statusId, 'warn', 'Select at least one card first.'); return; }
+  if(!window.PDFLib){ bcpSetStatus(statusId, 'warn', 'The PDF library (pdf-lib) did not load -- check that this browser can reach cdnjs.cloudflare.com.'); return; }
+  var s = bcpSettings();
+  bcpSaveSettings();
+  btn.disabled = true;
+  try{
+    bcpSetStatus(statusId, 'info', 'Fetching the blue card template...');
+    var bytes;
+    try{ bytes = await bcpTemplateBytes(s.pdfUrl); }
+    catch(e){
+      BCP.retryAfterPick = true;
+      throw new Error('Could not fetch the blank template from '+s.pdfUrl+' ('+e.message+'). Choose your own copy of the fillable blue card PDF using the "Blank template" file box just below this message and the PDF will be generated right away.');
+    }
+    var res = await bcpBuildPdf(selected, s, bytes, function(n, total){
+      bcpSetStatus(statusId, 'info', 'Building card '+n+' of '+total+'...');
+    });
+    var blob = new Blob([res.bytes], { type:'application/pdf' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = selected.length === 1
+      ? bcpSafeFilePart(selected[0].scout+' '+selected[0].badge+(s.unit ? ' '+s.unit : ''))+'.pdf'
+      : 'Blue_Cards.pdf';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 60000);
+    var over = selected.filter(function(c){ return c.overflow.length; }).length;
+    var nSheets = Math.ceil(selected.length / bcpLayout(s.layout).per);
+    var msg = 'Done -- '+selected.length+' card'+(selected.length===1?'':'s')+' ('+nSheets+' sheet'+(nSheets===1?'':'s')+', double-sided). Your download should start automatically. Print one test sheet before running a full batch.';
+    if(over) msg += '<br>'+over+' card'+(over===1?' has':'s have')+' more requirements than the 22 grid boxes; the extras are listed in the Remarks box.';
+    if(res.warnings.length) msg += '<br>'+res.warnings.slice(0,5).map(esc).join('<br>')+(res.warnings.length>5 ? '<br>...and '+(res.warnings.length-5)+' more.' : '');
+    bcpSetStatus(statusId, res.warnings.length ? 'warn' : 'ok', msg);
+  }catch(err){
+    bcpSetStatus(statusId, 'warn', 'Could not generate the PDF: '+esc(err.message));
+  }finally{ btn.disabled = false; }
+}
+
+/* ================= WIRING ================= */
+document.addEventListener('DOMContentLoaded', function(){
+  bcpLoadSettingsIntoForm();
+  // Every settings control saves itself; text boxes also swallow Enter so
+  // TWH's page-wide ASP.NET form can never post back from this page.
+  ['bcp-unit','bcp-district','bcp-council','bcp-leader-email','bcp-leader-title','bcp-since','bcp-menuid','bcp-scoutdirid','bcp-adultdirid','bcp-pdfurl'].forEach(function(id){
+    byId(id).addEventListener('change', bcpSaveSettings);
+    byId(id).addEventListener('keydown', function(e){ if(e.key === 'Enter') e.preventDefault(); });
+  });
+  ['bcp-layout','bcp-printdate','bcp-lookups'].forEach(function(id){
+    byId(id).addEventListener('change', function(){ bcpSaveSettings(); if(BCP.cards.length) bcpRefreshSelectionUi(); });
+  });
+  byId('bcp-reqmode').addEventListener('change', function(){
+    bcpSaveSettings();
+    if(BCP.cards.length){ bcpApplyReqMode(BCP.cards, bcpSettings().reqMode); bcpRenderTable(); bcpApplyFilter(); }
+  });
+  byId('bcp-filter').addEventListener('keydown', function(e){ if(e.key === 'Enter') e.preventDefault(); });
+  byId('bcp-filter').addEventListener('input', bcpApplyFilter);
+  byId('bcp-adv-reset').addEventListener('click', function(e){
+    e.preventDefault();
+    [BCP_KEYS.menuId, BCP_KEYS.scoutDirId, BCP_KEYS.adultDirId, BCP_KEYS.pdfUrl].forEach(function(k){ try{ localStorage.removeItem(k); }catch(err){} });
+    bcpLoadSettingsIntoForm();
+    bcpSetStatus('bcp-settings-status', 'ok', 'Advanced settings reset to defaults.');
+  });
+  byId('bcp-load-btn').addEventListener('click', function(e){ e.preventDefault(); bcpLoadFromTwh(); });
+  byId('bcp-csv-btn').addEventListener('click', function(e){ e.preventDefault(); byId('bcp-csv-file').click(); });
+  byId('bcp-csv-file').addEventListener('change', function(){ var f = this.files && this.files[0]; if(f) bcpLoadFromFile(f); });
+  byId('bcp-pdf-file').addEventListener('change', async function(){
+    var f = this.files && this.files[0];
+    if(!f) return;
+    BCP.localTemplate = new Uint8Array(await f.arrayBuffer());
+    bcpSetStatus('bcp-gen-status', 'ok', 'Using your PDF ('+esc(f.name)+') as the template.');
+    if(BCP.retryAfterPick){ BCP.retryAfterPick = false; bcpGenerate(); }
+  });
+  byId('bcp-select-all').addEventListener('click', function(e){ e.preventDefault(); bcpSetVisibleSelected(true); });
+  byId('bcp-select-none').addEventListener('click', function(e){ e.preventDefault(); bcpSetVisibleSelected(false); });
+  byId('bcp-gen-btn').addEventListener('click', function(e){ e.preventDefault(); bcpGenerate(); });
+  byId('bcp-tbody').addEventListener('change', function(e){
+    var t = e.target;
+    if(t.classList.contains('bcp-row-cb')){
+      BCP.cards[parseInt(t.getAttribute('data-idx'),10)].selected = t.checked;
+    } else if(t.classList.contains('bcp-grp-cb')){
+      var sc = t.getAttribute('data-scout');
+      var visible = {};
+      bcpVisibleRows().forEach(function(tr){ visible[tr.getAttribute('data-idx')] = 1; });
+      BCP.cards.forEach(function(c, i){ if(c.scout === sc && visible[i]) c.selected = t.checked; });
+    } else { return; }
+    bcpRefreshSelectionUi();
+  });
+});
+})();
+</script>
+<script>
+(function(){
+'use strict';
+var TABS = [{"key":"pocket","root":"mbc-root"},{"key":"blue","root":"bcp-root"}];
+var SHARED = [["mbc-unit","bcp-unit"],["mbc-council","bcp-council"],["mbc-adultdirid","bcp-adultdirid"],["mbc-leadertitle","bcp-leader-title"]];
+var STORE_KEY = 'mbtActiveTab';
+function byId(id){ return document.getElementById(id); }
+var wrap = byId('mbt-root');
+
+// The tabs borrow the active tool's resolved theme colors.
+function syncTheme(key){
+  try{
+    var t = TABS.filter(function(x){ return x.key === key; })[0];
+    var root = t && byId(t.root);
+    if(!root) return;
+    var cs = getComputedStyle(root);
+    [['--brass','--mbt-brass'],['--accent-ink','--mbt-accent-ink'],['--ink','--mbt-ink'],['--paper-800','--mbt-paper'],['--hair-strong','--mbt-hair']].forEach(function(p){
+      var v = cs.getPropertyValue(p[0]).trim();
+      if(v) wrap.style.setProperty(p[1], v);
+    });
+  }catch(e){ /* cosmetic only */ }
+}
+function select(key, focus){
+  if(!TABS.some(function(x){ return x.key === key; })) key = TABS[0].key;
+  TABS.forEach(function(t){
+    var on = t.key === key;
+    var btn = byId('mbt-tab-' + t.key), panel = byId('mbt-panel-' + t.key);
+    btn.setAttribute('aria-selected', on ? 'true' : 'false');
+    btn.tabIndex = on ? 0 : -1;
+    panel.classList.toggle('mbt-hidden', !on);
+    if(on && focus) btn.focus();
+  });
+  syncTheme(key);
+  try{ localStorage.setItem(STORE_KEY, key); }catch(e){}
+  try{ if(history.replaceState) history.replaceState(null, '', '#' + key); }catch(e){}
+}
+function initialTab(){
+  var h = (location.hash || '').replace('#', '');
+  if(TABS.some(function(x){ return x.key === h; })) return h;
+  try{ var s = localStorage.getItem(STORE_KEY); if(s) return s; }catch(e){}
+  return TABS[0].key;
+}
+function wire(){
+  var bar = wrap.querySelector('.mbt-tabs');
+  bar.addEventListener('click', function(e){
+    var b = e.target.closest ? e.target.closest('button[data-tab]') : null;
+    if(b){ e.preventDefault(); select(b.getAttribute('data-tab'), false); }
+  });
+  bar.addEventListener('keydown', function(e){
+    var i = -1;
+    TABS.forEach(function(t, n){ if(byId('mbt-tab-' + t.key) === document.activeElement) i = n; });
+    if(i < 0) return;
+    var next = null;
+    if(e.key === 'ArrowRight') next = (i + 1) % TABS.length;
+    else if(e.key === 'ArrowLeft') next = (i - 1 + TABS.length) % TABS.length;
+    else if(e.key === 'Home') next = 0;
+    else if(e.key === 'End') next = TABS.length - 1;
+    if(next !== null){ e.preventDefault(); select(TABS[next].key, true); }
+  });
+  window.addEventListener('hashchange', function(){
+    var h = (location.hash || '').replace('#', '');
+    if(TABS.some(function(x){ return x.key === h; })) select(h, false);
+  });
+  // Shared settings: fill an empty box from its partner, then mirror edits.
+  SHARED.forEach(function(pair){
+    var a = byId(pair[0]), b = byId(pair[1]);
+    if(!a || !b) return;
+    if(a.value && !b.value){ b.value = a.value; b.dispatchEvent(new Event('change')); }
+    else if(b.value && !a.value){ a.value = b.value; a.dispatchEvent(new Event('change')); }
+    function mirror(from, to){
+      from.addEventListener('change', function(){
+        if(to.value !== from.value){ to.value = from.value; to.dispatchEvent(new Event('change')); }
+      });
+    }
+    mirror(a, b); mirror(b, a);
+  });
+  select(initialTab(), false);
+}
+// The tools load their saved settings on DOMContentLoaded; this listener is
+// registered after theirs, so it runs after they have filled their boxes.
+if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
+else wire();
+})();
+</script>
