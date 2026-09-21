@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- README restructured: removed the TWH Terms of Service section, moved
+  "What it does" ahead of the screenshots, added a "Required TWH access"
+  table (login type -> pages needed -> fallback behavior), and shrank
+  screenshots to 50% display width. Removed SETUP.md - its essential
+  content (Quick start, HAR-capture tip for verifying `TWH_CONFIG`) folded
+  into the README directly.
 - Confirmed the exact field IDs for "My Personal Information"
   (`Menu_Item_ID=45902`, the Scout-direct profile page) via a real HAR
   capture, replacing the previous best-effort label-guessing with a proper

@@ -11,54 +11,12 @@ reviewed, or endorsed by the Boy Scouts of America or TroopWebHost. Always
 have a unit leader review the generated PDF before it's submitted - this
 tool is a time-saver, not a substitute for that review.
 
-## Screenshots
-
-The screenshots below are generated from a scripted demo run against fully
-made-up data (name, address, dates, badges - none of it is a real Scout),
-so you can see the wizard end-to-end without any real Scout's information.
-
-**Step 1 - Load a Scout.** Type a name to search the roster (leaders) or
-pick from your own linked Scout(s) (parents/Scouts).
-
-![Step 1: Load a Scout](./screenshots/01-load-scout.png)
-
-**Step 2 - Review Scout & unit info.** Everything pulled straight from
-TroopWebHost, editable before it goes any further.
-
-![Step 2: Scout and unit information](./screenshots/02-scout-info.png)
-
-**Step 3 - Merit badges.** Required badges are auto-assigned when there's
-exactly one earned candidate for a slot; choice requirements (like #10:
-Swimming/Hiking/Cycling) let you pick which earned badge fills the slot.
-
-![Step 3: Merit badges](./screenshots/03-merit-badges.png)
-
-**Step 4 - Positions of responsibility.** Pre-selected chronologically,
-earliest-first after the Life board of review, picking just enough to
-satisfy the 6-month requirement. Note in this demo data a fake "OA Vice
-Chief" position was deliberately included to confirm it's correctly
-excluded - only "OA Troop Representative" counts toward this requirement.
-
-![Step 4: Positions of responsibility](./screenshots/04-positions.png)
-
-**Step 5 - Generate & download.** A final checklist flags anything that
-still needs a human's attention (references, the service project writeup,
-signatures, and parent/guardian contact info this tool has no way to know).
-
-![Step 5: Generate and download](./screenshots/05-download.png)
-
-**The filled PDF itself.** Clicking "Generate & download" produces the
-actual filled application - this is the real, official 512-728 form (Jan
-2026 revision), filled by the tool's real pdf-lib logic against the same
-fake Scout data as above.
-
-![Filled PDF, page 1](./screenshots/06-filled-pdf-page1.png)
-![Filled PDF, page 2](./screenshots/07-filled-pdf-page2.png)
-
 ## What it does
 
 - Looks up a Scout by name (leaders see the full roster filtered to Life and
-  Eagle rank; parents/Scouts see their own linked Scout(s) via "My Scouts")
+  Eagle rank; parents/Scouts see their own linked Scout(s) via "My Scouts";
+  a Scout logged in directly under their own account loads their own record
+  automatically, with no picker at all)
 - Pulls profile info, rank history, merit badge history, and Eagle
   requirement dates directly from TroopWebHost's own report pages, using the
   browser's already-logged-in session - nothing is uploaded anywhere
@@ -81,6 +39,50 @@ fake Scout data as above.
     (earliest after the Life board of review first), picking just enough to
     satisfy the 6-month requirement
 
+## Screenshots
+
+The screenshots below are generated from a scripted demo run against fully
+made-up data (name, address, dates, badges - none of it is a real Scout),
+so you can see the wizard end-to-end without any real Scout's information.
+
+**Step 1 - Load a Scout.** Type a name to search the roster (leaders) or
+pick from your own linked Scout(s) (parents/Scouts).
+
+<img src="./screenshots/01-load-scout.png" alt="Step 1: Load a Scout" width="50%">
+
+**Step 2 - Review Scout & unit info.** Everything pulled straight from
+TroopWebHost, editable before it goes any further.
+
+<img src="./screenshots/02-scout-info.png" alt="Step 2: Scout and unit information" width="50%">
+
+**Step 3 - Merit badges.** Required badges are auto-assigned when there's
+exactly one earned candidate for a slot; choice requirements (like #10:
+Swimming/Hiking/Cycling) let you pick which earned badge fills the slot.
+
+<img src="./screenshots/03-merit-badges.png" alt="Step 3: Merit badges" width="50%">
+
+**Step 4 - Positions of responsibility.** Pre-selected chronologically,
+earliest-first after the Life board of review, picking just enough to
+satisfy the 6-month requirement. Note in this demo data a fake "OA Vice
+Chief" position was deliberately included to confirm it's correctly
+excluded - only "OA Troop Representative" counts toward this requirement.
+
+<img src="./screenshots/04-positions.png" alt="Step 4: Positions of responsibility" width="50%">
+
+**Step 5 - Generate & download.** A final checklist flags anything that
+still needs a human's attention (references, the service project writeup,
+signatures, and parent/guardian contact info this tool has no way to know).
+
+<img src="./screenshots/05-download.png" alt="Step 5: Generate and download" width="50%">
+
+**The filled PDF itself.** Clicking "Generate & download" produces the
+actual filled application - this is the real, official 512-728 form (Jan
+2026 revision), filled by the tool's real pdf-lib logic against the same
+fake Scout data as above.
+
+<img src="./screenshots/06-filled-pdf-page1.png" alt="Filled PDF, page 1" width="50%">
+<img src="./screenshots/07-filled-pdf-page2.png" alt="Filled PDF, page 2" width="50%">
+
 ## What it doesn't do
 
 - It does not submit anything on your Scout's behalf - the PDF download is
@@ -94,25 +96,36 @@ fake Scout data as above.
 
 ## Quick start
 
-See [SETUP.md](./SETUP.md) for full install instructions. In short:
-
 1. Copy the contents of `eagle-scout-rank-application-form.html`
 2. Paste into a new TroopWebHost Custom Page
-3. Edit the `TWH_CONFIG` block near the bottom of the script to match your
-   troop's Menu_Item_IDs (see SETUP.md for how to find them)
+3. At the top of the page, set the "Application form source" URL to wherever
+   your troop keeps the current official 512-728 PDF
 4. Save and open the page while logged into TroopWebHost
 
-## Before you distribute this to your own troop
+The `TWH_CONFIG` block near the bottom of the script holds the
+`Menu_Item_ID`/`Form_ID` values this tool fetches. These have matched
+exactly across every TroopWebHost installation checked so far, so you
+likely won't need to change anything - but if a page comes back empty on
+your site, a HAR capture (browser DevTools -> Network tab -> "Save all as
+HAR") of the equivalent page loaded through TWH's own menu is the fastest
+way to find the real values to swap in.
 
-TroopWebHost's Terms of Service (clause 11, as of this writing) restricts
-accessing TroopWebHost's web services by means other than their own HTML UI
-and prohibits reverse engineering. This tool works by having your own
-browser - already logged in as you - fetch pages TroopWebHost itself serves
-to you, the same way clicking a link would. It doesn't scrape another
-person's session, bypass authentication, or hit any endpoint you couldn't
-otherwise reach by clicking through the site yourself. That said, this is a
-judgment call and not legal advice: if you plan to distribute this beyond
-your own troop, consider reaching out to TroopWebHost first.
+## Required TWH access
+
+This tool only reads pages the logged-in account could already reach by
+clicking through TWH's own menu - it never bypasses permissions. What it
+needs depends on who's running it:
+
+| Login type | TWH pages it needs to reach | If access is missing |
+| --- | --- | --- |
+| Unit leader | Advancement Hub (roster, rank/position, merit badges, Eagle requirements) and the Membership Hub (profile) | Falls back to trying the logged-in account's own self-service access instead |
+| Parent | "My Scouts" (their linked Scout's profile, rank/position, merit badges, Eagle requirements) | Falls back to trying the Scout-direct links below |
+| Scout (logged in directly) | "My Personal Information", "My Rank Advancement", "My Merit Badges" | Tool shows a clear error naming which specific page it couldn't reach |
+
+Exact Task/Role names are configured per council/troop, so they aren't
+listed here - if a page comes back inaccessible for someone who should
+have it, check that their TWH Role includes whichever of the menu items
+above they're missing.
 
 ## Known TroopWebHost quirks this tool works around
 
