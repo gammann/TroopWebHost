@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+- Confirmed the exact field IDs for "My Personal Information"
+  (`Menu_Item_ID=45902`, the Scout-direct profile page) via a real HAR
+  capture, replacing the previous best-effort label-guessing with a proper
+  `extractProfileScoutDirect` extractor. The generic label-based fallback
+  added for this case stays in place as a last resort for any other
+  TWH page this tool hasn't sampled yet.
+- Fixed: a Scout running the tool as themselves got no name/address on the
+  review screen, even though it's right there on their own "My Personal
+  Information" screen. That page uses a third, unsampled `ENTRY###` field
+  scheme (neither the leader nor parent-facing schemes this tool already
+  knew), so the classifier silently dropped the whole page. Added a
+  hint-based fallback: when a fetch is known to be a profile page but its
+  fields don't match any known scheme, a generic label-text extractor
+  (`extractProfileGeneric`) now guesses at common field labels ("Full
+  Name", "Street Address", "Telephone", etc.) instead of losing the data
+  entirely. Also fixed a real bug caught while building this: the
+  label-lookup helpers' table-cell fallback checked an adjacent cell's
+  `textContent`, which is always empty when the cell holds an `<input>` -
+  both helpers now check for an embedded input/select/textarea first.
+  The exact field labels this page actually uses are still unconfirmed
+  (this is a best-effort guess) - a HAR capture of "My Personal
+  Information" would let this be replaced with confirmed field IDs.
+- Fixed: a Scout logged in directly (not through a parent) would hit a 302
+  redirect and get stuck on "Looking up available Scout(s)..." forever,
+  because the self-service fallback only tried `Menu_Item_ID=45899` ("My
+  Scouts"), which is a parent-only feature - it doesn't exist anywhere in a
+  Scout's own menu (confirmed via a Scout's saved menu source). Added a
+  third fallback tier using the Scout's own direct advancement links
+  (`Menu_Item_ID=45911`/`45902`/`45912`, no ID parameter needed), which auto-
+  loads with no picker step since there's only one possible record. The
+  Eagle requirement checklist has no known Scout-direct equivalent yet, so
+  it's flagged as unavailable rather than silently skipped - verified
+  end-to-end with a Playwright simulation of this exact login scenario.
 - Filled-PDF README screenshots now use the real, official 512-728 form
   (the user provided it directly) instead of a synthetic reconstruction.
   Cross-checked via `pypdf`: all 44 field names this tool fills exist

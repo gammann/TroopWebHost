@@ -20,24 +20,18 @@ so you can see the wizard end-to-end without any real Scout's information.
 **Step 1 - Load a Scout.** Type a name to search the roster (leaders) or
 pick from your own linked Scout(s) (parents/Scouts).
 
-<p align="center">
-<img src="./screenshots/01-load-scout.png" width="50%">
-</p>
+![Step 1: Load a Scout](./screenshots/01-load-scout.png)
 
 **Step 2 - Review Scout & unit info.** Everything pulled straight from
 TroopWebHost, editable before it goes any further.
 
-<p align="center">
-<img src="./screenshots/02-scout-info.png" width="50%">
-</p>
+![Step 2: Scout and unit information](./screenshots/02-scout-info.png)
 
 **Step 3 - Merit badges.** Required badges are auto-assigned when there's
 exactly one earned candidate for a slot; choice requirements (like #10:
 Swimming/Hiking/Cycling) let you pick which earned badge fills the slot.
 
-<p align="center">
-<img src="./screenshots/03-merit-badges.png" width="50%">
-</p>
+![Step 3: Merit badges](./screenshots/03-merit-badges.png)
 
 **Step 4 - Positions of responsibility.** Pre-selected chronologically,
 earliest-first after the Life board of review, picking just enough to
@@ -45,35 +39,26 @@ satisfy the 6-month requirement. Note in this demo data a fake "OA Vice
 Chief" position was deliberately included to confirm it's correctly
 excluded - only "OA Troop Representative" counts toward this requirement.
 
-<p align="center">
-<img src="./screenshots/04-positions.png" width="50%">
-</p>
+![Step 4: Positions of responsibility](./screenshots/04-positions.png)
 
 **Step 5 - Generate & download.** A final checklist flags anything that
 still needs a human's attention (references, the service project writeup,
 signatures, and parent/guardian contact info this tool has no way to know).
 
-<p align="center">
-<img src="./screenshots/05-download.png" width="50%">
-</p>
+![Step 5: Generate and download](./screenshots/05-download.png)
 
 **The filled PDF itself.** Clicking "Generate & download" produces the
 actual filled application - this is the real, official 512-728 form (Jan
 2026 revision), filled by the tool's real pdf-lib logic against the same
 fake Scout data as above.
 
-<p align="center">
-<img src="./screenshots/06-filled-pdf-page1.png" width="50%">
-</p>
-
-<p align="center">
-<img src="./screenshots/07-filled-pdf-page2.png" width="50%">
-</p>
+![Filled PDF, page 1](./screenshots/06-filled-pdf-page1.png)
+![Filled PDF, page 2](./screenshots/07-filled-pdf-page2.png)
 
 ## What it does
 
 - Looks up a Scout by name (leaders see the full roster filtered to Life and
-  Eagle rank; parents (Adult role) see their own linked Scout(s) via "My Scouts")
+  Eagle rank; parents/Scouts see their own linked Scout(s) via "My Scouts")
 - Pulls profile info, rank history, merit badge history, and Eagle
   requirement dates directly from TroopWebHost's own report pages, using the
   browser's already-logged-in session - nothing is uploaded anywhere
@@ -106,29 +91,6 @@ fake Scout data as above.
   guessing
 - It doesn't replace the actual Scout-Unit Leader conference, service
   project paperwork, or reference-letter process
-
-## Required roles
-
-**Leader mode**
-
-| Data | Menu_Item_ID | Roles that can reach it |
-|---|---|---|
-| Advancement Hub landing page, rank/position, merit badge and Eagle requirement forms | 56926 (Form_ID 190 / 228 / 213) | Rank Advancement |
-| Scout profile | 56934 (Form_ID 110) | Membership, Rank Advancement |
-
-A leader login needs the **Rank Advancement** role, which reaches both hubs. Membership alone reaches only the
-profile.
-
-**Self-service (parent) mode**
-
-| Data | Menu_Item_ID | Roles that can reach it |
-|---|---|---|
-| My Scouts list, profile, rank/position, merit badges, Eagle requirements | 45899 (Form_ID 209 / 432 / 425 / 427) | Adult |
-
-A parent login needs the **Adult** role. The Scout role does not hold the My Scouts tasks, so a Scout logged in
-directly is redirected and sees the restricted message.
-
-Roles come from the site's Task Role and Task Menu Items exports, matched on `Menu_Item_ID`, and were checked against a login that holds only the Adult role. They describe how one troop's TroopWebHost site is configured. A site administrator can change which tasks each role holds (**Menu > Administration > Security Configuration > Assign Tasks to Roles**), so confirm against your own site. A login that lacks access is redirected by TroopWebHost, which this tool detects and reports.
 
 ## Quick start
 

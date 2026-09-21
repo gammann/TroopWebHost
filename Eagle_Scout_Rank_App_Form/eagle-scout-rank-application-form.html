@@ -207,7 +207,7 @@
   <section class="eagle-card eagle-hidden" id="step-info">
     <h2>Step 2</h2>
     <h3>Scout &amp; unit information</h3>
-    <p class="eagle-help">Pulled from the member profile export. Fix anything that looks off - this feeds straight into the PDF.</p>
+    <p class="eagle-help">Pulled from TroopWebHost. Fix anything that looks off - this feeds straight into the PDF.</p>
 
     <div class="eagle-two-col">
       <div>
@@ -438,7 +438,13 @@ function getValueByLabelText(doc, labelText) {
         const cells = Array.from(row.querySelectorAll('td,th'));
         const i = cells.indexOf(el);
         if (i !== -1 && cells[i + 1]) {
-          const cellText = cells[i + 1].textContent.replace(/\s+/g, ' ').trim();
+          const cell = cells[i + 1];
+          const cellInput = cell.matches('input,select,textarea') ? cell : cell.querySelector('input,select,textarea');
+          if (cellInput) {
+            const v = (cellInput.value || cellInput.getAttribute('value') || '').trim();
+            if (v) return v;
+          }
+          const cellText = cell.textContent.replace(/\s+/g, ' ').trim();
           if (cellText) return cellText;
         }
       }
@@ -521,6 +527,14 @@ function classifyAndExtract(docEntry) {
     return results;
   }
 
+  // 1c) "My Personal Information" (Scout-direct login, Menu_Item_ID=45902) -
+  //     a THIRD, distinct field-ID scheme. Confirmed via HAR capture.
+  if (doc.querySelector('[name="ENTRY303925"]') || doc.querySelector('[name="ENTRY303928"]')) {
+    results.kind = 'profile';
+    results.data = extractProfileScoutDirect(doc);
+    return results;
+  }
+
   // 2) Eagle rank requirements checklist: inputs named like CB123ROW4DATA5678
   //    with title "The date on which this requirement was achieved."
   const reqDateInputs = Array.from(doc.querySelectorAll('input[type="text"]'))
@@ -587,7 +601,97 @@ function classifyAndExtract(docEntry) {
     return results;
   }
 
+  // 4) Last resort: the caller already knows which fetch this came from
+  // (e.g. the Scout-direct "My Personal Information" page) even though its
+  // field IDs don't match either known profile scheme above. Use the
+  // best-effort generic label extractor rather than dropping the page.
+  if (docEntry.hintKind === 'profile') {
+    results.kind = 'profile';
+    results.data = extractProfileGeneric(doc);
+    return results;
+  }
+
   return results;
+}
+
+// Looser cousin of getValueByLabelText: matches a label element whose text
+// CONTAINS the given substring (case-insensitive) rather than equaling it
+// exactly. Used only as a last-resort, best-effort extractor for a page
+// whose exact field IDs/labels haven't been confirmed via a real capture
+// yet - prefer getValueByLabelText or a confirmed ENTRY### ID wherever the
+// exact wording is known.
+function getValueByLabelContains(doc, substring) {
+  const target = substring.toLowerCase();
+  const candidates = Array.from(doc.querySelectorAll('label, td, th, span, div, b, strong'));
+  for (const el of candidates) {
+    const text = (el.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+    if (!text.includes(target)) continue;
+    const forId = el.getAttribute && el.getAttribute('for');
+    if (forId) {
+      const input = doc.getElementById(forId);
+      if (input) {
+        const v = (input.value || input.getAttribute('value') || input.textContent || '').trim();
+        if (v) return v;
+      }
+    }
+    if (el.tagName === 'TD' || el.tagName === 'TH') {
+      const row = el.closest('tr');
+      if (row) {
+        const cells = Array.from(row.querySelectorAll('td,th'));
+        const i = cells.indexOf(el);
+        if (i !== -1 && cells[i + 1]) {
+          const cell = cells[i + 1];
+          const cellInput = cell.matches('input,select,textarea') ? cell : cell.querySelector('input,select,textarea');
+          if (cellInput) {
+            const v = (cellInput.value || cellInput.getAttribute('value') || '').trim();
+            if (v) return v;
+          }
+          const cellText = cell.textContent.replace(/\s+/g, ' ').trim();
+          if (cellText) return cellText;
+        }
+      }
+    }
+    const sib = el.nextElementSibling;
+    if (sib) {
+      const input = sib.matches('input,select,textarea') ? sib : sib.querySelector('input,select,textarea');
+      if (input) {
+        const v = (input.value || input.getAttribute('value') || '').trim();
+        if (v) return v;
+      }
+      const sibText = sib.textContent.replace(/\s+/g, ' ').trim();
+      if (sibText) return sibText;
+    }
+  }
+  return '';
+}
+
+// Best-effort extractor for the Scout-direct "My Personal Information" page
+// (Menu_Item_ID=45902) - its exact field IDs/labels haven't been confirmed
+// via a real capture yet, so this guesses at common label wording instead
+// of a confirmed ENTRY### ID. Expect gaps until a HAR capture lets this be
+// replaced with exact field IDs, same as extractProfile/extractProfileAlt.
+function extractProfileGeneric(doc) {
+  const fullName = getValueByLabelContains(doc, 'full name')
+    || getValueByLabelContains(doc, 'name');
+  const street = getValueByLabelContains(doc, 'street address')
+    || getValueByLabelContains(doc, 'address');
+  const city = getValueByLabelContains(doc, 'city');
+  const state = toStateAbbr(getValueByLabelContains(doc, 'state'));
+  const zip = getValueByLabelContains(doc, 'zip');
+  const phone = getValueByLabelContains(doc, 'telephone')
+    || getValueByLabelContains(doc, 'phone');
+  const email = getValueByLabelContains(doc, 'email');
+  const dob = getValueByLabelContains(doc, 'date of birth')
+    || getValueByLabelContains(doc, 'birth date');
+  const dateJoinedUnit = getValueByLabelContains(doc, 'date joined unit')
+    || getValueByLabelContains(doc, 'date joined scouts');
+
+  return {
+    fullName: fullName || '', street: street || '', city: city || '',
+    state: state || '', zip: zip || '', phone: phone || '', email: email || '',
+    dob: dob || '', dateJoinedUnit: dateJoinedUnit || '',
+    cubPack: '', parents: [], troopNo: '', troopCity: '',
+  };
 }
 
 const US_STATE_ABBR = {
@@ -625,6 +729,36 @@ function extractProfileAlt(doc) {
     || getValueByLabelText(doc, 'Date Joined Unit')
     || getValueByLabelText(doc, 'Date Joined Scouts BSA')
     || '';
+
+  let troopNo = '', troopCity = '';
+  const headerText = doc.body ? doc.body.textContent : '';
+  const m = headerText.match(/Troop\s+(\d+)\s+([A-Za-z][A-Za-z .'-]*)/);
+  if (m) { troopNo = m[1]; troopCity = m[2].trim(); }
+
+  return {
+    fullName: [first, middle, last].filter(Boolean).join(' '),
+    street, city, state, zip, phone, email, dob,
+    dateJoinedUnit, cubPack: '', parents: [], troopNo, troopCity,
+  };
+}
+
+// "My Personal Information" (Scout-direct login, Menu_Item_ID=45902).
+// Confirmed via HAR capture (Sept 2026) against a real Scout's own page -
+// a third, distinct field-ID scheme from both extractProfile (leader) and
+// extractProfileAlt (parent-facing "My Scouts"). This page has no adult/
+// parent table, so `parents` is always empty here.
+function extractProfileScoutDirect(doc) {
+  const first = getInputValue(doc, 'ENTRY303925') || '';
+  const middle = getInputValue(doc, 'ENTRY303927') || '';
+  const last = getInputValue(doc, 'ENTRY303928') || '';
+  const dob = getInputValue(doc, 'ENTRY304016') || '';
+  const street = getInputValue(doc, 'ENTRY304129') || '';
+  const city = getInputValue(doc, 'ENTRY304131') || '';
+  const state = toStateAbbr(getInputValue(doc, 'ENTRY304132') || '');
+  const zip = getInputValue(doc, 'ENTRY304133') || '';
+  const dateJoinedUnit = getInputValue(doc, 'ENTRY304216') || '';
+  const phone = getInputValue(doc, 'ENTRY304352') || '';
+  const email = getInputValue(doc, 'ENTRY304935') || '';
 
   let troopNo = '', troopCity = '';
   const headerText = doc.body ? doc.body.textContent : '';
@@ -1250,7 +1384,7 @@ function renderBadgeStep() {
   if (missing.length) {
     const box = document.createElement('div');
     box.className = 'eagle-note eagle-warn';
-    box.innerHTML = `No earned badge was found for: <strong>${missing.map(m=>m.label).join(', ')}</strong>. You'll need to fill these in by hand on the printed form, or check your merit badge export was included.`;
+    box.innerHTML = `No earned badge was found for: <strong>${missing.map(m=>m.label).join(', ')}</strong>. You'll need to fill these in by hand on the printed form, or double check the merit badge is recorded correctly in TroopWebHost.`;
     area.appendChild(box);
   }
 
@@ -1671,10 +1805,22 @@ const TWH_CONFIG = {
 
   // Self-service versions (under "My Scouts") - what a Scout or parent login
   // can reach for their own record even without Advancement Hub access.
+  // NOTE: Menu_Item_ID=45899 ("My Scouts") is PARENT-only - it's a picker
+  // for browsing multiple linked Scouts, and does not appear anywhere in a
+  // directly-logged-in Scout's own menu (confirmed via a Scout's saved menu
+  // source). A Scout account will get a 302 redirect from every URL below.
   selfProfileUrl: id => `FormDetail.aspx?Menu_Item_ID=45899&Form_ID=209&FK=0&ID=${id}&Stack=2`,
   selfRankPositionUrl: id => `FormDetail.aspx?Menu_Item_ID=45899&Form_ID=432&FK=0&ID=${id}&Stack=2`,
   selfMeritBadgeUrl: id => `FormDetail.aspx?Menu_Item_ID=45899&Form_ID=425&FK=0&ID=${id}&Stack=2`,
   selfEagleReqUrl: id => `FormDetail.aspx?Menu_Item_ID=45899&Form_ID=427&FK=0&ID=${id}&Stack=2`,
+
+  // Scout-direct versions - what a Scout sees in their OWN menu when logged
+  // in directly (not through a parent). These are implicitly scoped to
+  // whoever is logged in, so they take no ID parameter at all - there's
+  // only one record they could possibly mean.
+  scoutDirectRankPositionUrl: 'FormDetail.aspx?Menu_Item_ID=45911&Stack=1',
+  scoutDirectProfileUrl: 'FormDetail.aspx?Menu_Item_ID=45902&Stack=1',
+  scoutDirectMeritBadgeUrl: 'FormDetail.aspx?Menu_Item_ID=45912&Stack=1',
 };
 
 // How long to wait on any single TWH request before giving up. Some
@@ -1786,10 +1932,30 @@ async function fetchMyScoutsRoster() {
   return roster;
 }
 
+// Sentinel "ID" for a Scout logged in directly (not through a parent).
+// TWH gives a Scout's own account no picker at all - just fixed links
+// straight to their own record - so there's no real numeric ID to carry
+// around for this case.
+const SCOUT_DIRECT_ID = 'SCOUT_DIRECT';
+
+// Lightweight check: can this login reach the Scout-direct "My Rank
+// Advancement" link? Used only to detect this login type, not to fetch
+// real data (fetchScoutByIdLive does that separately).
+async function probeScoutDirectAccess() {
+  try {
+    await fetchDoc(TWH_CONFIG.scoutDirectRankPositionUrl);
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 // Tries the leader-only full roster first; falls back to "My Scouts" for
-// Scout/parent-level logins that can't see the full roster. Returns
-// { roster, source } where source is 'roster' or 'myScouts' so the UI can
-// explain what's showing.
+// parent-level logins; falls back again to the Scout-direct links for a
+// Scout logged in under their own account (which has no "My Scouts" picker
+// at all - see the TWH_CONFIG comment above). Returns { roster, source }
+// where source is 'roster', 'myScouts', 'scoutDirect', or 'none', so the UI
+// can explain what's showing.
 async function fetchAvailableScouts() {
   console.debug('[Eagle tool] fetchAvailableScouts: trying leader roster first...');
   try {
@@ -1799,10 +1965,25 @@ async function fetchAvailableScouts() {
   } catch (e) {
     console.warn('[Eagle tool] Full roster not available (expected for Scout/parent logins):', e);
   }
+
   console.debug('[Eagle tool] falling back to My Scouts...');
-  const myScouts = await fetchMyScoutsRoster();
-  console.debug(`[Eagle tool] My Scouts returned ${myScouts.length} record(s)`);
-  return { roster: myScouts, source: 'myScouts' };
+  try {
+    const myScouts = await fetchMyScoutsRoster();
+    console.debug(`[Eagle tool] My Scouts returned ${myScouts.length} record(s)`);
+    if (myScouts.length > 0) return { roster: myScouts, source: 'myScouts' };
+  } catch (e) {
+    console.warn('[Eagle tool] "My Scouts" not available (expected for a Scout logged in directly, not through a parent):', e);
+  }
+
+  console.debug('[Eagle tool] falling back to Scout-direct advancement link...');
+  const isScoutDirect = await probeScoutDirectAccess();
+  if (isScoutDirect) {
+    console.debug('[Eagle tool] Scout-direct link reachable - using it as the only available record');
+    return { roster: [{ name: 'My Own Record', id: SCOUT_DIRECT_ID, rank: '' }], source: 'scoutDirect' };
+  }
+
+  console.debug('[Eagle tool] Scout-direct link not reachable either - nothing available to this login');
+  return { roster: [], source: 'none' };
 }
 
 // Fetches whatever detail pages the current login has access to. A leader
@@ -1821,6 +2002,34 @@ async function fetchDocWithFallback(primaryUrl, fallbackUrl) {
 }
 
 async function fetchScoutByIdLive(id) {
+  if (id === SCOUT_DIRECT_ID) {
+    // Scout-direct login: fixed links, no ID needed, no leader/self-service
+    // fallback to try (these ARE already the fallback). There's no known
+    // Scout-direct equivalent for the Eagle requirement checklist yet, so
+    // that one is marked failed up front rather than silently skipped -
+    // it'll show up as a normal "couldn't be reached" item on the review
+    // screen, same as any other permission gap.
+    const jobs = [
+      { name: 'profile', url: TWH_CONFIG.scoutDirectProfileUrl },
+      { name: 'rank & position history', url: TWH_CONFIG.scoutDirectRankPositionUrl },
+      { name: 'merit badges', url: TWH_CONFIG.scoutDirectMeritBadgeUrl },
+    ];
+    const settled = await Promise.allSettled(jobs.map(j => fetchDoc(j.url)));
+    const docs = [];
+    const failed = ['Eagle requirements'];
+    settled.forEach((r, i) => {
+      if (r.status === 'fulfilled') {
+        const entry = r.value;
+        if (jobs[i].name === 'profile') entry.hintKind = 'profile';
+        docs.push(entry);
+      } else {
+        failed.push(jobs[i].name);
+      }
+    });
+    const summary = ingestDocs(docs);
+    return { summary, failed, totalJobs: jobs.length + 1 }; // +1 for the pre-marked Eagle requirements
+  }
+
   const jobs = [
     { name: 'profile', url: TWH_CONFIG.profileUrl(id), fallback: TWH_CONFIG.selfProfileUrl(id) },
     { name: 'rank & position history', url: TWH_CONFIG.rankPositionUrl(id), fallback: TWH_CONFIG.selfRankPositionUrl(id) },
@@ -1835,7 +2044,7 @@ async function fetchScoutByIdLive(id) {
     else failed.push(jobs[i].name);
   });
   const summary = ingestDocs(docs);
-  return { summary, failed };
+  return { summary, failed, totalJobs: jobs.length };
 }
 
 /* ---------- Live mode UI wiring ---------- */
@@ -1855,8 +2064,8 @@ document.addEventListener('DOMContentLoaded', () => {
     statusEl.innerHTML = '<div class="eagle-note eagle-info">Fetching profile, ranks, merit badges, and requirement dates...</div>';
     try {
       resetScoutState();
-      const { failed } = await fetchScoutByIdLive(id);
-      if (failed.length === 4) {
+      const { failed, totalJobs } = await fetchScoutByIdLive(id);
+      if (failed.length === totalJobs) {
         statusEl.innerHTML = `<div class="eagle-note eagle-warn">Couldn't load any details for ${name} - your login may not have access to these pages. Check with a unit leader, or try again if you think this is a mistake.</div>`;
         loadBtn.disabled = false;
         return;
@@ -1881,9 +2090,10 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
 
-    if (source === 'myScouts' && roster.length === 1) {
-      // Scout viewing their own record, or a parent with exactly one linked
-      // Scout - skip the picker entirely and load straight away.
+    if ((source === 'myScouts' || source === 'scoutDirect') && roster.length === 1) {
+      // Scout viewing their own record (directly, or via "My Scouts"), or a
+      // parent with exactly one linked Scout - skip the picker entirely and
+      // load straight away.
       const only = roster[0];
       searchInput.value = only.name;
       searchInput.parentElement.classList.add('eagle-hidden');
