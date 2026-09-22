@@ -11,8 +11,8 @@
    When you update either standalone tool, just run this again:
 
        node build.js
-       node build.js --pocket ../Merit_Badge_Pocket_Cert/merit-badge-pocket-cert.html \
-                     --blue   ../Blue_Card/blue-card.html --out merit-badge-print-tools.html
+       node build.js --pocket ./src/merit-badge-pocket-cert.html \
+                     --blue   ./src/blue-card.html --out merit-badge-print-tools.html
        node build.js --slim --out merit-badge-print-tools-slim.html   (drops the tools' notes comments)
 
    The build FAILS LOUDLY (instead of producing a subtly broken page) if the
@@ -22,10 +22,10 @@ const fs = require('fs'), path = require('path');
 
 const TOOLS = [
   { key: 'pocket', label: 'Pocket Certificates', root: 'mbc-root',
-    file: '../Merit_Badge_Pocket_Cert/merit-badge-pocket-cert.html',
+    file: './src/merit-badge-pocket-cert.html',
     title: 'Merit Badge Pocket Certificate Filler' },
   { key: 'blue', label: 'Blue Cards', root: 'bcp-root',
-    file: '../Blue_Card/blue-card.html',
+    file: './src/blue-card.html',
     title: 'Blue Card Printer' }
 ];
 // Fields that mean the same thing on every tab. The value is copied into the
