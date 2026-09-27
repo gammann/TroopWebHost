@@ -40,7 +40,6 @@ const HISTORY_DELAY_MS = 800; // per-Scout latency so the "Stop" state can be ca
 function serial(iso){ if(!iso) return ''; const p = iso.split('-').map(Number); return Date.UTC(p[0], p[1]-1, p[2]) / 86400000 + 25569; }
 function usDate(iso){ const p = iso.split('-').map(Number); return p[1] + '/' + p[2] + '/' + p[0]; }
 function addDays(iso, n){ const p = iso.split('-').map(Number); const d = new Date(Date.UTC(p[0], p[1]-1, p[2] + n)); return d.toISOString().slice(0,10); }
-function spread(a, b, i, n){ const A = Date.UTC(...a.split('-').map((v,k)=>k===1?v-1:+v)); const B = Date.UTC(...b.split('-').map((v,k)=>k===1?v-1:+v)); const t = n <= 1 ? 1 : i/(n-1); return new Date(A + (B-A)*t).toISOString().slice(0,10); }
 
 const RANK_ORDER = ['Scout','Tenderfoot','Second Class','First Class','Star','Life','Eagle'];
 const CODES = {
@@ -52,7 +51,6 @@ const CODES = {
   'Life': ['1','2','3','4','5','6','7','8'],
   'Eagle': ['1','2','3','4','5','6','7']
 };
-const FINALS = { 'Scout':['7'], 'Tenderfoot':['10','11'], 'Second Class':['11','12'], 'First Class':['12','13'], 'Star':['7','8'], 'Life':['7','8'], 'Eagle':['6','7'] };
 // Short, invented paraphrases -- parallel to CODES above.
 const LABELS = {
   'Scout': ['Scout Oath, Law, motto, slogan','Explain the Scout Oath','Explain the Scout Law','Describe the Scout badge','Pledge of Allegiance','Handshake, salute, sign','Tie a square knot','Tie two half hitches','Tie a bowline','Tie a taut-line hitch','Explain the patrol method','Discuss troop meetings','Review safety guidelines','Discuss outdoor safety','Fitness baseline','Youth protection guide','Scoutmaster conference'],
@@ -64,30 +62,6 @@ const LABELS = {
   'Eagle': ['Active 6 months as Life','Live the Oath and Law','Merit Badges (21, 13 Eagle-required)','Serve in a position of responsibility','Plan and lead a service project','Scoutmaster conference','Board of review']
 };
 
-/* Build Sheet 2 rows for one rank. `done` = array of codes completed.
-   `over` optionally pins specific code -> ISO date. */
-function rankReqRows(rank, done, start, end, over){
-  over = over || {};
-  const codes = CODES[rank], fin = FINALS[rank];
-  const rows = [];
-  const mid = codes.filter(c => done.includes(c) && !fin.includes(c) && !(c === '1' && ACTIVE_DAYS[rank]) && !over[c]);
-  let midEnd = addDays(end, fin.length === 2 ? -14 : -5);
-  let midStart = addDays(start, 10);
-  if(midStart > midEnd) midStart = start;
-  let mi = 0;
-  codes.forEach((c, idx) => {
-    if(!done.includes(c)) return;
-    let date;
-    if(over[c]) date = over[c];
-    else if(c === '1' && ACTIVE_DAYS[rank]) date = addDays(start, ACTIVE_DAYS[rank]) > end ? end : addDays(start, ACTIVE_DAYS[rank]);
-    else if(fin.includes(c)) date = (fin.length === 2 && c === fin[0]) ? addDays(end, -9) : end;
-    else date = spread(midStart, midEnd, mi++, mid.length);
-    rows.push([rank, c, LABELS[rank][idx], serial(date)]);
-  });
-  return rows;
-}
-// "Be active N months in the current position/rank" completes after that span.
-const ACTIVE_DAYS = { 'Star': 125, 'Life': 185, 'Eagle': 185 };
 /* Join date: a Scout earns the Scout rank a few weeks after joining. */
 function joinedFor(s){ return s.ranks.length ? addDays(s.ranks[0][1], -35) : s.joined; }
 
@@ -158,6 +132,69 @@ const SCOUTS = [
     totals1:[42,3,40,8,66,20], totals2:[14,6,0,4,0,0], oa:['Yes','2025-05-10','2025-10-11','',''] }
 ];
 
+function nextRankFor(s){
+  const i = s.rank ? RANK_ORDER.indexOf(s.rank) : -1;
+  const nextIdx = i + 1;
+  return nextIdx < RANK_ORDER.length ? RANK_ORDER[nextIdx] : null;
+}
+function doneSetFor(s, rankName){
+  if(rankName !== nextRankFor(s)) return [];
+  if(rankName === 'Eagle' && s.eagleDone) return s.eagleDone;
+  if(s.nextDone) return s.nextDone;
+  if(s.nextDoneCount) return CODES[rankName].slice(0, s.nextDoneCount);
+  return [];
+}
+function csvField(v){
+  v = String(v == null ? '' : v);
+  return /[",\r\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+}
+/* Fakes the real "Rank Requirements Status" report: one row per rank
+   requirement per Scout, for the WHOLE troop in one shot, matching the
+   real CSV's own header names exactly (Scout,Age,Patrol,Current Rank,
+   Rank,Code,Requirement,Date Earned) -- a rank before the Scout's
+   current one is fully done (a real earned date on every row), the rank
+   right after uses each fixture Scout's own designed done-set (same
+   logic as the old per-rank grid this replaced), and anything further
+   out is entirely blank/not-done. Two codes (Eagle:3, Life:3) get a
+   deliberately long, official-BSA-style Requirement string to prove a
+   long value from this report still renders fine (this report's real
+   text is short, but nothing stops it from being long some day). */
+const LONG_REQ_OVERRIDE = {
+  'Eagle:3': 'Earn a total of 21 merit badges (10 more than required for the Life rank), including these 14 merit badges: First Aid, Citizenship in the Community, Citizenship in the Nation, Citizenship in Society, Citizenship in the World, Communication, Cooking, Personal Fitness, Emergency Preparedness or Lifesaving, Environmental Science or Sustainability, Personal Management, Swimming or Hiking or Cycling, Camping, and Family Life.',
+  'Life:3': 'Earn a total of five merit badges from the following list not previously earned, including three from the Eagle-required list, no more than one of which may be started after completing the requirements for Star rank.'
+};
+function spreadDate(startIso, endIso, i, n){
+  const A = Date.UTC(...startIso.split('-').map((v,k)=>k===1?v-1:+v));
+  const B = Date.UTC(...endIso.split('-').map((v,k)=>k===1?v-1:+v));
+  const t = n <= 1 ? 1 : i/(n-1);
+  const d = new Date(A + (B-A)*t);
+  return (d.getUTCMonth()+1) + '/' + d.getUTCDate() + '/' + d.getUTCFullYear();
+}
+function earnedDateFor(s, rankName){
+  const r = s.ranks.find(x => x[0] === rankName);
+  return r ? r[1] : null;
+}
+function buildRankReqStatusCsv(){
+  const lines = ['Scout,Age,Patrol,Current Rank,Rank,Code,Requirement,Date Earned'];
+  SCOUTS.forEach(s => {
+    const curIdx = s.rank ? RANK_ORDER.indexOf(s.rank) : -1;
+    RANK_ORDER.forEach((rank, idx) => {
+      const doneCodes = idx <= curIdx ? CODES[rank] : (idx === curIdx + 1 ? doneSetFor(s, rank) : []);
+      const prevRank = idx > 0 ? RANK_ORDER[idx-1] : null;
+      const startIso = (prevRank && earnedDateFor(s, prevRank)) || joinedFor(s);
+      const endIso = (idx <= curIdx && earnedDateFor(s, rank)) || '2026-09-01';
+      let di = 0;
+      CODES[rank].forEach((code, i) => {
+        const done = doneCodes.indexOf(code) !== -1;
+        const req = LONG_REQ_OVERRIDE[rank + ':' + code] || LABELS[rank][i];
+        const date = done ? spreadDate(startIso, endIso, di++, doneCodes.length) : '';
+        lines.push([s.name, 14, s.patrol, s.rank || '', rank, code, req, date].map(csvField).join(','));
+      });
+    });
+  });
+  return lines.join('\r\n') + '\r\n';
+}
+
 function buildHistoryWorkbook(s){
   const rows = [[s.name], [],
     ['BSA ID','Rank','Patrol','Date Joined Unit'], [s.bsa, s.rank, s.patrol, serial(joinedFor(s))], []];
@@ -195,25 +232,11 @@ function buildHistoryWorkbook(s){
   rows.push(['Total Cycling Miles','Total Paddling Miles','Total Motorboating Miles','Total Water Hours','Total Horseback Miles','Total Skating Miles'], s.totals2, []);
   if(s.oa) rows.push(['OA Eligibility','OA Call Out','OA Ordeal','OA Brotherhood','OA Vigil'], [s.oa[0], serial(s.oa[1]), serial(s.oa[2]), serial(s.oa[3]), serial(s.oa[4])]);
 
-  // Sheet 2: Rank Requirement Completion Dates
-  const req = [['Rank Requirement Completion Dates'], ['Award','Code','Requirement','Earned']];
-  RANK_ORDER.forEach((rn, i) => {
-    const earned = s.ranks.find(r => r[0] === rn);
-    const prev = i > 0 ? s.ranks.find(r => r[0] === RANK_ORDER[i-1]) : null;
-    const start = prev ? prev[1] : joinedFor(s);
-    if(earned){
-      rankReqRows(rn, CODES[rn], start, earned[1]).forEach(r => req.push(r));
-    } else if(s.nextRank === rn){
-      let done = s.nextDone;
-      if(!done && s.nextDoneCount) done = CODES[rn].slice(0, s.nextDoneCount);
-      rankReqRows(rn, done, start, s.asOf).forEach(r => req.push(r));
-    } else if(rn === 'Eagle' && s.eagleDone){
-      rankReqRows(rn, s.eagleDone, start, s.eagleAsOf, s.eagleDates).forEach(r => req.push(r));
-    }
-  });
+  // Rank requirement detail now comes from the separate Rank Requirements
+  // Status CSV (see buildRankReqStatusCsv) instead of a second sheet here
+  // -- matches the real tool, which stopped reading Sheet 2 for this.
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Scouting History');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(req), 'Rank Requirements');
   return XLSX.write(wb, { bookType:'biff8', type:'buffer' });
 }
 
@@ -248,6 +271,7 @@ async function newFakePage(browser, dark){
     if(url.indexOf('/Custom.aspx') !== -1) return respond(200, 'text/html', shellHtml(html, dark));
     if(url.indexOf('FormReport.aspx?Menu_Item_ID=46012') !== -1) return respond(200, 'text/csv', DIRECTORY_CSV, 150);
     if(url.indexOf('FormList.aspx?Menu_Item_ID=56934') !== -1) return respond(200, 'text/html', BSA_GRID_HTML, 150);
+    if(url.indexOf('FormReport.aspx?Menu_Item_ID=55384') !== -1) return respond(200, 'text/plain', buildRankReqStatusCsv(), 150);
     if(url.indexOf('FormReportMultiSection.aspx') !== -1){
       const m = url.match(/[?&]FK=([^&]+)/);
       const s = SCOUTS.find(x => x.id === (m && decodeURIComponent(m[1])));
@@ -312,6 +336,15 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
     await page.evaluate(i => document.querySelectorAll('.shr-scout-page')[i].id = 'shot-target', bIdx);
     await page.evaluate(() => { const s = document.getElementById('shr-step2'); s.id = 'shr-step2'; });
     await shotRegion(page, '04-detailed-view.png', '#shot-target', '#shot-target', 8);
+
+    /* ---- 4b: close-up on the in-progress rank's pending requirements ---- */
+    await page.evaluate(() => {
+      const scoutPage = document.getElementById('shot-target');
+      const ranks = scoutPage.querySelectorAll('.shr-rank');
+      const eagleRank = Array.prototype.find.call(ranks, r => /Eagle/.test(r.querySelector('.shr-rank-name').textContent));
+      eagleRank.id = 'shot-eagle-rank';
+    });
+    await shotRegion(page, '07-in-progress-requirements.png', '#shot-eagle-rank', '#shot-eagle-rank', 8);
 
     await page.click('#shr-view-summary');
     await sleep(500);

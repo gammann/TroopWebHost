@@ -15,33 +15,56 @@ WHAT THIS DOES
 Lets you check off any number of Scouts and prints a compact, one-page-
 per-Scout "Advancement Record" for each -- current rank, BSA ID, unit
 position, and every rank's numbered requirements with the date each was
-completed, laid out in two columns per rank. For Star, Life, and Eagle,
-the merit badges applied toward that rank are listed under the "Merit
-Badges" requirement line, and Eagle additionally gets its own box of the
-required merit badge categories (marked #, with either the earned date
-or a percent-complete if still in progress) plus a list of any other
-earned merit badges. The look is modeled on a Scoutbook-style "Scouts
-BSA Individual Advancement Record" printout, built entirely from
-TroopWebHost's own data -- it is not a copy of any particular vendor's
-report and some layout details (exact abbreviations, spacing) will
-differ.
+completed, laid out in three columns per rank. Every rank the Scout
+hasn't earned yet (not just the very next one) also lists requirements
+NOT yet completed (dimmed, no date) alongside the completed ones -- see
+item 2(c) below -- so the whole path ahead is visible in one printout,
+not just the next step. For Star, Life, and Eagle, the merit badges
+applied toward that rank are listed under the "Merit Badges" requirement
+line, and Eagle additionally gets its own box of the required merit
+badge categories (marked #, with either the earned date or a
+percent-complete if still in progress) plus a list of any other earned
+merit badges -- shown even for a Scout who's nowhere near Eagle yet,
+since that's the only place a badge earned before Star has anywhere to
+appear. The look is modeled on a Scoutbook-style "Scouts BSA Individual
+Advancement Record" printout, built entirely from TroopWebHost's own
+data -- it is not a copy of any particular vendor's report and some
+layout details (exact abbreviations, spacing) will differ.
 
 READ BEFORE USING
 ------------------
-1. Read-only against TroopWebHost. Nothing is saved anywhere.
-2. THREE things are fetched per run, in this order:
+1. Read-only against TroopWebHost. Nothing is saved anywhere -- every
+   fetch below is a plain GET.
+2. THREE reports are fetched, in this order:
      a) Scout Directory (Menu_Item_ID=46012) -- Name/Patrol/BSA Number,
         to build the checklist of Scouts to choose from.
      b) Scout BSA ID admin grid (Menu_Item_ID=56934, Form_ID=3547) --
         Name/BSA ID/TroopWebHost's own internal person ID for every
-        Scout. This is REQUIRED, not optional: the per-Scout report
-        below is fetched by internal person ID, and this grid is the
-        only place that ID is exposed. If your login can't reach
-        Membership Hub -> Scout BSA ID, this tool cannot run. Scouts are
-        matched to this grid first by BSA Number (immune to Preferred
-        Name / nickname differences) and, for anyone with no BSA Number
-        on file, by name as a fallback.
-     c) For each checked Scout (one fetch at a time, never concurrently
+        Scout. This is REQUIRED, not optional: the per-Scout report in
+        2(d) is fetched by internal person ID, and this grid is the only
+        place that ID is exposed. If your login can't reach Membership
+        Hub -> Scout BSA ID, this tool cannot run. Scouts are matched to
+        this grid first by BSA Number (immune to Preferred Name /
+        nickname differences) and, for anyone with no BSA Number on
+        file, by name as a fallback.
+     c) "Rank Requirements Status" (Menu_Item_ID=55384) -- ONE fetch,
+        not per-Scout, covering the WHOLE troop: every rank requirement
+        for every Scout, with TWH's own short requirement names (e.g.
+        "Scout Spirit", "Board of Review") and a Date Earned column left
+        blank for anything not yet done. This is the only report found
+        so far that lists a rank's FULL checklist -- done and not done
+        -- which is what makes item 3's "still to do" lines and the
+        readiness filter (Step 1) possible at all, and it's what every
+        Scout is matched against by name (same matching as 2(b)).
+        Confirmed via HAR capture; being a plain report (like 2(a), not
+        an admin data-entry form) makes it more likely, though still not
+        certain, to be a portable Menu_Item_ID across different troops'
+        TroopWebHost installs. This fetch is optional: if it fails, a
+        status note says so and the report still builds for every
+        Scout, just without the "still needed" lines -- every rank then
+        shows only what's completed, same as if this feature didn't
+        exist.
+     d) For each checked Scout (one fetch at a time, never concurrently
         -- TroopWebHost's session state races under concurrent fetches),
         the Eagle Advancement Hub's own "Scouting History Report"
         (Menu_Item_ID=56926, Form_ID=1005, opened via
@@ -50,14 +73,22 @@ READ BEFORE USING
         and this XLS link side by side). Despite the .XLS extension this
         one really is a binary Excel file (unlike most other
         ReportFormat=XLS exports on this platform, which are plain
-        CSV) -- it's parsed here with SheetJS.
+        CSV) -- it's parsed here with SheetJS. Only its member-info/rank/
+        merit-badge/position/etc. sheet is used now; rank REQUIREMENT
+        detail comes from 2(c) instead (see item 3).
 3. WHAT'S SHOWN, AND WHAT ISN'T:
-     - TroopWebHost's export only carries a date for a requirement once
-       it's been checked off -- it doesn't carry the full official
-       checklist of not-yet-done requirements. So a rank the Scout is
-       still working on shows only the items already completed; there
-       are no blank "still to do" lines the way a Scoutbook printout
-       might show them.
+     - Every rank the Scout hasn't earned yet -- not just the very next
+       one -- shows its FULL requirement checklist from 2(c) above: every
+       numbered requirement, done or not, in TWH's own short wording,
+       with a real date for whatever's done and nothing (dimmed) for
+       whatever isn't. Only the very next rank gets the italic "In
+       Progress" label where its date would go; ranks further out just
+       show no date, same as "not started" always looked. An
+       ALREADY-earned rank also comes from 2(c), filtered to what's done
+       -- so its requirement list is naturally complete (everything in
+       it WAS done) with no dimmed lines. If 2(c)'s fetch failed
+       entirely, every rank falls back to showing nothing (no
+       requirement lines at all) rather than guessing.
      - The "Position" line in the header shows whichever position(s)
        currently have no end date on file (or, if none do, the most
        recently held one) -- not the full position history, which is
@@ -186,19 +217,22 @@ READ BEFORE USING
 .shr-rank-head{ display:flex; justify-content:space-between; align-items:baseline; border-bottom:1px solid #999; padding-bottom:2px; margin-bottom:4px; }
 .shr-rank-name{ font-size:13.5px; font-weight:700; text-transform:uppercase; letter-spacing:.03em; }
 .shr-rank-date{ font-size:12px; color:#333; }
-.shr-rank-reqs{ column-count:2; column-gap:26px; font-size:11.8px; line-height:1.55; }
-.shr-req{ display:flex; gap:6px; break-inside:avoid; }
-.shr-req-code{ flex:0 0 30px; color:#555; }
-.shr-req-label{ flex:1 1 auto; padding-right:6px; }
+.shr-rank-reqs{ column-count:3; column-gap:16px; font-size:10.3px; line-height:1.45; }
+.shr-req{ display:flex; gap:4px; break-inside:avoid; }
+.shr-req-code{ flex:0 0 22px; color:#555; }
+.shr-req-label{ flex:1 1 auto; padding-right:4px; }
 .shr-req-date{ flex:0 0 auto; color:#333; white-space:nowrap; }
-.shr-req-sub{ padding-left:30px; font-style:italic; }
+.shr-req-sub{ padding-left:22px; font-style:italic; }
 .shr-req-sub .shr-req-label{ font-style:normal; }
-.shr-eagle-box{ margin-top:6px; border:1px solid #999; border-radius:3px; padding:8px 10px; }
+.shr-req-pending{ color:#888; }
+.shr-req-pending .shr-req-date{ color:#aaa; }
+.shr-rank-date-inprogress{ font-style:italic; color:#666; }
+.shr-eagle-box{ margin-top:6px; border:1px solid #999; border-radius:3px; padding:8px 10px; font-size:10.3px; line-height:1.5; }
 .shr-eagle-box .shr-eagle-title{ font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:#555; font-family:Arial, sans-serif; margin:0 0 4px; }
 .shr-eagle-box .shr-req-code{ flex:0 0 0; }
 .shr-additional{ margin-top:10px; }
 .shr-additional-title{ font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; color:#555; font-family:Arial, sans-serif; font-weight:700; margin:0 0 4px; }
-.shr-additional-list{ column-count:2; column-gap:26px; font-size:11.8px; line-height:1.55; }
+.shr-additional-list{ column-count:3; column-gap:16px; font-size:10.3px; line-height:1.45; }
 .shr-inprogress-note{ margin-top:8px; font-size:11px; color:#555; font-style:italic; }
 .shr-empty-note{ font-size:12px; color:#777; font-style:italic; margin-top:6px; }
 
@@ -527,13 +561,66 @@ var SHR_HISTORY_FORM_ID = '1005';
 function shrHistoryUrl(id){
   return 'FormReportMultiSection.aspx?Menu_Item_ID='+SHR_EAGLE_HUB_MENU_ITEM_ID+'&Form_ID='+SHR_HISTORY_FORM_ID+'&FK='+encodeURIComponent(id)+'&ID='+encodeURIComponent(id)+'&Stack=2&ReportFormat=XLS';
 }
+/* "Rank Requirements Status" -- a standard TWH report (same FormReport.aspx
+   + plain-CSV pattern as the Scout Directory above, not the fragile
+   per-troop custom admin tool this replaced) listing EVERY rank
+   requirement for EVERY Scout in one shot: short TWH-authored requirement
+   names (e.g. "Scout Spirit", "Merit Badges", "Board of Review") and a
+   Date Earned column left blank for anything not yet done. One fetch for
+   the whole troop, done once when the Scout list loads -- not per-Scout,
+   not per-rank. Confirmed via HAR capture; being a plain report rather
+   than a custom admin form makes it much more likely (though still not
+   certain) to be a stable, portable Menu_Item_ID across troops. */
+var SHR_RANKREQ_MENU_ITEM_ID = '55384';
+function shrRankReqStatusUrl(){
+  return 'FormReport.aspx?Menu_Item_ID='+SHR_RANKREQ_MENU_ITEM_ID+'&Stack=1&ReportFormat=XLS';
+}
+function shrFetchRankReqStatus(){
+  return shrFetchRaw(shrRankReqStatusUrl())
+    .then(function(res){ return res.arrayBuffer(); })
+    .then(function(buf){
+      var text = shrDecode(buf);
+      if(/^\s*</.test(text)) throw new Error('Rank Requirements Status came back as a web page, not a report.');
+      return shrCsvObjects(text);
+    });
+}
+/* {normalized Scout name -> {rank -> [{code, requirement, earned, done}]}},
+   in the CSV's own row order (already numeric/lettered order). Codes come
+   zero-padded with trailing periods/spaces ("01.a", "1.      ") -- only
+   ever displayed, never matched against anything else, so no normalizing
+   needed here (unlike the old per-troop admin-grid approach this
+   replaced). Rows for ranks outside the 7 core ranks (Eagle Palms, etc.)
+   are dropped. This report's own "Current Rank" column is captured too
+   (currentRankByName) -- it's what lets the readiness filter work out
+   each Scout's in-progress rank without fetching anything per-Scout. */
+function shrBuildRankReqLookup(csv){
+  var nameH = shrFindHeader(csv.headers, ['Scout']);
+  var rankH = shrFindHeader(csv.headers, ['Rank']);
+  var codeH = shrFindHeader(csv.headers, ['Code']);
+  var reqH = shrFindHeader(csv.headers, ['Requirement']);
+  var dateH = shrFindHeader(csv.headers, ['Date Earned']);
+  var curRankH = shrFindHeader(csv.headers, ['Current Rank']);
+  if(!nameH || !rankH || !codeH || !reqH) return null;
+  var reqs = {}, currentRankByName = {};
+  csv.objects.forEach(function(o){
+    var key = shrNormName(o[nameH]);
+    if(curRankH && !currentRankByName.hasOwnProperty(key)) currentRankByName[key] = (o[curRankH]||'').trim();
+    var rank = (o[rankH]||'').trim();
+    if(SHR_RANK_ORDER.indexOf(rank) === -1) return;
+    if(!reqs[key]) reqs[key] = {};
+    if(!reqs[key][rank]) reqs[key][rank] = [];
+    var earned = dateH ? (o[dateH]||'').trim() : '';
+    reqs[key][rank].push({ code: (o[codeH]||'').trim(), requirement: (o[reqH]||'').trim(), earned: earned, done: !!earned });
+  });
+  return { reqs: reqs, currentRankByName: currentRankByName };
+}
 function shrUnitLabel(){
   var m = (document.title || '').match(/\b((?:Troop|Pack|Crew|Ship|Post)\s*#?\s*\d+[A-Za-z]?)\b/i);
   return m ? m[1].replace(/\s+/g,' ') : '';
 }
 
 /* =====================================================================
-   PURE LOGIC -- Sheet 1 / Sheet 2 parsing and report data shaping.
+   PURE LOGIC -- Sheet 1 parsing and report data shaping.
    No DOM, no network; operates on arrays-of-arrays from SheetJS
    (sheet_to_json(ws, {header:1, defval:'', raw:true})).
    ===================================================================== */
@@ -545,55 +632,47 @@ var SHR_EAGLE_REQUIRED_BASE_NAMES = [
   'environmental science','family life','first aid','hiking','lifesaving','personal fitness',
   'personal management','sustainability','swimming'
 ];
-/* Official numbered/lettered requirement codes per rank (public BSA
-   requirement structure, not TroopWebHost-specific) -- used ONLY to spot
-   Scouts who have completed every requirement code for their in-progress
-   rank except the final "Scoutmaster conference" and/or "Board of
-   review" line(s), since TroopWebHost's own export has no field that
-   says this directly (it only records a date once something IS done, as
-   noted elsewhere in this file). If BSA revises a rank's requirement
-   list, this copy would need updating to match. */
-var SHR_RANK_REQUIREMENT_CODES = {
-  'Scout': ['1a','1b','1c','1d','1e','1f','2a','2b','2c','2d','3a','3b','4a','4b','5','6','7'],
-  'Tenderfoot': ['1a','1b','1c','2a','2b','2c','3a','3b','3c','3d','4a','4b','4c','4d','5a','5b','5c','5d','6a','6b','6c','7a','7b','8','9','10','11'],
-  'Second Class': ['1a','1b','1c','2a','2b','2c','2d','2e','2f','2g','3a','3b','3c','3d','4','5a','5b','5c','5d','6a','6b','6c','6d','6e','7a','7b','7c','8a','8b','8c','8d','8e','9a','9b','10','11','12'],
-  'First Class': ['1a','1b','2a','2b','2c','2d','2e','3a','3b','3c','3d','4a','4b','5a','5b','5c','5d','6a','6b','6c','6d','6e','7a','7b','7c','7d','7e','7f','8a','8b','9a','9b','9c','9d','10','11','12','13'],
-  'Star': ['1','2','3','4','5','6a','6b','7','8'],
-  'Life': ['1','2','3','4','5','6','7','8'],
-  'Eagle': ['1','2','3','4','5','6','7']
-};
-/* The requirement code(s), within the list above, that ARE the
-   Scoutmaster conference and/or Board of review for that rank. */
-var SHR_RANK_FINAL_CODES = {
-  'Scout': ['7'], 'Tenderfoot': ['10','11'], 'Second Class': ['11','12'], 'First Class': ['12','13'],
-  'Star': ['7','8'], 'Life': ['7','8'], 'Eagle': ['6','7']
-};
-function shrNormCode(c){ return String(c||'').trim().toLowerCase().replace(/\.$/, ''); }
-/* Returns null if not applicable (already Eagle, or no in-progress rank
-   yet), otherwise {rank, needsConference, needsBoardOfReview}. "In
-   progress" rank = the one immediately after the Scout's highest earned
-   rank; codes completed for it are read straight off Sheet 2. */
-function shrRankReadiness(sheet1, reqRows){
+/* "In progress" rank = the one immediately after the Scout's highest
+   earned rank (null once Eagle is earned -- nothing further to work
+   toward). */
+/* Same "next rank" idea as shrNextRankName above, but from the Rank
+   Requirements Status report's own "Current Rank" column instead of a
+   per-Scout history export -- lets the readiness filter work out every
+   Scout's in-progress rank from data already loaded, with no per-Scout
+   fetch at all. A blank label (a brand new Scout with nothing earned
+   yet) naturally resolves to 'Scout', same as an empty ranks list would
+   in shrNextRankName. */
+function shrNextRankFromLabel(label){
+  var idx = SHR_RANK_ORDER.indexOf(String(label||'').trim());
+  var nextIdx = idx + 1;
+  return nextIdx < SHR_RANK_ORDER.length ? SHR_RANK_ORDER[nextIdx] : null;
+}
+function shrNextRankName(sheet1){
   var earnedIdx = -1;
   SHR_RANK_ORDER.forEach(function(rn, i){
     if(sheet1.ranks.some(function(r){ return r.rank === rn; })) earnedIdx = i;
   });
   var nextIdx = earnedIdx + 1;
-  if(nextIdx >= SHR_RANK_ORDER.length) return null;
-  var rankName = SHR_RANK_ORDER[nextIdx];
-  var fullCodes = SHR_RANK_REQUIREMENT_CODES[rankName];
-  var finalCodes = SHR_RANK_FINAL_CODES[rankName];
-  if(!fullCodes) return null;
-  var done = {};
-  reqRows.forEach(function(r){ if(r.rank === rankName) done[shrNormCode(r.code)] = true; });
-  var missing = fullCodes.filter(function(c){ return !done[shrNormCode(c)]; });
+  return nextIdx < SHR_RANK_ORDER.length ? SHR_RANK_ORDER[nextIdx] : null;
+}
+/* Readiness from the Rank Requirements Status lookup for a Scout's
+   in-progress rank: ready when every requirement is done EXCEPT a
+   Scoutmaster conference and/or board of review line, spotted by
+   matching those two phrases in TWH's own requirement text -- real
+   wording, not a hardcoded code list, so this doesn't need updating if
+   BSA revises a rank's numbered requirements. Returns null if not
+   applicable (no rank passed, fully done already, or something besides
+   just the conference/review is still missing). */
+function shrRankReadinessFromReqs(rankName, reqs){
+  if(!rankName || !reqs || !reqs.length) return null;
+  var isFinal = function(r){ return /scoutmaster conference/i.test(r.requirement) || /board of review/i.test(r.requirement); };
+  var missing = reqs.filter(function(r){ return !r.done; });
   if(!missing.length) return null; /* fully done -- would already show as earned */
-  var onlyFinalsMissing = missing.every(function(c){ return finalCodes.indexOf(c) !== -1; });
-  if(!onlyFinalsMissing) return null;
+  if(!missing.every(isFinal)) return null;
   return {
     rank: rankName,
-    needsConference: missing.indexOf(finalCodes[0]) !== -1,
-    needsBoardOfReview: finalCodes.length > 1 && missing.indexOf(finalCodes[1]) !== -1
+    needsConference: missing.some(function(r){ return /scoutmaster conference/i.test(r.requirement); }),
+    needsBoardOfReview: missing.some(function(r){ return /board of review/i.test(r.requirement); })
   };
 }
 function shrTrimTrailingBlank(row){
@@ -764,17 +843,6 @@ function shrParseSheet1(rows){
   }
   return data;
 }
-function shrParseSheet2(rows){
-  var out = [];
-  for(var i=2;i<rows.length;i++){
-    var r = rows[i] || [];
-    if(shrIsBlankRow(shrTrimTrailingBlank(r))) continue;
-    var earned = shrFmtDate(r[3]);
-    if(!earned) continue; /* uncompleted requirements have no date and no other content worth a row */
-    out.push({ rank:String(r[0]||'').trim(), code:String(r[1]||'').trim().replace(/\s+$/,''), requirement:String(r[2]||'').trim(), earned:earned });
-  }
-  return out;
-}
 function shrBadgeIsRequired(name){ return /^\s*\*/.test(String(name||'')); }
 function shrBadgeDisplayName(name){ return String(name||'').replace(/^\s*\*/, '').trim(); }
 function shrBadgeBaseName(name){
@@ -836,16 +904,30 @@ function shrRankDateLabel(ranks, rankName){
   if(!r) return '';
   return r.earned || r.awarded || '';
 }
-/* Builds the full render-ready model for one Scout from the two parsed sheets. */
-function shrBuildReportModel(sheet1, reqRows){
+/* Builds the full render-ready model for one Scout from Sheet 1 and this
+   Scout's slice of the Rank Requirements Status lookup (see
+   shrBuildRankReqLookup) -- scoutReqs is {rank -> [{code, requirement,
+   earned, done}]}, or null if that report couldn't be loaded at all. */
+function shrBuildReportModel(sheet1, scoutReqs){
   var model = { name: sheet1.name, bsaId: sheet1.bsaId, patrol: sheet1.patrol, dateJoinedUnit: sheet1.dateJoinedUnit, currentRank: sheet1.rank, ranks: [] };
   var positions = shrCurrentPositions(sheet1.positions);
   model.positionLabel = positions.map(function(p){ return p.name + (p.start ? ' '+p.start : ''); }).join('  ');
+  var inProgressRank = shrNextRankName(sheet1);
   SHR_RANK_ORDER.forEach(function(rankName){
-    var reqs = reqRows.filter(function(r){ return r.rank === rankName; });
     var hasRankEntry = sheet1.ranks.some(function(r){ return r.rank === rankName; });
+    var allReqs = (scoutReqs && scoutReqs[rankName]) || [];
+    /* Already-earned ranks only ever show what's done (matches how this
+       report always worked); every NOT-yet-earned rank -- not just the
+       very next one -- shows everything, done or not, so the whole path
+       ahead is visible in one printout. This also means Star/Life/Eagle
+       always get a block even for a Scout who's nowhere close yet, which
+       is what surfaces merit badges earned well before Star -- those had
+       nowhere to show up when only the single in-progress rank got a
+       full checklist. */
+    var reqs = hasRankEntry ? allReqs.filter(function(r){ return r.done; }) : allReqs;
+    reqs = reqs.map(function(r){ return { rank: rankName, code: r.code, requirement: r.requirement, earned: r.earned, done: r.done }; });
     if(!reqs.length && !hasRankEntry) return;
-    var rankBlock = { name: rankName, dateLabel: shrRankDateLabel(sheet1.ranks, rankName), reqs: reqs, badges: [], eagleBox: null, additional: null, inProgressNote: '' };
+    var rankBlock = { name: rankName, dateLabel: shrRankDateLabel(sheet1.ranks, rankName), reqs: reqs, badges: [], eagleBox: null, additional: null, inProgressNote: '', inProgress: (!hasRankEntry && rankName === inProgressRank) };
     if(rankName === 'Star' || rankName === 'Life'){
       rankBlock.badges = shrMeritBadgesForRank(sheet1.meritBadges, rankName);
     }
@@ -920,7 +1002,10 @@ function shrBuildConsolidatedModel(sheet1){
 
 /* ================= RENDER ================= */
 function shrRenderReqLine(r){
-  return '<div class="shr-req"><span class="shr-req-code">'+shrEsc(r.code)+'</span><span class="shr-req-label">'+shrEsc(r.requirement)+'</span><span class="shr-req-date">'+shrEsc(r.earned)+'</span></div>';
+  var pending = r.done === false;
+  var cls = 'shr-req' + (pending ? ' shr-req-pending' : '');
+  var dateText = pending ? '\u2014' : r.earned;
+  return '<div class="'+cls+'"><span class="shr-req-code">'+shrEsc(r.code)+'</span><span class="shr-req-label">'+shrEsc(r.requirement)+'</span><span class="shr-req-date">'+shrEsc(dateText)+'</span></div>';
 }
 function shrRenderBadgeLine(b){
   var label = b.display + (b.required ? ' #' : '');
@@ -931,8 +1016,10 @@ function shrRenderEagleBoxLine(b){
   return '<div class="shr-req"><span class="shr-req-label">'+shrEsc(b.display)+' #</span><span class="shr-req-date">'+shrEsc(right)+'</span></div>';
 }
 function shrRenderRank(rank){
+  var showInProgress = rank.inProgress && !rank.dateLabel;
+  var dateText = rank.dateLabel ? shrEsc(rank.dateLabel) : (showInProgress ? 'In Progress' : '');
   var html = '<div class="shr-rank">';
-  html += '<div class="shr-rank-head"><span class="shr-rank-name">'+shrEsc(rank.name)+'</span><span class="shr-rank-date">'+shrEsc(rank.dateLabel)+'</span></div>';
+  html += '<div class="shr-rank-head"><span class="shr-rank-name">'+shrEsc(rank.name)+'</span><span class="shr-rank-date'+(showInProgress?' shr-rank-date-inprogress':'')+'">'+dateText+'</span></div>';
   if(rank.reqs.length){
     html += '<div class="shr-rank-reqs">';
     rank.reqs.forEach(function(r){
@@ -981,7 +1068,7 @@ function shrRenderScoutPage(model){
 }
 
 /* ================= SCOUT PICKER ================= */
-var SHR = { scouts: [], idLookup: null, detailedModels: [], consolidatedModels: [], readiness: {} };
+var SHR = { scouts: [], idLookup: null, rankReqLookup: null, currentRankByName: {}, detailedModels: [], consolidatedModels: [], readiness: {} };
 function shrSetStatus(el, msg, cls){
   el.innerHTML = '<div class="shr-line'+(cls?(' '+cls):'')+'">'+shrEsc(msg)+'</div>';
 }
@@ -1046,7 +1133,19 @@ function shrLoadScouts(){
       }).filter(function(s){ return s.name; });
       scouts.sort(function(a,b){ return a.name.localeCompare(b.name); });
       SHR.scouts = scouts;
-      return scouts;
+      shrAppendStatus(status, 'Loading Rank Requirements Status report...');
+      return shrFetchRankReqStatus().then(function(csv){
+        var built = shrBuildRankReqLookup(csv);
+        SHR.rankReqLookup = built ? built.reqs : null;
+        SHR.currentRankByName = built ? built.currentRankByName : {};
+        if(!built){
+          shrAppendStatus(status, 'Note: the Rank Requirements Status report didn\'t have the expected columns -- showing what\'s still needed for a Scout\'s current rank will be unavailable.', 'shr-err');
+        }
+      }).catch(function(e){
+        SHR.rankReqLookup = null;
+        SHR.currentRankByName = {};
+        shrAppendStatus(status, 'Note: could not load the Rank Requirements Status report -- showing what\'s still needed for a Scout\'s current rank will be unavailable (' + e.message + ').', 'shr-err');
+      }).then(function(){ return scouts; });
     });
   }).then(function(scouts){
     scouts.sort(function(a,b){
@@ -1128,63 +1227,42 @@ function shrReadinessLabel(r){
   if(r.needsBoardOfReview) parts.push('Board of Review');
   return r.rank + ' -- needs ' + parts.join(' & ');
 }
-/* Fetches each not-yet-checked Scout's Scouting History Report (same
-   endpoint/parse as the main report) purely to compute readiness, one at
-   a time like every other fetch in this tool; results are cached in
-   SHR.readiness keyed by internal ID (a stored `null` means "checked,
-   not ready" -- distinct from the key being absent, i.e. "not checked
-   yet" -- so re-checking the box doesn't re-fetch). */
+/* Reads straight from what shrLoadScouts already fetched (Current Rank +
+   the Rank Requirements Status lookup) -- no per-Scout fetch needed at
+   all, so this just runs instantly rather than checking Scouts one at a
+   time. Unavailable (SHR.rankReqLookup is null, e.g. that report's fetch
+   failed) means nobody can be confirmed ready, same as before this
+   feature existed. */
 function shrRunReadyFilter(){
   var cb = shrById('shr-ready-filter');
   var status = shrById('shr-ready-status');
   if(!cb.checked){ shrSetStatus(status, ''); shrApplyFilter(); return; }
-  var toCheck = SHR.scouts.filter(function(s){ return s.internalId && !SHR.readiness.hasOwnProperty(s.internalId); });
-  function annotateAndFilter(){
-    Array.prototype.slice.call(document.querySelectorAll('#shr-scout-list .shr-scout-item')).forEach(function(el){
-      var idx = +el.querySelector('.shr-scout-cb').getAttribute('data-idx');
-      var s = SHR.scouts[idx];
-      var r = s.internalId ? SHR.readiness[s.internalId] : null;
-      el.setAttribute('data-ready', r ? 'yes' : 'no');
-      var oldTag = el.querySelector('.shr-ready-tag');
-      if(oldTag) oldTag.remove();
-      if(r){
-        var span = document.createElement('span');
-        span.className = 'shr-ready-tag';
-        span.textContent = shrReadinessLabel(r);
-        el.appendChild(span);
-      }
-    });
-    shrApplyFilter();
-  }
-  if(!toCheck.length){ annotateAndFilter(); return; }
-  cb.disabled = true;
-  var checked = 0;
-  shrSetStatus(status, 'Checking ' + toCheck.length + ' Scout(s) for advancement readiness... (0/' + toCheck.length + ')');
-  var chain = Promise.resolve();
-  toCheck.forEach(function(s){
-    chain = chain.then(function(){
-      return shrFetchRaw(shrHistoryUrl(s.internalId))
-        .then(function(res){ return res.arrayBuffer(); })
-        .then(function(buf){
-          var wb = XLSX.read(buf, { type:'array', cellDates:false });
-          var rows1 = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, defval:'', raw:true });
-          var rows2 = wb.SheetNames.length > 1 ? XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[1]], { header:1, defval:'', raw:true }) : [];
-          var sheet1 = shrParseSheet1(rows1);
-          var reqRows = shrParseSheet2(rows2);
-          SHR.readiness[s.internalId] = shrRankReadiness(sheet1, reqRows);
-        })
-        .catch(function(){ SHR.readiness[s.internalId] = null; })
-        .then(function(){
-          checked++;
-          shrSetStatus(status, 'Checking Scouts for advancement readiness... (' + checked + '/' + toCheck.length + ')');
-        });
-    });
+  SHR.scouts.forEach(function(s){
+    var key = shrNormName(s.name);
+    var nextRank = shrNextRankFromLabel(SHR.currentRankByName[key]);
+    var reqs = SHR.rankReqLookup && SHR.rankReqLookup[key] && SHR.rankReqLookup[key][nextRank];
+    SHR.readiness[key] = shrRankReadinessFromReqs(nextRank, reqs);
   });
-  chain.then(function(){
-    cb.disabled = false;
+  Array.prototype.slice.call(document.querySelectorAll('#shr-scout-list .shr-scout-item')).forEach(function(el){
+    var idx = +el.querySelector('.shr-scout-cb').getAttribute('data-idx');
+    var s = SHR.scouts[idx];
+    var r = SHR.readiness[shrNormName(s.name)];
+    el.setAttribute('data-ready', r ? 'yes' : 'no');
+    var oldTag = el.querySelector('.shr-ready-tag');
+    if(oldTag) oldTag.remove();
+    if(r){
+      var span = document.createElement('span');
+      span.className = 'shr-ready-tag';
+      span.textContent = shrReadinessLabel(r);
+      el.appendChild(span);
+    }
+  });
+  if(!SHR.rankReqLookup){
+    shrSetStatus(status, 'The Rank Requirements Status report isn\'t available, so readiness can\'t be checked.', 'shr-err');
+  } else {
     shrSetStatus(status, 'Readiness check complete.', 'shr-ok');
-    annotateAndFilter();
-  });
+  }
+  shrApplyFilter();
 }
 var SHR_CANCEL = { requested: false };
 function shrGenerate(){
@@ -1215,10 +1293,9 @@ function shrGenerate(){
           var wb = XLSX.read(buf, { type:'array', cellDates:false });
           if(!wb.SheetNames.length) throw new Error('empty workbook');
           var rows1 = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, defval:'', raw:true });
-          var rows2 = wb.SheetNames.length > 1 ? XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[1]], { header:1, defval:'', raw:true }) : [];
           var sheet1 = shrParseSheet1(rows1);
-          var reqRows = shrParseSheet2(rows2);
-          var model = shrBuildReportModel(sheet1, reqRows);
+          var scoutReqs = SHR.rankReqLookup ? SHR.rankReqLookup[shrNormName(s.name)] : null;
+          var model = shrBuildReportModel(sheet1, scoutReqs);
           report.insertAdjacentHTML('beforeend', shrRenderScoutPage(model));
           SHR.detailedModels.push(model);
           SHR.consolidatedModels.push(shrBuildConsolidatedModel(sheet1));
@@ -1244,6 +1321,9 @@ function shrGenerate(){
       shrById('shr-view-row').style.display = '';
       shrById('shr-view-detailed').classList.add('shr-view-active');
       shrById('shr-view-summary').classList.remove('shr-view-active');
+    }
+    if(!SHR.rankReqLookup){
+      shrAppendStatus(status, 'Note: showing what\'s still needed for each Scout\'s current rank was unavailable this run (see the load-Scouts status above) -- every rank above shows only what\'s completed. Everything else is unaffected.', 'shr-err');
     }
   });
 }
