@@ -39,7 +39,7 @@ Reports are fetched one Scout at a time (never concurrently -- TWH's session sta
 
 ### Detailed view
 
-One page per Scout. Each rank lists its completed requirements with dates in two columns. Star and Life list the merit badges applied to that rank under the "Merit Badges" line (Eagle-required badges marked `#`). Eagle adds a box of the Eagle-required badge categories -- each showing its earned date, or a percent complete if still in progress -- plus a list of other earned badges and any non-required badges still in progress.
+One page per Scout. Each rank lists its completed requirements with dates in three columns. A rank you haven't earned yet shows a percent-complete next to its name instead of a date. Star and Life list the merit badges applied to that rank under the "Merit Badges" line (Eagle-required badges marked `#`). Eagle adds a box of the Eagle-required badge categories -- each showing its earned date, or a percent complete if still in progress -- plus a list of other earned badges and any non-required badges still in progress.
 
 <p align="center">
   <img src="screenshots/04-detailed-view.png" alt="Detailed advancement record for a Life Scout with an Eagle-required merit badge box" width="50%">
@@ -47,7 +47,7 @@ One page per Scout. Each rank lists its completed requirements with dates in two
 
 ### Every rank ahead shows what's still needed, not just the next one
 
-Every rank the Scout hasn't earned yet pulls from a separate, troop-wide Rank Requirements Status report so it can show not-yet-completed requirements (dimmed, no date) right alongside the completed ones -- not just the very next rank, the whole path to Eagle. Already-earned ranks are unaffected; they only ever list what's done, same as before. This is also where a merit badge earned well before Star or Life finally has somewhere to show up: it appears in the Eagle-required box or "Additional Earned Merit Badges" list as soon as that block renders, which now happens for every Scout regardless of how far along they are.
+Every rank the Scout hasn't earned yet pulls from a separate, troop-wide Rank Requirements Status report so it can show not-yet-completed requirements (dimmed, no date) right alongside the completed ones, plus a percent-complete next to the rank's name -- not just the very next rank, the whole path to Eagle. Already-earned ranks are unaffected; they only ever list what's done, same as before. This is also where a merit badge earned well before Star or Life finally has somewhere to show up: it appears in the Eagle-required box or "Additional Earned Merit Badges" list as soon as that block renders, which now happens for every Scout regardless of how far along they are -- and that badge display never depends on the Rank Requirements Status report itself having usable data for that Scout, so a name-matching miss there (see "What it fetches" below) can only ever cost the requirement checklist, never the badges.
 
 <p align="center">
   <img src="screenshots/07-in-progress-requirements.png" alt="An Eagle rank block, not yet earned, showing some requirements completed with dates and others dimmed as not yet done" width="50%">
@@ -55,10 +55,10 @@ Every rank the Scout hasn't earned yet pulls from a separate, troop-wide Rank Re
 
 ### One-Page Summary
 
-The same Scouts, one dense page each. The page's font size steps down (10pt to a 6pt floor) based on the real rendered height until everything fits one printed Letter page.
+The same Scouts, one dense page each. Rank Advancement lists every rank, earned ones with their date and not-yet-earned ones with a percent-complete instead. The page's font size steps down (10pt to a 6pt floor) based on the real rendered height until everything fits one printed Letter page.
 
 <p align="center">
-  <img src="screenshots/05-one-page-summary.png" alt="One-page consolidated summary for an Eagle Scout" width="50%">
+  <img src="screenshots/05-one-page-summary.png" alt="One-page consolidated summary for a Life Scout, with Eagle shown as 43% complete instead of an earned date" width="50%">
 </p>
 
 ### Follows your site's theme
@@ -88,30 +88,32 @@ The page must run **on troopwebhost.org** so its requests inherit your logged-in
 
 ## What it fetches
 
-Three reports, in this order:
+Five reports, in this order:
 
 | # | Purpose | TroopWebHost endpoint |
 |---|---------|-----------------------|
 | 1 | Scout Directory (name, patrol, BSA number) -- builds the checklist | `FormReport.aspx?Menu_Item_ID=46012` |
 | 2 | Scout BSA ID admin grid -- maps each Scout to TWH's internal person ID | `FormList.aspx?Menu_Item_ID=56934&Form_ID=3547` |
 | 3 | Rank Requirements Status -- every rank requirement for every Scout, one fetch for the whole troop | `FormReport.aspx?Menu_Item_ID=55384` |
-| 4 | Scouting History Report, once per selected Scout | `FormReportMultiSection.aspx?Menu_Item_ID=56926&Form_ID=1005&FK=<id>&ID=<id>&Stack=2&ReportFormat=XLS` |
+| 4 | Merit Badge History By Scout By Badge Name -- every merit badge ever earned by every Scout, one fetch for the whole troop | `FormReport.aspx?Menu_Item_ID=52388` |
+| 5 | Scouting History Report, once per selected Scout | `FormReportMultiSection.aspx?Menu_Item_ID=56926&Form_ID=1005&FK=<id>&ID=<id>&Stack=2&ReportFormat=XLS` |
 
-Step 2 is required, not optional: report 4 is fetched by internal person ID, and this grid is the only place TWH exposes it. Scouts are matched to it by BSA number first (immune to nickname/preferred-name differences), then by name for anyone without a BSA number on file. Anyone who still can't be matched is listed with an "ID not found" note and can't be selected.
+Step 2 is required, not optional: report 5 is fetched by internal person ID, and this grid is the only place TWH exposes it. Scouts are matched to it by BSA number first (immune to nickname/preferred-name differences), then by name for anyone without a BSA number on file -- an ID match is always preferred wherever this tool can get one; name matching is only ever a fallback, and only ever for a report that gives no ID at all (3 and 4 below). Anyone who still can't be matched is listed with an "ID not found" note and can't be selected.
 
-Step 3 is the only report found so far that lists a rank's **full** checklist -- done and not done -- with TWH's own short requirement wording (e.g. "Scout Spirit", "Board of Review") and a blank Date Earned for anything not yet done. It's fetched once, up front, for the whole troop -- not per Scout -- and every Scout is matched against it by name (same matching as step 2). Being a plain report (`FormReport.aspx`, like step 1) rather than a custom admin form makes it more likely, though still not certain, to be a stable Menu_Item_ID across different troops' installs. This fetch is optional: if it fails, a status note says so and the report still builds for every Scout, just without any "still needed" lines -- every rank then shows only what's completed, same as if this feature didn't exist.
+Steps 3 and 4 are the only reports found so far that list, respectively, a rank's **full** requirement checklist (done and not done, TWH's own short wording like "Scout Spirit" or "Board of Review") and **every** merit badge a Scout has ever earned -- report 5's own per-Scout data turned out to be incomplete for merit badges specifically, which is why 4 exists and is preferred whenever it has a match. Both are fetched once, up front, for the whole troop -- not per Scout -- and both have no shared ID to join on, only a name, so each Scout is matched into each of them the same way: first the Directory's own name for that Scout, then (if that misses) report 5's own self-reported name for the same Scout, in case the two exports spell it differently (nickname vs. legal first name, etc.). Being plain reports (`FormReport.aspx`, like step 1) rather than a custom admin form makes them more likely, though still not certain, to be stable Menu_Item_IDs across different troops' installs. Either fetch, or the name match for a particular Scout, is allowed to fail without taking anything else down: a Scout report 3 has no data for shows a note that requirement detail wasn't available instead of a suspiciously-empty list; a Scout report 4 has no data for just falls back to report 5's own (possibly incomplete) badge list. These three things -- rank requirements, merit badges, and everything else -- are independent enough that any one of them coming up empty for a Scout never hides the others.
 
-Despite the `.XLS` extension, report 4 (unlike most other `ReportFormat=XLS` exports on TWH, which are plain CSV) is a genuine binary Excel workbook. It is parsed client-side with [SheetJS](https://sheetjs.com/) for member info, the rank table, merit badge tables, awards, positions, training, totals, and OA status -- rank *requirement* detail comes from report 3 instead.
+Despite the `.XLS` extension, report 5 (unlike most other `ReportFormat=XLS` exports on TWH, which are plain CSV) is a genuine binary Excel workbook. It is parsed client-side with [SheetJS](https://sheetjs.com/) for member info, the rank table, positions, awards, training, totals, and OA status -- rank *requirement* detail comes from report 3 and merit badges preferably from report 4 instead, as above.
 
 ## Required access
 
-Your TroopWebHost login must be able to open reports 1, 2, and 4 -- in practice, **Leader-level access**, including the Membership Hub's Scout BSA ID admin grid. If a fetch is redirected (TWH's way of denying access), the tool shows a **Restricted** message explaining what's missing instead of failing silently; if only the per-Scout history report (4) is denied, that Scout is reported as "access denied" in the build log and the rest continue.
+Your TroopWebHost login must be able to open reports 1, 2, and 5 -- in practice, **Leader-level access**, including the Membership Hub's Scout BSA ID admin grid. If a fetch is redirected (TWH's way of denying access), the tool shows a **Restricted** message explaining what's missing instead of failing silently; if only the per-Scout history report (5) is denied, that Scout is reported as "access denied" in the build log and the rest continue.
 
-Report 3 (Rank Requirements Status) is designed to fail soft: if your login can't reach it, or it comes back in an unexpected shape, everything else works exactly as before -- you just won't see not-yet-completed requirements for anyone's current rank, and a status note says so.
+Reports 3 and 4 (Rank Requirements Status, Merit Badge History) are designed to fail soft, independently of each other and of everything else: if your login can't reach one, or it comes back in an unexpected shape, or a particular Scout just doesn't match into it, that Scout loses only what that one report was providing -- either the not-yet-completed requirement lines, or the merit-badge detail falls back to a less complete source -- never both, and never anything else about the report.
 
 ## Good to know
 
-- **Completed vs. not-yet-completed.** Every already-earned rank only ever lists what's done. Every rank the Scout hasn't earned yet -- not just the very next one -- shows not-yet-completed items too (dimmed, no date), both sourced from the Rank Requirements Status report; if that report isn't available, every rank falls back to showing nothing rather than guessing. Only the very next rank gets the italic "In Progress" label; ranks further out just show no date.
+- **Completed vs. not-yet-completed.** Every already-earned rank only ever lists what's done, with its earned date. Every rank the Scout hasn't earned yet -- not just the very next one -- shows not-yet-completed items too (dimmed, no date) and a percent-complete next to its name in place of a date, both sourced from the Rank Requirements Status report (same math in both the Detailed view and the One-Page Summary's Rank Advancement line); if that report has no usable data for a given Scout, every one of that Scout's ranks shows a note that requirement detail wasn't available, rather than looking like they simply haven't done anything. Only the very next rank gets the italic "In Progress" label alongside its percent; ranks further out just show the bare percent.
+- **Merit badges prefer the Merit Badge History report, falling back per Scout.** A Scout matched into it gets the complete, authoritative badge list from there (merged with their own Scouting History Report only to learn which rank, if any, a badge was applied to, since the comprehensive report doesn't track that); a Scout it has no match for still shows whatever badges their own Scouting History Report has, rather than nothing. Either way, badges are shown regardless of whether the Rank Requirements Status report has anything for that Scout -- these are two completely independent sources. A Star/Life badge list that would normally sit nested under the "Merit Badges" requirement line instead gets its own small "Merit Badges Earned" heading on a Scout whose Rank Requirements Status data is missing, since there's no requirement line to nest it under.
 - **Rank date is "earned," not "awarded."** The awarded (ceremony) date isn't always recorded even once a rank is fully earned, so the earned date is used and the awarded date is only a fallback.
 - **The "Position" line** shows whichever position(s) currently have no end date on file (or a future one). If none do, it falls back to the most recently held position. The one-page summary shows full position history.
 - **Eagle-required badges come from TWH itself.** They are detected via TWH's own leading `*` on the badge name in the earned table. For badges still *in progress* (which carry no `*`), whether one counts toward Eagle is checked against a fixed list of the official Eagle-required categories built into the page.
@@ -125,7 +127,7 @@ This is an unofficial community tool. It is not affiliated with or endorsed by S
 
 ## Regenerating the screenshots
 
-`gen_screenshots.js` runs the actual shipped `scouting-history-report.html` in headless Chromium against an in-memory fake TroopWebHost: a synthetic Scout Directory (7 Scouts across two patrols at different advancement stages, including one Scout ready for a Board of Review and one ready for a Scoutmaster Conference), a fake BSA ID grid, a fake Rank Requirements Status CSV covering all 7 Scouts and every rank (built from the same per-Scout done/not-done fixtures), and genuine binary `.xls` history workbooks for the rest of each Scout's data. Nothing touches a real TWH site.
+`gen_screenshots.js` runs the actual shipped `scouting-history-report.html` in headless Chromium against an in-memory fake TroopWebHost: a synthetic Scout Directory (7 Scouts across two patrols at different advancement stages, including one Scout ready for a Board of Review and one ready for a Scoutmaster Conference), a fake BSA ID grid, a fake Rank Requirements Status CSV and a fake Merit Badge History CSV both covering all 7 Scouts (built from the same per-Scout fixtures, deliberately spelling one Scout's name differently in both fake reports than everywhere else, to prove that Scout's requirement checklist and earned merit badges still show up even when the name match fails entirely; one Scout also has a merit badge known only to the fake Merit Badge History CSV and missing from their own history workbook, to prove that report's badges are still picked up), and genuine binary `.xls` history workbooks for the rest of each Scout's data. Nothing touches a real TWH site.
 
 ```bash
 npm init -y

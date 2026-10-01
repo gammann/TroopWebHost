@@ -17,9 +17,9 @@ per-Scout "Advancement Record" for each -- current rank, BSA ID, unit
 position, and every rank's numbered requirements with the date each was
 completed, laid out in three columns per rank. Every rank the Scout
 hasn't earned yet (not just the very next one) also lists requirements
-NOT yet completed (dimmed, no date) alongside the completed ones -- see
-item 2(c) below -- so the whole path ahead is visible in one printout,
-not just the next step. For Star, Life, and Eagle, the merit badges
+NOT yet completed (dimmed, no date) alongside the completed ones, and a
+percent-complete next to its name -- see item 2(c) below -- so the whole
+path ahead is visible in one printout, not just the next step. For Star, Life, and Eagle, the merit badges
 applied toward that rank are listed under the "Merit Badges" requirement
 line, and Eagle additionally gets its own box of the required merit
 badge categories (marked #, with either the earned date or a
@@ -35,18 +35,21 @@ READ BEFORE USING
 ------------------
 1. Read-only against TroopWebHost. Nothing is saved anywhere -- every
    fetch below is a plain GET.
-2. THREE reports are fetched, in this order:
+2. FOUR reports are fetched, in this order:
      a) Scout Directory (Menu_Item_ID=46012) -- Name/Patrol/BSA Number,
         to build the checklist of Scouts to choose from.
      b) Scout BSA ID admin grid (Menu_Item_ID=56934, Form_ID=3547) --
         Name/BSA ID/TroopWebHost's own internal person ID for every
         Scout. This is REQUIRED, not optional: the per-Scout report in
-        2(d) is fetched by internal person ID, and this grid is the only
+        2(e) is fetched by internal person ID, and this grid is the only
         place that ID is exposed. If your login can't reach Membership
         Hub -> Scout BSA ID, this tool cannot run. Scouts are matched to
         this grid first by BSA Number (immune to Preferred Name /
         nickname differences) and, for anyone with no BSA Number on
-        file, by name as a fallback.
+        file, by name as a fallback -- ID is always preferred here and
+        everywhere else this tool can get one; name matching is only
+        ever a fallback for a report that gives no ID at all (2(c), 2(d)
+        below).
      c) "Rank Requirements Status" (Menu_Item_ID=55384) -- ONE fetch,
         not per-Scout, covering the WHOLE troop: every rank requirement
         for every Scout, with TWH's own short requirement names (e.g.
@@ -54,17 +57,37 @@ READ BEFORE USING
         blank for anything not yet done. This is the only report found
         so far that lists a rank's FULL checklist -- done and not done
         -- which is what makes item 3's "still to do" lines and the
-        readiness filter (Step 1) possible at all, and it's what every
-        Scout is matched against by name (same matching as 2(b)).
+        readiness filter (Step 1) possible at all. Unlike 2(a)/2(b),
+        this report has no shared ID column to join on, only a name --
+        so each Scout is matched against it by name (same normalizing as
+        2(b)'s fallback), tried first against the Directory's own name
+        for that Scout and, if that comes up empty, against 2(e)'s own
+        self-reported name for the same Scout, in case the two exports
+        format it differently (nickname vs. legal first name, etc.).
         Confirmed via HAR capture; being a plain report (like 2(a), not
         an admin data-entry form) makes it more likely, though still not
         certain, to be a portable Menu_Item_ID across different troops'
-        TroopWebHost installs. This fetch is optional: if it fails, a
-        status note says so and the report still builds for every
-        Scout, just without the "still needed" lines -- every rank then
-        shows only what's completed, same as if this feature didn't
-        exist.
-     d) For each checked Scout (one fetch at a time, never concurrently
+        TroopWebHost installs. This fetch is optional and, per Scout,
+        can also simply fail to match: either way, the report still
+        builds for that Scout, just without the "still needed" lines --
+        every rank then shows only what's completed (or, for a Scout
+        this report has no data for at all, a note saying so instead of
+        an empty-looking rank). Merit badges never depend on this fetch
+        succeeding -- see item 3.
+     d) "Merit Badge History By Scout By Badge Name" (Menu_Item_ID=52388)
+        -- another single, troop-wide fetch: every merit badge ever
+        earned by every Scout (name, Eagle-required "*" marker, earned/
+        awarded dates), name-matched the same two-attempt way as 2(c)
+        above (it has no ID column either). This exists because 2(e)'s
+        own per-Scout merit badge table turned out to be incomplete for
+        some Scouts; this report is the authoritative badge list
+        whenever a Scout can be matched into it, merged with 2(e)'s own
+        list only to inherit which rank (Star/Life) a badge was applied
+        to, since this report doesn't carry that column. Also optional
+        and also can simply fail to match a given Scout -- either way,
+        that Scout's badges just fall back to 2(e)'s own (possibly
+        incomplete) list rather than showing nothing.
+     e) For each checked Scout (one fetch at a time, never concurrently
         -- TroopWebHost's session state races under concurrent fetches),
         the Eagle Advancement Hub's own "Scouting History Report"
         (Menu_Item_ID=56926, Form_ID=1005, opened via
@@ -73,22 +96,41 @@ READ BEFORE USING
         and this XLS link side by side). Despite the .XLS extension this
         one really is a binary Excel file (unlike most other
         ReportFormat=XLS exports on this platform, which are plain
-        CSV) -- it's parsed here with SheetJS. Only its member-info/rank/
-        merit-badge/position/etc. sheet is used now; rank REQUIREMENT
-        detail comes from 2(c) instead (see item 3).
+        CSV) -- it's parsed here with SheetJS. Its member-info/rank/
+        position/etc. sheet is still the source for everything except
+        rank requirement detail (2(c)) and, preferably, merit badges
+        (2(d)).
 3. WHAT'S SHOWN, AND WHAT ISN'T:
      - Every rank the Scout hasn't earned yet -- not just the very next
        one -- shows its FULL requirement checklist from 2(c) above: every
        numbered requirement, done or not, in TWH's own short wording,
        with a real date for whatever's done and nothing (dimmed) for
-       whatever isn't. Only the very next rank gets the italic "In
-       Progress" label where its date would go; ranks further out just
-       show no date, same as "not started" always looked. An
+       whatever isn't. Every such rank also shows a percent-complete next
+       to its name in place of a date, computed from that same checklist
+       (omitted, not shown as 0%, when 2(c) has no data to compute it
+       from). Only the very next rank gets the italic "In Progress"
+       label alongside its percent; ranks further out just show the bare
+       percent, same as "not started" always looked otherwise. An
        ALREADY-earned rank also comes from 2(c), filtered to what's done
        -- so its requirement list is naturally complete (everything in
-       it WAS done) with no dimmed lines. If 2(c)'s fetch failed
-       entirely, every rank falls back to showing nothing (no
-       requirement lines at all) rather than guessing.
+       it WAS done) with no dimmed lines, and it shows its earned date
+       rather than a percent. If 2(c) has no data for a
+       given Scout (its fetch failed entirely, or that Scout's name
+       didn't match it -- see 2(c) above), every one of that Scout's
+       ranks shows a note saying detail wasn't available instead of a
+       requirement list, rather than looking suspiciously empty.
+     - Merit badges (the Star/Life "Merit Badges" line, the Eagle-
+       required box, "Additional Earned Merit Badges") come from 2(d)
+       when that Scout can be matched into it, falling back to 2(e)'s
+       own (possibly incomplete) badge list otherwise -- either way,
+       shown regardless of whether 2(c) has anything for that Scout,
+       since rank-requirement detail and merit-badge detail are three
+       entirely independent data sources here, and none of them hides
+       the others when it comes up empty for a particular Scout. A
+       Star/Life badge list that would normally sit nested under the
+       "Merit Badges" requirement line instead gets its own small
+       "Merit Badges Earned" heading on a Scout whose 2(c) data is
+       missing, since there's no requirement line to nest it under.
      - The "Position" line in the header shows whichever position(s)
        currently have no end date on file (or, if none do, the most
        recently held one) -- not the full position history, which is
@@ -278,7 +320,6 @@ READ BEFORE USING
 <section class="shr-card" id="shr-step1">
   <h2>Step 1 -- Select Scouts</h2>
   <div class="shr-row">
-    <button class="shr-btn" type="button" id="shr-load-scouts">Load Scout List</button>
     <input type="text" id="shr-filter" placeholder="Filter by name or patrol" style="display:none;">
     <label style="display:none;" id="shr-select-all-wrap"><input type="checkbox" id="shr-select-all"> Select all shown</label>
     <span class="shr-count" id="shr-count"></span>
@@ -614,6 +655,76 @@ function shrBuildRankReqLookup(csv){
   });
   return { reqs: reqs, currentRankByName: currentRankByName };
 }
+/* "Merit Badge History By Scout By Badge Name" -- another standard TWH
+   report, same FormReport.aspx + plain-CSV pattern, listing EVERY merit
+   badge EVER earned by EVERY Scout in one shot: Scout, Merit Badge (with
+   TWH's own leading "*" for Eagle-required, same convention as the
+   per-Scout history export), Earned, Awarded. Confirmed via HAR capture.
+   This exists because the per-Scout Scouting History Report's own merit
+   badge table (Sheet 1) turned out to be incomplete for some Scouts --
+   this comprehensive report is the fix, used as the authoritative badge
+   list whenever this Scout can be matched into it. Like Rank
+   Requirements Status, it carries no BSA Number or internal ID column to
+   join on -- name is genuinely the only option TWH gives here, so this
+   uses the same two-attempt name match as the per-Scout fetch (Directory
+   name, then that Scout's own self-reported name) rather than a single
+   fragile lookup. It has no "Applied To Rank" column, so shrMergeBadges
+   below still leans on Sheet 1 for that one detail where Sheet 1 has it. */
+var SHR_MERITBADGE_MENU_ITEM_ID = '52388';
+function shrMeritBadgeHistoryUrl(){
+  return 'FormReport.aspx?Menu_Item_ID='+SHR_MERITBADGE_MENU_ITEM_ID+'&Stack=1&ReportFormat=XLS';
+}
+function shrFetchMeritBadgeHistory(){
+  return shrFetchRaw(shrMeritBadgeHistoryUrl())
+    .then(function(res){ return res.arrayBuffer(); })
+    .then(function(buf){
+      var text = shrDecode(buf);
+      if(/^\s*</.test(text)) throw new Error('Merit Badge History came back as a web page, not a report.');
+      return shrCsvObjects(text);
+    });
+}
+/* {normalized Scout name -> [{name, earned, awarded}]}. `name` keeps
+   TWH's own leading "*" so shrBadgeIsRequired/shrBadgeDisplayName work
+   on it unchanged. */
+function shrBuildMeritBadgeLookup(csv){
+  var nameH = shrFindHeader(csv.headers, ['Scout']);
+  var badgeH = shrFindHeader(csv.headers, ['Merit Badge']);
+  var earnedH = shrFindHeader(csv.headers, ['Earned']);
+  var awardedH = shrFindHeader(csv.headers, ['Awarded']);
+  if(!nameH || !badgeH) return null;
+  var byName = {};
+  csv.objects.forEach(function(o){
+    var key = shrNormName(o[nameH]);
+    if(!byName[key]) byName[key] = [];
+    byName[key].push({
+      name: (o[badgeH]||'').trim(),
+      earned: earnedH ? (o[earnedH]||'').trim() : '',
+      awarded: awardedH ? (o[awardedH]||'').trim() : ''
+    });
+  });
+  return byName;
+}
+/* Merges the comprehensive, authoritative badge list above with Sheet 1's
+   own (possibly incomplete) one -- comprehensiveBadges wins on WHICH
+   badges exist and their earned date, but a badge Sheet 1 also has (by
+   base name -- shrBadgeBaseName already strips a trailing "(2015
+   rqmts)"-style version tag) inherits Sheet 1's "Applied To Rank" for
+   the Star/Life-specific grouping, since the comprehensive report
+   doesn't carry that column at all. A badge with no Sheet-1 match simply
+   isn't applied to a specific rank as far as this report can tell, and
+   falls into the Eagle-required box or "Additional Earned" bucket like
+   any other unapplied badge -- never dropped. Falls back to Sheet 1's
+   own list untouched when comprehensiveBadges is null (fetch failed, or
+   this Scout couldn't be matched into it either way). */
+function shrMergeMeritBadges(comprehensiveBadges, sheet1Badges){
+  if(!comprehensiveBadges) return sheet1Badges;
+  var byBase = {};
+  sheet1Badges.forEach(function(b){ byBase[shrBadgeBaseName(b.name)] = b; });
+  return comprehensiveBadges.map(function(b){
+    var match = byBase[shrBadgeBaseName(b.name)];
+    return { name: b.name, earned: b.earned, appliedToRank: match ? match.appliedToRank : '' };
+  });
+}
 function shrUnitLabel(){
   var m = (document.title || '').match(/\b((?:Troop|Pack|Crew|Ship|Post)\s*#?\s*\d+[A-Za-z]?)\b/i);
   return m ? m[1].replace(/\s+/g,' ') : '';
@@ -913,6 +1024,7 @@ function shrBuildReportModel(sheet1, scoutReqs){
   var positions = shrCurrentPositions(sheet1.positions);
   model.positionLabel = positions.map(function(p){ return p.name + (p.start ? ' '+p.start : ''); }).join('  ');
   var inProgressRank = shrNextRankName(sheet1);
+  var reqsUnavailable = !scoutReqs; /* whole lookup missing, or this Scout's name didn't match it */
   SHR_RANK_ORDER.forEach(function(rankName){
     var hasRankEntry = sheet1.ranks.some(function(r){ return r.rank === rankName; });
     var allReqs = (scoutReqs && scoutReqs[rankName]) || [];
@@ -926,8 +1038,24 @@ function shrBuildReportModel(sheet1, scoutReqs){
        full checklist. */
     var reqs = hasRankEntry ? allReqs.filter(function(r){ return r.done; }) : allReqs;
     reqs = reqs.map(function(r){ return { rank: rankName, code: r.code, requirement: r.requirement, earned: r.earned, done: r.done }; });
-    if(!reqs.length && !hasRankEntry) return;
-    var rankBlock = { name: rankName, dateLabel: shrRankDateLabel(sheet1.ranks, rankName), reqs: reqs, badges: [], eagleBox: null, additional: null, inProgressNote: '', inProgress: (!hasRankEntry && rankName === inProgressRank) };
+    /* Star/Life/Eagle carry merit-badge info (shrMeritBadgesForRank /
+       shrEagleRequiredBox / shrAdditionalEarnedBadges below) that comes
+       from Sheet 1, entirely independent of the Rank Requirements Status
+       lookup -- so these three always get a block even with zero
+       requirement rows (lookup unavailable, or this Scout's name didn't
+       match it), rather than badges silently disappearing along with the
+       "still needed" checklist whenever that lookup comes up empty for
+       a particular Scout. */
+    var isBadgeRank = (rankName === 'Star' || rankName === 'Life' || rankName === 'Eagle');
+    if(!reqs.length && !hasRankEntry && !isBadgeRank) return;
+    /* Percent complete is only shown for a not-yet-earned rank -- an
+       earned one already shows its date, and a rank that's 100% done
+       would just be redundant clutter next to that date on every single
+       earned rank for every Scout. null means "no data to compute it
+       from" (lookup unavailable) rather than 0%, which would otherwise
+       misleadingly claim nothing has been done. */
+    var percent = (!hasRankEntry && allReqs.length) ? Math.round((allReqs.filter(function(r){ return r.done; }).length / allReqs.length) * 100) : null;
+    var rankBlock = { name: rankName, dateLabel: shrRankDateLabel(sheet1.ranks, rankName), reqs: reqs, badges: [], eagleBox: null, additional: null, inProgressNote: '', inProgress: (!hasRankEntry && rankName === inProgressRank), reqsUnavailable: reqsUnavailable, percent: percent };
     if(rankName === 'Star' || rankName === 'Life'){
       rankBlock.badges = shrMeritBadgesForRank(sheet1.meritBadges, rankName);
     }
@@ -955,9 +1083,13 @@ function shrBuildReportModel(sheet1, scoutReqs){
    merit badge list instead of grouped-by-rank, and the sections that
    model intentionally left out (positions with end dates, awards,
    training, camping/service totals, OA) restored, since there's room
-   for them at this level of detail. Does not need Sheet 2 (the
-   requirement-completion-dates sheet) at all -- every field here comes
-   from Sheet 1's own rank/badge/position/award/training/totals rows. */
+   for them at this level of detail. Every field here comes from Sheet
+   1's own rank/badge/position/award/training/totals rows, EXCEPT the
+   Rank Advancement line for a not-yet-earned rank, which shows a
+   percent-complete instead of a date, computed from the same
+   Rank Requirements Status lookup (scoutReqs) the detailed view uses --
+   omitted entirely, not shown as 0%, for a rank that lookup has no data
+   for at all. */
 function shrFormatTotalsLine(totals){
   var map = [['Camping Nights','camping nights'],['Total Service Hours','service hrs'],['Total Conservation Hours','conservation hrs'],
     ['Total Hiking Miles','hiking mi'],['Total Backpacking Miles','backpacking mi'],['Total Cycling Miles','cycling mi'],
@@ -970,19 +1102,25 @@ function shrFormatTotalsLine(totals){
   });
   return parts.join('   /   ');
 }
-function shrBuildConsolidatedModel(sheet1){
+function shrBuildConsolidatedModel(sheet1, scoutReqs){
   var model = {
     name: sheet1.name, bsaId: sheet1.bsaId, patrol: sheet1.patrol, dateJoinedUnit: sheet1.dateJoinedUnit,
     currentRank: sheet1.rank, unit: shrUnitLabel()
   };
   var currentPositions = shrCurrentPositions(sheet1.positions);
   model.positionLabel = currentPositions.map(function(p){ return p.name + (p.start ? ' ' + p.start : ''); }).join('  ');
-  model.ranks = SHR_RANK_ORDER.filter(function(rn){
-    return sheet1.ranks.some(function(r){ return r.rank === rn; });
-  }).map(function(rn){
+  model.ranks = SHR_RANK_ORDER.map(function(rn){
     var r = sheet1.ranks.filter(function(x){ return x.rank === rn; })[0];
-    return { name: rn, earned: r.earned, awarded: r.awarded };
-  });
+    if(r) return { name: rn, earned: r.earned, awarded: r.awarded, percent: null };
+    /* Not yet earned: show percent complete instead of a date, same
+       source as the detailed view's own per-rank percent. Omitted
+       entirely (not a misleading 0%) when there's no data to compute it
+       from at all. */
+    var allReqs = (scoutReqs && scoutReqs[rn]) || [];
+    if(!allReqs.length) return null;
+    var percent = Math.round((allReqs.filter(function(x){ return x.done; }).length / allReqs.length) * 100);
+    return { name: rn, earned: null, awarded: null, percent: percent };
+  }).filter(function(r){ return r; });
   model.positions = sheet1.positions.slice();
   model.badges = sheet1.meritBadges.map(function(mb){
     return { display: shrBadgeDisplayName(mb.name), required: shrBadgeIsRequired(mb.name), earned: mb.earned };
@@ -1017,20 +1155,45 @@ function shrRenderEagleBoxLine(b){
 }
 function shrRenderRank(rank){
   var showInProgress = rank.inProgress && !rank.dateLabel;
-  var dateText = rank.dateLabel ? shrEsc(rank.dateLabel) : (showInProgress ? 'In Progress' : '');
+  var dateText, dateCls = '';
+  if(rank.dateLabel){
+    dateText = shrEsc(rank.dateLabel);
+  } else if(showInProgress){
+    dateText = 'In Progress' + (rank.percent != null ? ' \u2014 ' + rank.percent + '%' : '');
+    dateCls = ' shr-rank-date-inprogress';
+  } else if(rank.percent != null){
+    dateText = rank.percent + '%';
+  } else {
+    dateText = '';
+  }
   var html = '<div class="shr-rank">';
-  html += '<div class="shr-rank-head"><span class="shr-rank-name">'+shrEsc(rank.name)+'</span><span class="shr-rank-date'+(showInProgress?' shr-rank-date-inprogress':'')+'">'+dateText+'</span></div>';
+  html += '<div class="shr-rank-head"><span class="shr-rank-name">'+shrEsc(rank.name)+'</span><span class="shr-rank-date'+dateCls+'">'+dateText+'</span></div>';
+  var badgesInjected = false;
   if(rank.reqs.length){
     html += '<div class="shr-rank-reqs">';
     rank.reqs.forEach(function(r){
       html += shrRenderReqLine(r);
       if((rank.name === 'Star' || rank.name === 'Life') && /merit badges/i.test(r.requirement)){
         rank.badges.forEach(function(b){ html += shrRenderBadgeLine(b); });
+        badgesInjected = true;
       }
     });
     html += '</div>';
   } else {
-    html += '<p class="shr-empty-note">No completed requirements on file yet for this rank.</p>';
+    html += '<p class="shr-empty-note">'+(rank.reqsUnavailable ? 'Rank requirement detail wasn\'t available for this Scout.' : 'No completed requirements on file yet for this rank.')+'</p>';
+  }
+  /* Star/Life's earned-badge list is meant to sit nested under their
+     "Merit Badges" requirement line above -- but that line only exists
+     when reqs came back for this rank, which isn't guaranteed (see
+     shrBuildReportModel). If it didn't render there, show the same
+     badges here instead so they're never simply missing. */
+  if((rank.name === 'Star' || rank.name === 'Life') && !badgesInjected && rank.badges.length){
+    html += '<div class="shr-additional"><p class="shr-additional-title">Merit Badges Earned</p><div class="shr-additional-list">';
+    rank.badges.forEach(function(b){
+      var label = b.display + (b.required ? ' #' : '');
+      html += '<div class="shr-req"><span class="shr-req-label">'+shrEsc(label)+'</span><span class="shr-req-date">'+shrEsc(b.earned)+'</span></div>';
+    });
+    html += '</div></div>';
   }
   if(rank.name === 'Eagle'){
     if(rank.eagleBox && rank.eagleBox.length){
@@ -1068,7 +1231,7 @@ function shrRenderScoutPage(model){
 }
 
 /* ================= SCOUT PICKER ================= */
-var SHR = { scouts: [], idLookup: null, rankReqLookup: null, currentRankByName: {}, detailedModels: [], consolidatedModels: [], readiness: {} };
+var SHR = { scouts: [], idLookup: null, rankReqLookup: null, currentRankByName: {}, meritBadgeLookup: null, detailedModels: [], consolidatedModels: [], readiness: {} };
 function shrSetStatus(el, msg, cls){
   el.innerHTML = '<div class="shr-line'+(cls?(' '+cls):'')+'">'+shrEsc(msg)+'</div>';
 }
@@ -1113,8 +1276,6 @@ function shrFetchBsaIdLookup(){
 function shrLoadScouts(){
   var listWrap = shrById('shr-scout-list-wrap');
   var status = shrById('shr-load-status');
-  var btn = shrById('shr-load-scouts');
-  btn.disabled = true;
   shrSetStatus(status, 'Loading Scout Directory...');
   shrFetchDirectory().then(function(dir){
     var headers = dir.headers;
@@ -1145,6 +1306,17 @@ function shrLoadScouts(){
         SHR.rankReqLookup = null;
         SHR.currentRankByName = {};
         shrAppendStatus(status, 'Note: could not load the Rank Requirements Status report -- showing what\'s still needed for a Scout\'s current rank will be unavailable (' + e.message + ').', 'shr-err');
+      }).then(function(){
+        shrAppendStatus(status, 'Loading Merit Badge History report...');
+        return shrFetchMeritBadgeHistory().then(function(csv){
+          SHR.meritBadgeLookup = shrBuildMeritBadgeLookup(csv);
+          if(!SHR.meritBadgeLookup){
+            shrAppendStatus(status, 'Note: the Merit Badge History report didn\'t have the expected columns -- merit badges will come from each Scout\'s own history export only.', 'shr-err');
+          }
+        }).catch(function(e){
+          SHR.meritBadgeLookup = null;
+          shrAppendStatus(status, 'Note: could not load the Merit Badge History report -- merit badges will come from each Scout\'s own history export only (' + e.message + ').', 'shr-err');
+        });
       }).then(function(){ return scouts; });
     });
   }).then(function(scouts){
@@ -1192,9 +1364,7 @@ function shrLoadScouts(){
     shrById('shr-count').textContent = scouts.length + ' Scouts loaded' + (noId ? ' (' + noId + ' without a resolvable ID)' : '');
     shrSetStatus(status, 'Loaded ' + scouts.length + ' Scouts.', 'shr-ok');
     shrById('shr-step2').style.display = '';
-    btn.disabled = false;
   }).catch(function(err){
-    btn.disabled = false;
     if(String(err.message||'').indexOf('REDIRECTED') === 0){
       listWrap.innerHTML = '';
       status.innerHTML = '<div class="shr-restricted"><strong>Restricted.</strong> Your TroopWebHost login does not have access to the Scout Directory or the Membership Hub Scout BSA ID admin grid, both of which this tool needs. Ask your Troop\'s TroopWebHost administrator for Leader-level access.</div>';
@@ -1294,11 +1464,26 @@ function shrGenerate(){
           if(!wb.SheetNames.length) throw new Error('empty workbook');
           var rows1 = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]], { header:1, defval:'', raw:true });
           var sheet1 = shrParseSheet1(rows1);
-          var scoutReqs = SHR.rankReqLookup ? SHR.rankReqLookup[shrNormName(s.name)] : null;
+          /* Matched by Directory name first; a Scout's name isn't always
+             formatted identically across every TWH export (nickname vs.
+             legal first name, etc.), so if that key comes up empty, also
+             try the History Report's own self-reported name for this
+             same Scout before giving up -- missing this lookup used to
+             mean losing Star/Life/Eagle's merit-badge display entirely
+             for that Scout, not just the "still needed" checklist (see
+             shrBuildReportModel), so it's worth two tries. */
+          var scoutReqs = null;
+          if(SHR.rankReqLookup){
+            scoutReqs = SHR.rankReqLookup[shrNormName(s.name)] || SHR.rankReqLookup[shrNormName(sheet1.name)] || null;
+          }
+          if(SHR.meritBadgeLookup){
+            var comprehensiveBadges = SHR.meritBadgeLookup[shrNormName(s.name)] || SHR.meritBadgeLookup[shrNormName(sheet1.name)] || null;
+            sheet1.meritBadges = shrMergeMeritBadges(comprehensiveBadges, sheet1.meritBadges);
+          }
           var model = shrBuildReportModel(sheet1, scoutReqs);
           report.insertAdjacentHTML('beforeend', shrRenderScoutPage(model));
           SHR.detailedModels.push(model);
-          SHR.consolidatedModels.push(shrBuildConsolidatedModel(sheet1));
+          SHR.consolidatedModels.push(shrBuildConsolidatedModel(sheet1, scoutReqs));
           okCount++;
           shrAppendStatus(status, s.name + ': done.', 'shr-ok');
         })
@@ -1345,7 +1530,7 @@ function shrBuildConsolidatedSections(model){
   var sections = [];
   if(model.ranks.length){
     sections.push({ title:'Rank Advancement', columns:1, rows: model.ranks.map(function(r){
-      var right = r.earned ? ('Earned ' + r.earned) : (r.awarded ? ('Awarded ' + r.awarded) : '');
+      var right = r.earned ? ('Earned ' + r.earned) : (r.awarded ? ('Awarded ' + r.awarded) : (r.percent != null ? (r.percent + '% complete') : ''));
       return [r.name, right];
     })});
   }
@@ -1460,7 +1645,6 @@ function shrShowDetailedView(){
   shrById('shr-view-detailed').classList.add('shr-view-active');
 }
 
-shrById('shr-load-scouts').addEventListener('click', shrLoadScouts);
 shrById('shr-filter').addEventListener('input', shrApplyFilter);
 shrById('shr-scout-list-wrap').addEventListener('change', function(e){
   if(!e.target.classList || !e.target.classList.contains('shr-patrol-cb')) return;
@@ -1490,5 +1674,5 @@ shrById('shr-stop-generate').addEventListener('click', function(){
 shrById('shr-view-detailed').addEventListener('click', shrShowDetailedView);
 shrById('shr-view-summary').addEventListener('click', shrShowConsolidatedView);
 shrById('shr-print').addEventListener('click', function(){ window.print(); });
-shrLoadScouts(); /* auto-load on page load; the button stays for a manual retry/refresh */
+shrLoadScouts(); /* loads automatically on page load; reload the page to retry */
 </script>

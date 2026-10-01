@@ -72,6 +72,11 @@ const SCOUTS = [
             ['*Personal Fitness','2023-05-16','Life'],['*Citizenship in the Community','2023-08-08','Life'],['*Emergency Preparedness','2023-09-19','Life'],['Fishing','2023-07-11','Life'],['Woodwork','2023-10-03','Life'],
             ['*Citizenship in the Nation','2024-01-16','Eagle'],['*Citizenship in Society','2024-03-19','Eagle'],['*Communication','2024-05-14','Eagle'],['*Environmental Science','2024-06-18','Eagle'],['*Personal Management','2024-09-24','Eagle'],['*Family Life','2024-11-12','Eagle'],
             ['Pioneering','2024-02-13',''],['Rifle Shooting','2024-07-09',''],['Search and Rescue','2024-08-13',''],['Wilderness Survival','2024-10-08',''],['Photography','2025-01-21','']],
+    /* Known only to the comprehensive Merit Badge History report, not to
+       this Scout's own per-Scout history export's badge table -- this is
+       the real bug being tested: Sheet 1's own list is sometimes
+       incomplete, and this Scout's report must still show this badge. */
+    extraBadges:[['Backpacking','2025-03-02','']],
     inProgress:[['Programming',3,4],['Astronomy',1,5]],
     positions:[['Troop Guide','2022-09-01','2023-02-28'],['Patrol Leader','2023-03-01','2023-08-31'],['Assistant Senior Patrol Leader','2023-09-01','2024-02-29'],['Senior Patrol Leader','2024-03-01','2024-08-31'],['Junior Assistant Scoutmaster','2024-09-01','']],
     awards:[["Totin' Chip",'2021-10-12','2021-10-12'],["Firem'n Chit",'2021-10-12','2021-10-12'],['Mile Swim','2022-07-19','2022-08-09'],['50-Miler Award','2024-07-20','2024-09-10'],['Service Award (Silver)','2025-08-05','2025-09-09']],
@@ -174,9 +179,19 @@ function earnedDateFor(s, rankName){
   const r = s.ranks.find(x => x[0] === rankName);
   return r ? r[1] : null;
 }
+/* Garrity's name is deliberately spelled differently here than in the
+   Directory/History-XLS fixtures ("Sam" vs "Samuel") to simulate a real-
+   world case this tool has to tolerate: the same Scout's name isn't
+   always formatted identically across different TWH exports, so this
+   report's lookup can fail to match a Scout even though everything else
+   about them loaded fine. Garrity already has real Star-applied and
+   Eagle-required earned badges in her fixture data, so this exercises
+   the "merit badges must never depend on this lookup succeeding" fix. */
+const CSV_NAME_OVERRIDE = { 'Garrity, Sam': 'Garrity, Samuel' };
 function buildRankReqStatusCsv(){
   const lines = ['Scout,Age,Patrol,Current Rank,Rank,Code,Requirement,Date Earned'];
   SCOUTS.forEach(s => {
+    const csvName = CSV_NAME_OVERRIDE[s.name] || s.name;
     const curIdx = s.rank ? RANK_ORDER.indexOf(s.rank) : -1;
     RANK_ORDER.forEach((rank, idx) => {
       const doneCodes = idx <= curIdx ? CODES[rank] : (idx === curIdx + 1 ? doneSetFor(s, rank) : []);
@@ -188,8 +203,25 @@ function buildRankReqStatusCsv(){
         const done = doneCodes.indexOf(code) !== -1;
         const req = LONG_REQ_OVERRIDE[rank + ':' + code] || LABELS[rank][i];
         const date = done ? spreadDate(startIso, endIso, di++, doneCodes.length) : '';
-        lines.push([s.name, 14, s.patrol, s.rank || '', rank, code, req, date].map(csvField).join(','));
+        lines.push([csvName, 14, s.patrol, s.rank || '', rank, code, req, date].map(csvField).join(','));
       });
+    });
+  });
+  return lines.join('\r\n') + '\r\n';
+}
+/* Fakes "Merit Badge History By Scout By Badge Name": every badge ever
+   earned by every Scout, name-only (no ID column, matching the real
+   report), including each fixture Scout's extraBadges -- ones known
+   only to this comprehensive report, not to that Scout's own per-Scout
+   history export, to prove the merge picks them up regardless. Uses the
+   same CSV_NAME_OVERRIDE as the Rank Requirements Status fake, so
+   Garrity's name-mismatch test case exercises this report too. */
+function buildMeritBadgeHistoryCsv(){
+  const lines = ['Scout,Merit Badge,Earned,Awarded'];
+  SCOUTS.forEach(s => {
+    const csvName = CSV_NAME_OVERRIDE[s.name] || s.name;
+    (s.badges || []).concat(s.extraBadges || []).forEach(b => {
+      lines.push([csvName, b[0], usDate(b[1]), usDate(addDays(b[1], 21))].map(csvField).join(','));
     });
   });
   return lines.join('\r\n') + '\r\n';
@@ -272,6 +304,7 @@ async function newFakePage(browser, dark){
     if(url.indexOf('FormReport.aspx?Menu_Item_ID=46012') !== -1) return respond(200, 'text/csv', DIRECTORY_CSV, 150);
     if(url.indexOf('FormList.aspx?Menu_Item_ID=56934') !== -1) return respond(200, 'text/html', BSA_GRID_HTML, 150);
     if(url.indexOf('FormReport.aspx?Menu_Item_ID=55384') !== -1) return respond(200, 'text/plain', buildRankReqStatusCsv(), 150);
+    if(url.indexOf('FormReport.aspx?Menu_Item_ID=52388') !== -1) return respond(200, 'text/plain', buildMeritBadgeHistoryCsv(), 150);
     if(url.indexOf('FormReportMultiSection.aspx') !== -1){
       const m = url.match(/[?&]FK=([^&]+)/);
       const s = SCOUTS.find(x => x.id === (m && decodeURIComponent(m[1])));
@@ -348,7 +381,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
     await page.click('#shr-view-summary');
     await sleep(500);
-    const aIdx = await page.evaluate(() => Array.prototype.findIndex.call(document.querySelectorAll('.shr-consolidated-page .shr-name'), e => e.textContent.indexOf('Ashworth') === 0));
+    const aIdx = await page.evaluate(() => Array.prototype.findIndex.call(document.querySelectorAll('.shr-consolidated-page .shr-name'), e => e.textContent.indexOf('Bellweather') === 0));
     await page.evaluate(i => document.querySelectorAll('.shr-consolidated-page')[i].id = 'shot-target2', aIdx);
     await shotRegion(page, '05-one-page-summary.png', '#shot-target2', '#shot-target2', 8);
     await page.close();
